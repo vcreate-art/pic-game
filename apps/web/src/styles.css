@@ -185,7 +185,7 @@ button, input { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- word mask */
 
-.wordmask { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.wordmask { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .wordmask__label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); white-space: nowrap; }
 .wordmask__word { font-family: var(--display); font-size: 26px; font-weight: 800; letter-spacing: .02em; }
 .wordmask__slots { display: flex; gap: 5px; flex-wrap: wrap; align-items: flex-end; }
@@ -196,9 +196,12 @@ button, input { font: inherit; color: inherit; }
 }
 .wordmask__slot.is-revealed { color: var(--accent); border-color: var(--accent); }
 .wordmask__gap { width: 14px; }
+/* Sits directly beside the slots it counts. It previously used margin-left:auto,
+   which pushed it to the far end of the header, next to the timer. */
 .wordmask__count {
-  margin-left: auto; font-size: 12px; font-weight: 700; color: var(--ink-soft);
+  font-size: 12px; font-weight: 700; color: var(--ink-soft);
   background: var(--paper); border-radius: 999px; padding: 3px 10px;
+  white-space: nowrap; flex: none;
 }
 
 /* ---------------------------------------------------------------- timer */

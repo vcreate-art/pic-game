@@ -40,7 +40,9 @@ export function WordMask() {
           );
         })}
       </span>
-      <span className="wordmask__count">{chars.filter((c) => c !== ' ').length}</span>
+      <span className="wordmask__count" title="Letters in the word">
+        {chars.filter((c) => c !== ' ').length}
+      </span>
     </div>
   );
 }
