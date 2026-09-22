@@ -122,8 +122,8 @@ export type GameKind = 'skribbl' | 'kungfu';
 export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu'];
 
 export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
-  skribbl: { name: 'Draw & Guess', blurb: 'One player draws a secret word, everyone races to guess it.' },
-  kungfu: { name: 'Kung Fu Chess', blurb: 'Chess with no turns. Move whenever you like — each piece needs to catch its breath.' },
+  skribbl: { name: 'Draw & Guess', blurb: 'One draws a secret word, everyone else races to guess.' },
+  kungfu: { name: 'Kung Fu Chess', blurb: 'Chess with no turns. Every piece has a cooldown.' },
 };
 
 /** What every room reports, whichever game it is running. */
