@@ -87,6 +87,19 @@ blurt the answer — the incentives police the leak, so no chat restriction is n
 The mode wants 4+ players: with three, there is a single eligible guesser and the curve
 collapses to all-or-nothing.
 
+## Removing players
+
+The host can remove anyone from the lobby tiles or the in-game scoreboard. It takes two
+clicks, since it is irreversible from the other person's side. Removal runs through the
+same path as a disconnect, so a removed drawer ends the turn and a removed host hands
+over.
+
+Be clear about what a kick is here: with no accounts, it is a **soft block**. It stops
+the client reconnecting and stops them returning through the invite link on the same
+seat, which covers ordinary nuisance. Someone determined can clear their session and
+come back as a new player. Keying the block on IP would be stronger but would eject
+everyone behind the same router — which is exactly how people play this over home Wi-Fi.
+
 ## How the secret stays secret
 
 The whole game hinges on hiding the word from the people trying to guess it, which

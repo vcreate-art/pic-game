@@ -68,6 +68,18 @@ export class Room {
 
   private phaseTimer: ReturnType<typeof setTimeout> | null = null;
   private hintTimer: ReturnType<typeof setInterval> | null = null;
+  /**
+   * Seat tokens the host has removed.
+   *
+   * Worth being clear about what this is: with no accounts, a kick is a soft
+   * block. It stops the client auto-reconnecting and stops them walking back in
+   * through the invite link with the same seat, which covers ordinary nuisance.
+   * Someone determined can clear their session and return as a new player.
+   * Keying on IP instead would be stronger but would also eject everyone behind
+   * the same router — which is exactly how people play this over a home Wi-Fi.
+   */
+  private readonly banned = new Set<string>();
+
   /** Set when the room empties; cancelled the moment someone joins. */
   emptyTimer: ReturnType<typeof setTimeout> | null = null;
   destroyed = false;
@@ -163,6 +175,29 @@ export class Room {
     }
     if (this.players.size < 2 && this.phase !== 'lobby') this.abortToLobby();
     if (this.activeCount() === 0) this.scheduleEmptyCollection();
+  }
+
+  /**
+   * Removes a player at the host's request. Everything after the ban is the
+   * ordinary leave path, so a kicked drawer ends the turn and a kicked host
+   * would hand over — the same handling a disconnect already gets.
+   */
+  kick(byPlayerId: string, targetId: string): void {
+    if (byPlayerId !== this.hostId) return;
+    if (byPlayerId === targetId) return; // the host cannot kick themselves
+    const target = this.players.get(targetId);
+    if (!target) return;
+
+    const host = this.players.get(byPlayerId);
+    this.banned.add(target.token);
+    // Told before removal, while the socket is still in the room.
+    this.emitTo(targetId, 'kicked', { by: host?.name ?? 'the host' });
+    this.systemMessage(`${target.name} was removed by ${host?.name ?? 'the host'}.`);
+    this.removePlayer(targetId);
+  }
+
+  isBanned(token: string | undefined): boolean {
+    return !!token && this.banned.has(token);
   }
 
   activeCount(): number {

@@ -487,3 +487,29 @@ button, input { font: inherit; color: inherit; }
   margin-left: 4px; font-size: 12px; font-weight: 700; color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------------------------------------------------------------- kick */
+
+.kick {
+  display: grid; place-items: center; flex: none;
+  min-width: 22px; height: 22px; padding: 0 6px;
+  border: 1px solid var(--line); background: var(--card);
+  border-radius: 7px; color: var(--ink-soft);
+  font-size: 13px; font-weight: 700; line-height: 1; cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.kick:hover { border-color: var(--warn); color: var(--warn); background: #fef2f2; }
+.kick.is-armed {
+  background: var(--warn); border-color: var(--warn); color: #fff;
+  font-size: 11px; letter-spacing: .02em;
+}
+.kick-slot { width: 22px; height: 22px; }
+
+/* The tile's kick sits in its corner rather than in the flow, so adding it does
+   not shuffle the avatar and name. */
+.lobby__player { position: relative; }
+.lobby__player .kick { position: absolute; top: 6px; right: 6px; }
+
+.scores__list.is-host .scores__row {
+  grid-template-columns: 16px auto minmax(0, 1fr) auto auto;
+}

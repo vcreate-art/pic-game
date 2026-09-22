@@ -116,6 +116,10 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
         }
       }
 
+      if (room.isBanned(p.token)) {
+        return cb({ ok: false, code: 'KICKED', message: 'You were removed from this room.' });
+      }
+
       // A returning player reclaims their seat and score before any capacity check,
       // so a full room can never lock out someone who is already in it.
       if (p.token) {
@@ -217,6 +221,12 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       }
       if (typeof p?.text !== 'string') return;
       s.room.handleChat(s.playerId, p.text);
+    });
+
+    socket.on('player:kick', (p) => {
+      if (!s.room || !s.playerId) return;
+      if (typeof p?.playerId !== 'string') return;
+      s.room.kick(s.playerId, p.playerId);
     });
 
     socket.on('room:leave', () => {

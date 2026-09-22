@@ -3,6 +3,7 @@ import { copyText } from '../lib/clipboard.js';
 import { getSocket } from '../net/socket.js';
 import { selectIsHost, useGame } from '../store/game.js';
 import { Avatar } from './Avatar.js';
+import { KickButton } from './KickButton.js';
 import { Settings } from './Settings.js';
 
 export function Lobby() {
@@ -41,6 +42,7 @@ export function Lobby() {
             <li key={p.id} className="lobby__player">
               <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
               <span>{p.name}</span>
+              {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
             </li>
           ))}
         </ul>

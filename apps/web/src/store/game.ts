@@ -40,6 +40,8 @@ interface GameStore {
   turnResult: TurnResult | null;
   final: Player[] | null;
   notice: string | null;
+  /** Name of whoever removed us, set only when it happens. */
+  kickedBy: string | null;
 
   setConnected: (c: boolean) => void;
   setMe: (id: string) => void;
@@ -60,6 +62,7 @@ interface GameStore {
   endGame: (players: Player[]) => void;
   pushMessage: (m: ChatMessage) => void;
   setNotice: (n: string | null) => void;
+  setKickedBy: (name: string) => void;
   reset: () => void;
 }
 
@@ -77,6 +80,7 @@ export const useGame = create<GameStore>((set) => ({
   turnResult: null,
   final: null,
   notice: null,
+  kickedBy: null,
 
   setConnected: (connected) => set({ connected }),
   setMe: (me) => set({ me }),
@@ -191,12 +195,13 @@ export const useGame = create<GameStore>((set) => ({
     set((s) => ({ messages: [...s.messages, m].slice(-MAX_MESSAGES) })),
 
   setNotice: (notice) => set({ notice }),
+  setKickedBy: (kickedBy) => set({ kickedBy }),
 
   reset: () =>
     set({
       me: null, room: null, secret: null, choices: null, chooseEndsAt: null,
       suggest: null, mySuggestion: null, suggestError: null,
-      messages: [], turnResult: null, final: null, notice: null,
+      messages: [], turnResult: null, final: null, notice: null, kickedBy: null,
     }),
 }));
 

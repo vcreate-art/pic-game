@@ -12,7 +12,7 @@ export interface JoinOk {
 }
 export interface JoinErr {
   ok: false;
-  code: 'NOT_FOUND' | 'FULL' | 'BAD_NAME' | 'IN_PROGRESS' | 'RATE_LIMITED';
+  code: 'NOT_FOUND' | 'FULL' | 'BAD_NAME' | 'IN_PROGRESS' | 'RATE_LIMITED' | 'KICKED';
   message: string;
 }
 export type JoinAck = JoinOk | JoinErr;
@@ -36,6 +36,8 @@ export interface ClientToServerEvents {
     cb: (r: JoinAck) => void,
   ) => void;
   'room:leave': () => void;
+  /** Host only. Removes a player and blocks that seat from coming back. */
+  'player:kick': (p: { playerId: string }) => void;
   'room:settings': (p: Partial<RoomSettings>) => void;
   'game:start': () => void;
 
@@ -66,6 +68,8 @@ export interface ServerToClientEvents {
   'player:updated': (p: Player) => void;
   'room:settings': (s: RoomSettings) => void;
   'host:changed': (p: { hostId: string }) => void;
+  /** Sent to the removed player's socket alone, just before they are dropped. */
+  'kicked': (p: { by: string }) => void;
 
   'turn:choosing': (p: {
     drawerId: string;

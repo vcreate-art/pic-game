@@ -180,6 +180,85 @@ const nf = await emitAck(mk('D'), 'room:join', { code: 'ZZZZZZ', name: 'Dan', av
 if (!nf.ok && nf.code === 'NOT_FOUND') ok('unknown room code rejected cleanly');
 else bad('unknown code not rejected');
 
+console.log('\n\x1b[1m13. Kicking\x1b[0m');
+{
+  const [H, K, M] = [mk('H'), mk('K'), mk('M')];
+  await Promise.all([ready(H), ready(K), ready(M)]);
+  const ch = await emitAck(H, 'room:create', { name: 'Host', avatar: {} });
+  const rc = ch.state.code;
+  const ck = await emitAck(K, 'room:join', { code: rc, name: 'Kicky', avatar: {} });
+  const cm = await emitAck(M, 'room:join', { code: rc, name: 'Mo', avatar: {} });
+  await sleep(200);
+
+  // Only the host may remove anyone.
+  M.emit('player:kick', { playerId: ck.playerId });
+  await sleep(300);
+  if (K.saw('kicked').length === 0) ok('a non-host cannot kick');
+  else bad('a non-host removed a player');
+
+  // And not themselves, which would leave the room without a host.
+  H.emit('player:kick', { playerId: ch.playerId });
+  await sleep(300);
+  if (H.saw('kicked').length === 0) ok('the host cannot kick themselves');
+  else bad('the host kicked themselves');
+
+  H.emit('player:kick', { playerId: ck.playerId });
+  const note = await waitFor(K, 'kicked', 5000);
+  if (note.by === 'Host') ok(`kicked player told who did it ("${note.by}")`);
+  else bad('kick notice missing the name', JSON.stringify(note));
+
+  await sleep(300);
+  if (M.saw('player:left').some(e => e.args[0].id === ck.playerId)) ok('other players saw them leave');
+  else bad('player:left not broadcast');
+  if (M.saw('chat:message').some(e => /removed by Host/.test(e.args[0].text ?? ''))) ok('a system message explains the removal');
+  else bad('no system message for the removal');
+
+  // The seat is what gets blocked, so presenting the same token is refused.
+  const back = await emitAck(K, 'room:join', { code: rc, name: 'Kicky', avatar: {}, token: ck.token });
+  if (!back.ok && back.code === 'KICKED') ok('the kicked seat cannot rejoin');
+  else bad('a kicked player walked back in', JSON.stringify(back));
+
+  // Being honest about the limit: a fresh session is a different seat.
+  const fresh = await emitAck(K, 'room:join', { code: rc, name: 'Kicky', avatar: {} });
+  if (fresh.ok) ok('a fresh session is a new seat — kick is a soft block, as documented');
+  else bad('unexpected: a brand new seat was refused', JSON.stringify(fresh));
+  H.disconnect(); K.disconnect(); M.disconnect();
+}
+
+console.log('\n\x1b[1m14. Kicking mid-turn\x1b[0m');
+{
+  const [H, K, M] = [mk('H2'), mk('K2'), mk('M2')];
+  await Promise.all([ready(H), ready(K), ready(M)]);
+  const ch = await emitAck(H, 'room:create', { name: 'Boss', avatar: {} });
+  const rc = ch.state.code;
+  await emitAck(K, 'room:join', { code: rc, name: 'Drawer', avatar: {} });
+  const cm = await emitAck(M, 'room:join', { code: rc, name: 'Watcher', avatar: {} });
+  H.emit('room:settings', { rounds: 1, drawTime: 60 });
+  await sleep(200);
+  H.emit('game:start');
+  const ch2 = await waitFor(H, 'turn:choosing');
+  const drawerId = ch2.drawerId;
+  if (drawerId === ch.playerId) {
+    // The room creator is the host AND the first drawer, and cannot kick
+    // themselves, so turn 1 can only exercise the guesser path. The
+    // drawer-left path is reached through the same removePlayer() call and is
+    // covered by the disconnect test above.
+    H.emit('player:kick', { playerId: cm.playerId });
+    await sleep(400);
+    if (M.saw('kicked').length === 1) ok('a guesser can be removed mid-turn');
+    else bad('mid-turn kick failed');
+    const stillGoing = H.saw('turn:end').length === 0;
+    if (stillGoing) ok('the turn carries on after a guesser is removed');
+    else bad('removing a guesser ended the turn');
+  } else {
+    H.emit('player:kick', { playerId: drawerId });
+    const end = await waitFor(M, 'turn:end', 6000);
+    if (end.reason === 'drawer-left') ok('kicking the drawer ended the turn cleanly');
+    else bad('wrong end reason after kicking the drawer', end.reason);
+  }
+  H.disconnect(); K.disconnect(); M.disconnect();
+}
+
 console.log(`\n\x1b[1mRESULT: ${pass.length} passed, ${fail.length} failed\x1b[0m`);
 if (fail.length) { console.log('\nFailures:'); fail.forEach(f => console.log(`  - ${f}`)); }
 process.exit(fail.length ? 1 : 0);

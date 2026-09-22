@@ -97,6 +97,16 @@ function RoomPage() {
   };
 
 
+  /** Being removed ends the session here. The seat token is deliberately kept:
+   *  it is what the server matches to stop us walking straight back in. */
+  const kickedBy = useGame((s) => s.kickedBy);
+  useEffect(() => {
+    if (!kickedBy) return;
+    useGame.getState().reset();
+    useGame.getState().setNotice(`${kickedBy} removed you from the room.`);
+    void navigate({ to: '/' });
+  }, [kickedBy, navigate]);
+
   // Arrived via an invite link with no seat yet — collect a name first.
   if (!me || !room) {
     return (
