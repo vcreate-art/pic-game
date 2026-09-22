@@ -13,7 +13,7 @@ import { TurnResult } from '../components/TurnResult.js';
 import { WordChoice } from '../components/WordChoice.js';
 import { WordMask } from '../components/WordMask.js';
 import { bindSocket } from '../net/bindings.js';
-import { clearSeat, getSocket, loadSeat, saveSeat } from '../net/socket.js';
+import { clearSeat, getSocket, loadProfile, loadSeat, saveSeat } from '../net/socket.js';
 import { selectIsDrawer, useGame } from '../store/game.js';
 import { Route as rootRoute } from './__root.js';
 
@@ -26,7 +26,7 @@ function RoomPage() {
   const isDrawer = useGame(selectIsDrawer);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const identity = useRef<Identity | null>(null);
+  const identity = useRef<Identity | null>(loadProfile());
 
   // Bind socket events for as long as this page is mounted.
   useEffect(() => bindSocket(getEngine()), []);
@@ -56,36 +56,46 @@ function RoomPage() {
     };
   }, [code]);
 
-  // Leaving the page should free the seat rather than leave a ghost player behind.
+  /** Joins on mount from the saved seat, which makes this route self-sufficient:
+   *  it works the same whether you arrived from the landing page, refreshed, or
+   *  opened an invite link cold. Nothing is carried over in memory from elsewhere.
+   *
+   *  Note there is deliberately no leave-on-unmount here. A cleanup that tears down
+   *  shared state is unsafe under React's mount/unmount/remount cycle — it wiped the
+   *  seat the landing page had just created. Leaving is now an explicit action, and
+   *  a closed tab is handled by the socket disconnecting. */
   useEffect(() => {
-    return () => {
-      getSocket().emit('room:leave');
-      clearSeat();
-      useGame.getState().reset();
-    };
-  }, []);
+    if (useGame.getState().me) return;
+    const profile = loadProfile();
+    if (!profile) return; // no nickname yet — the panel below collects one
+    identity.current = profile;
+    joinRoom(profile, loadSeat(code)?.token);
+  }, [code]);
 
-  const join = (id: Identity) => {
+  function joinRoom(id: Identity, token?: string) {
     setBusy(true);
     setError(null);
     identity.current = id;
-    const seat = loadSeat(code);
-    getSocket().emit(
-      'room:join',
-      { code, name: id.name, avatar: id.avatar, token: seat?.token },
-      (res) => {
-        setBusy(false);
-        if (!res.ok) {
-          setError(res.message);
-          if (res.code === 'NOT_FOUND') clearSeat();
-          return;
-        }
-        useGame.getState().setMe(res.playerId);
-        useGame.getState().sync(res.state);
-        saveSeat({ code, playerId: res.playerId, token: res.token });
-      },
-    );
+    getSocket().emit('room:join', { code, name: id.name, avatar: id.avatar, token }, (res) => {
+      setBusy(false);
+      if (!res.ok) {
+        setError(res.message);
+        if (res.code === 'NOT_FOUND') clearSeat();
+        return;
+      }
+      useGame.getState().setMe(res.playerId);
+      useGame.getState().sync(res.state);
+      saveSeat({ code, playerId: res.playerId, token: res.token });
+    });
+  }
+
+  const leave = () => {
+    getSocket().emit('room:leave');
+    clearSeat();
+    useGame.getState().reset();
+    void navigate({ to: '/' });
   };
+
 
   // Arrived via an invite link with no seat yet — collect a name first.
   if (!me || !room) {
@@ -96,7 +106,12 @@ function RoomPage() {
           <p className="landing__sub">Pick a nickname to jump in.</p>
         </div>
         <div className="card landing__card">
-          <JoinPanel submitLabel="Join room" busy={busy} error={error} onSubmit={join} />
+          <JoinPanel
+            submitLabel="Join room"
+            busy={busy}
+            error={error}
+            onSubmit={(id) => joinRoom(id, loadSeat(code)?.token)}
+          />
           <button className="btn btn--ghost" type="button" onClick={() => void navigate({ to: '/' })}>
             Back to home
           </button>
@@ -105,7 +120,18 @@ function RoomPage() {
     );
   }
 
-  if (phase === 'lobby') return <Lobby />;
+  if (phase === 'lobby') {
+    return (
+      <>
+        <Lobby />
+        <div className="leavebar">
+          <button className="btn btn--ghost" type="button" onClick={leave}>
+            Leave room
+          </button>
+        </div>
+      </>
+    );
+  }
 
   return (
     <div className="game">
@@ -117,6 +143,9 @@ function RoomPage() {
         {phase === 'drawing' && room.turn && (
           <Timer endsAt={room.turn.endsAt} total={room.settings.drawTime} />
         )}
+        <button className="tool" type="button" onClick={leave}>
+          Leave
+        </button>
       </div>
 
       <div className="game__body">
