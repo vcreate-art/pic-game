@@ -1,41 +1,32 @@
 import { randomUUID } from 'node:crypto';
-import type { Server } from 'socket.io';
 import {
   DEFAULT_SETTINGS, SETTINGS_BOUNDS, WORD_MODES,
   authorPoints, drawerPoints, guessPoints, judge, maskOf, pickHintPositions,
   suggestionKey, validateSuggestion,
-  type Avatar, type CanvasOp, type ChatMessage, type ClientToServerEvents,
-  type Phase, type Player, type RoomSettings, type RoomState,
-  type ServerToClientEvents, type SuggestAck, type TurnPublic, type WordOption,
+  type CanvasOp, type ChatMessage, type Phase, type Player,
+  type RoomSettings, type RoomState, type SuggestAck, type TurnPublic,
+  type WordOption,
 } from '@pic-game/shared';
 import {
   CHOOSE_SECONDS, GAME_END_SECONDS, MAX_CHAT_LEN, MAX_OPS_PER_TURN,
   RECONNECT_GRACE_MS, SUGGEST_SECONDS, TURN_END_SECONDS, EMPTY_ROOM_TTL_MS,
-} from '../config.js';
+} from '../../config.js';
+import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
 import { pickWords } from './words.js';
 
-type IO = Server<ClientToServerEvents, ServerToClientEvents>;
-
-export interface ServerPlayer extends Player {
-  /** Secret bearer token; proves seat ownership across reconnects. */
-  token: string;
-  socketId: string | null;
-  disconnectedAt: number | null;
+export interface ServerPlayer extends CorePlayer {
+  /** When they solved this turn's word, and in what position. */
   guessedAt: number | null;
   placement: number | null;
 }
 
-export class Room {
-  readonly code: string;
+/** Draw-and-guess. Seats, host, presence and chat come from BaseRoom; this
+ *  class is the game itself — turns, words, scoring and the canvas. */
+export class SkribblRoom extends BaseRoom<ServerPlayer> {
   settings: RoomSettings = { ...DEFAULT_SETTINGS };
   phase: Phase = 'lobby';
-  hostId = '';
   round = 0;
   turnIndex = 0;
-
-  readonly players = new Map<string, ServerPlayer>();
-  /** Join order, which is also turn order. */
-  order: string[] = [];
   ops: CanvasOp[] = [];
 
   // ---- current turn (word is private to this object and the drawer's socket) ----
@@ -68,104 +59,45 @@ export class Room {
 
   private phaseTimer: ReturnType<typeof setTimeout> | null = null;
   private hintTimer: ReturnType<typeof setInterval> | null = null;
-  /**
-   * Seat tokens the host has removed.
-   *
-   * Worth being clear about what this is: with no accounts, a kick is a soft
-   * block. It stops the client auto-reconnecting and stops them walking back in
-   * through the invite link with the same seat, which covers ordinary nuisance.
-   * Someone determined can clear their session and return as a new player.
-   * Keying on IP instead would be stronger but would also eject everyone behind
-   * the same router — which is exactly how people play this over a home Wi-Fi.
-   */
-  private readonly banned = new Set<string>();
 
-  /** Set when the room empties; cancelled the moment someone joins. */
-  emptyTimer: ReturnType<typeof setTimeout> | null = null;
-  destroyed = false;
-
-  constructor(code: string, private readonly io: IO) {
-    this.code = code;
+  constructor(code: string, io: IO) {
+    super(code, io);
   }
 
-  // ------------------------------------------------------------------ players
+  // ------------------------------------------------------- BaseRoom contract
 
-  addPlayer(name: string, avatar: Avatar, socketId: string): ServerPlayer {
-    const p: ServerPlayer = {
-      id: randomUUID(),
-      token: randomUUID(),
-      name,
-      avatar,
-      score: 0,
-      connected: true,
-      socketId,
-      disconnectedAt: null,
-      guessedAt: null,
-      placement: null,
-    };
-    this.players.set(p.id, p);
-    this.order.push(p.id);
-    if (!this.hostId) this.hostId = p.id;
-    if (this.emptyTimer) {
-      clearTimeout(this.emptyTimer);
-      this.emptyTimer = null;
+  isLobby(): boolean {
+    return this.phase === 'lobby';
+  }
+
+  protected get minPlayers(): number {
+    return 2;
+  }
+
+  protected createPlayer(base: CorePlayer): ServerPlayer {
+    return { ...base, guessedAt: null, placement: null };
+  }
+
+  /** A player back mid-window counts again, so the tally has to say so. */
+  protected override onPlayerReconnected(_p: ServerPlayer): void {
+    if (this.phase === 'choosing' && this.playerWords) {
+      queueMicrotask(() => this.broadcastSuggestState());
     }
-    return p;
   }
 
-  /** Rebinds an existing seat to a new socket. Socket.IO issues a fresh socket.id on
-   *  every reconnect, so without this a refresh would clone the player and zero their score. */
-  reclaim(token: string, socketId: string): ServerPlayer | null {
-    for (const p of this.players.values()) {
-      if (p.token !== token) continue;
-      if (p.connected) return null; // token in use by a live socket
-      if (p.disconnectedAt && Date.now() - p.disconnectedAt > RECONNECT_GRACE_MS) return null;
-      p.socketId = socketId;
-      p.connected = true;
-      p.disconnectedAt = null;
-      if (this.phase === 'choosing' && this.playerWords) {
-        // They count again — reflected in `expected` on the next broadcast.
-        queueMicrotask(() => this.broadcastSuggestState());
-      }
-      if (this.emptyTimer) {
-        clearTimeout(this.emptyTimer);
-        this.emptyTimer = null;
-      }
-      return p;
-    }
-    return null;
-  }
-
-  markDisconnected(playerId: string): void {
-    const p = this.players.get(playerId);
-    if (!p) return;
-    p.connected = false;
-    p.socketId = null;
-    p.disconnectedAt = Date.now();
-    this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
-
-    if (this.drawerId === playerId && (this.phase === 'drawing' || this.phase === 'choosing')) {
+  protected override onPlayerDisconnected(p: ServerPlayer): boolean {
+    if (this.drawerId === p.id && (this.phase === 'drawing' || this.phase === 'choosing')) {
       this.endTurn('drawer-left');
-    } else {
-      this.checkTurnComplete();
-      // Nobody waits on a player who dropped out mid-window.
-      this.broadcastSuggestState();
-      this.maybeOpenPicking();
+      return true;
     }
-    if (this.activeCount() === 0) this.scheduleEmptyCollection();
+    this.checkTurnComplete();
+    // Nobody waits on a player who dropped out mid-window.
+    this.broadcastSuggestState();
+    this.maybeOpenPicking();
+    return true;
   }
 
-  removePlayer(playerId: string): void {
-    const p = this.players.get(playerId);
-    if (!p) return;
-    this.players.delete(playerId);
-    this.order = this.order.filter((id) => id !== playerId);
-    this.io.to(this.code).emit('player:left', { id: playerId });
-
-    if (this.hostId === playerId) {
-      this.hostId = this.order[0] ?? '';
-      if (this.hostId) this.io.to(this.code).emit('host:changed', { hostId: this.hostId });
-    }
+  protected override onPlayerRemoved(playerId: string): boolean {
     if (this.drawerId === playerId && (this.phase === 'drawing' || this.phase === 'choosing')) {
       this.endTurn('drawer-left');
     } else if (this.phase === 'choosing') {
@@ -173,46 +105,16 @@ export class Room {
       this.broadcastSuggestState();
       this.maybeOpenPicking();
     }
-    if (this.players.size < 2 && this.phase !== 'lobby') this.abortToLobby();
-    if (this.activeCount() === 0) this.scheduleEmptyCollection();
+    return true;
   }
 
-  /**
-   * Removes a player at the host's request. Everything after the ban is the
-   * ordinary leave path, so a kicked drawer ends the turn and a kicked host
-   * would hand over — the same handling a disconnect already gets.
-   */
-  kick(byPlayerId: string, targetId: string): void {
-    if (byPlayerId !== this.hostId) return;
-    if (byPlayerId === targetId) return; // the host cannot kick themselves
-    const target = this.players.get(targetId);
-    if (!target) return;
-
-    const host = this.players.get(byPlayerId);
-    this.banned.add(target.token);
-    // Told before removal, while the socket is still in the room.
-    this.emitTo(targetId, 'kicked', { by: host?.name ?? 'the host' });
-    this.systemMessage(`${target.name} was removed by ${host?.name ?? 'the host'}.`);
-    this.removePlayer(targetId);
+  protected override onTooFewPlayers(): void {
+    this.abortToLobby();
   }
 
-  isBanned(token: string | undefined): boolean {
-    return !!token && this.banned.has(token);
+  protected override onDestroy(): void {
+    this.clearTimers();
   }
-
-  activeCount(): number {
-    let n = 0;
-    for (const p of this.players.values()) if (p.connected) n++;
-    return n;
-  }
-
-  private scheduleEmptyCollection(): void {
-    if (this.emptyTimer) clearTimeout(this.emptyTimer);
-    this.emptyTimer = setTimeout(() => this.onEmpty?.(this), EMPTY_ROOM_TTL_MS);
-  }
-
-  /** Set by RoomManager so the room can ask to be collected. */
-  onEmpty?: (room: Room) => void;
 
   // ------------------------------------------------------------------ settings
 
@@ -585,13 +487,6 @@ export class Room {
     this.hintTimer = null;
   }
 
-  destroy(): void {
-    this.clearTimers();
-    if (this.emptyTimer) clearTimeout(this.emptyTimer);
-    this.emptyTimer = null;
-    this.destroyed = true;
-  }
-
   // ------------------------------------------------------------------ drawing
 
   /** Authorization is re-checked on every drawing event rather than once at
@@ -748,10 +643,6 @@ export class Room {
     }
   }
 
-  private broadcastChat(m: Omit<ChatMessage, 'id' | 'at'>): void {
-    this.io.to(this.code).emit('chat:message', { ...m, id: randomUUID(), at: Date.now() });
-  }
-
   private sendToSolvers(m: Omit<ChatMessage, 'id' | 'at'>): void {
     const msg: ChatMessage = { ...m, id: randomUUID(), at: Date.now() };
     for (const p of this.players.values()) {
@@ -759,39 +650,7 @@ export class Room {
     }
   }
 
-  systemMessage(text: string): void {
-    this.broadcastChat({ kind: 'system', text });
-  }
-
-  // ------------------------------------------------------------------ serialization
-
-  private socketOf(playerId: string): string | null {
-    return this.players.get(playerId)?.socketId ?? null;
-  }
-
-  private emitTo<E extends keyof ServerToClientEvents>(
-    playerId: string,
-    event: E,
-    ...args: Parameters<ServerToClientEvents[E]>
-  ): void {
-    const sid = this.socketOf(playerId);
-    if (sid) this.io.to(sid).emit(event, ...args);
-  }
-
-  emitError(playerId: string, code: string, message: string): void {
-    this.emitTo(playerId, 'error', { code, message });
-  }
-
-  private publicPlayer(p: ServerPlayer): Player {
-    return { id: p.id, name: p.name, avatar: p.avatar, score: p.score, connected: p.connected };
-  }
-
-  publicPlayers(): Player[] {
-    return this.order
-      .map((id) => this.players.get(id))
-      .filter((p): p is ServerPlayer => !!p)
-      .map((p) => this.publicPlayer(p));
-  }
+  // ------------------------------------------------------------ serialization
 
   private turnPublic(): TurnPublic | null {
     if (!this.drawerId || this.phase === 'lobby') return null;

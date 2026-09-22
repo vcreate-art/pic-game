@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { WORDS_EN } from '@pic-game/shared';
-import type { RoomManager } from '../game/RoomManager.js';
+import type { RoomManager } from '../core/RoomManager.js';
 
 export function makeRoutes(rooms: RoomManager): Router {
   const r = Router();

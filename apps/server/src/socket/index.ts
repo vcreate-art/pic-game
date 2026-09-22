@@ -4,8 +4,8 @@ import {
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
 import { CHAT_BUCKET, DRAW_BUCKET, MAX_NAME_LEN, SUGGEST_BUCKET } from '../config.js';
-import type { RoomManager } from '../game/RoomManager.js';
-import type { Room } from '../game/Room.js';
+import type { RoomManager } from '../core/RoomManager.js';
+import type { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
 import { TokenBucket } from '../rateLimit.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -14,7 +14,7 @@ type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
 /** Per-connection session. The room/player binding lives here rather than on the
  *  socket id, which is not stable across reconnects. */
 interface Session {
-  room: Room | null;
+  room: SkribblRoom | null;
   playerId: string | null;
   chat: TokenBucket;
   draw: TokenBucket;
@@ -57,7 +57,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       suggest: new TokenBucket(SUGGEST_BUCKET.capacity, SUGGEST_BUCKET.refillPerSec),
     };
 
-    const bind = (room: Room, playerId: string) => {
+    const bind = (room: SkribblRoom, playerId: string) => {
       s.room = room;
       s.playerId = playerId;
       socket.join(room.code);

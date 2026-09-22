@@ -36,6 +36,23 @@ const waitFor = (s, ev, ms = 9000) => new Promise((res, rej) => {
   s.once(ev, (a) => { clearTimeout(t); res(a); });
 });
 
+/** The dev server restarts on file changes, and a suite launched into that
+ *  window dies on a dropped first connection. Wait for a settled server. */
+async function waitForServer(ms = 30000) {
+  const until = Date.now() + ms;
+  let streak = 0;
+  while (Date.now() < until) {
+    try {
+      const r = await fetch(URL.replace(/\/$/, '') + '/health');
+      if (r.ok) { if (++streak >= 2) return; } else streak = 0;
+    } catch { streak = 0; }
+    await sleep(400);
+  }
+  console.log('\x1b[31mServer never became ready at ' + URL + '\x1b[0m');
+  process.exit(1);
+}
+await waitForServer();
+
 const A = mk('A'), B = mk('B'), C = mk('C'), D = mk('D');
 await Promise.all([ready(A), ready(B), ready(C), ready(D)]);
 

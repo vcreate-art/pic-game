@@ -4,7 +4,7 @@ import cors from 'cors';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@pic-game/shared';
 import { IS_PROD, PORT, isAllowedOrigin } from './config.js';
-import { RoomManager } from './game/RoomManager.js';
+import { RoomManager } from './core/RoomManager.js';
 import { makeRoutes } from './http/routes.js';
 import { attachSocket } from './socket/index.js';
 
