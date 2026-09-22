@@ -1,4 +1,4 @@
-import { GAME_LABELS, type Side } from '@pic-game/shared';
+import { CLASSIC, sideLabel, type Side } from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectIsHost, selectKungFu, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
@@ -6,7 +6,7 @@ import { Chat } from '../Chat.js';
 import { ChessBoard } from './ChessBoard.js';
 import { KungFuLobby } from './KungFuLobby.js';
 
-const SIDE_NAME: Record<Side, string> = { w: 'White', b: 'Black' };
+
 
 export function KungFuGame({ onLeave }: { onLeave: () => void }) {
   const room = useGame(selectKungFu);
@@ -31,7 +31,7 @@ export function KungFuGame({ onLeave }: { onLeave: () => void }) {
         <div className="chess__side">
         <section className="scores card">
           <h2 className="card__title">
-            {playing ? (mySide ? `You are ${SIDE_NAME[mySide]}` : 'Spectating') : 'Sides'}
+            {playing ? (mySide ? `You are ${sideLabel(CLASSIC, mySide)}` : 'Spectating') : 'Sides'}
           </h2>
           <div className="seats">
             {(['w', 'b'] as Side[]).map((side) => {
@@ -39,7 +39,7 @@ export function KungFuGame({ onLeave }: { onLeave: () => void }) {
               const mine = holder === me;
               return (
                 <div key={side} className={`seat ${mine ? 'is-mine' : ''}`}>
-                  <span className={`seat__chip seat__chip--${side}`}>{SIDE_NAME[side]}</span>
+                  <span className={`seat__chip seat__chip--${side}`}>{sideLabel(CLASSIC, side)}</span>
                   {holder ? (
                     <span className="seat__who">
                       <Avatar
@@ -92,7 +92,7 @@ export function KungFuGame({ onLeave }: { onLeave: () => void }) {
                     {game.reason === 'opponent-left' ? 'Opponent left' : 'King taken'}
                   </p>
                   <h3 className="overlay__title">
-                    {game.winner ? `${SIDE_NAME[game.winner]} wins` : 'Game over'}
+                    {game.winner ? `${sideLabel(CLASSIC, game.winner)} wins` : 'Game over'}
                   </h3>
                   {(isHost || mySide) && (
                     <button

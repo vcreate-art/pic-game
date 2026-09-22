@@ -1,10 +1,12 @@
-import { KUNGFU_BOUNDS, cooldownFor, type PieceType, type Side } from '@pic-game/shared';
+import {
+  CLASSIC, KUNGFU_BOUNDS, cooldownFor, sideLabel, type PieceType, type Side,
+} from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectIsHost, selectKungFu, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { InviteCard } from '../InviteCard.js';
 
-const SIDE_NAME: Record<Side, string> = { w: 'White', b: 'Black' };
+
 /** Every piece, shortest rest first, so the slider means something concrete and
  *  the spread between light and heavy pieces is visible at a glance. */
 const PIECE_ROWS: Array<[PieceType, string]> = [
@@ -41,7 +43,7 @@ export function KungFuLobby({ onLeave }: { onLeave: () => void }) {
                 <li key={p.id} className="lobby__player">
                   <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                   <span>{p.name}</span>
-                  {side && <span className={`seat__chip seat__chip--${side}`}>{SIDE_NAME[side]}</span>}
+                  {side && <span className={`seat__chip seat__chip--${side}`}>{sideLabel(CLASSIC, side)}</span>}
                 </li>
               );
             })}
@@ -57,7 +59,7 @@ export function KungFuLobby({ onLeave }: { onLeave: () => void }) {
               const mine = holder === me;
               return (
                 <div key={side} className={`seat ${mine ? 'is-mine' : ''}`}>
-                  <span className={`seat__chip seat__chip--${side}`}>{SIDE_NAME[side]}</span>
+                  <span className={`seat__chip seat__chip--${side}`}>{sideLabel(CLASSIC, side)}</span>
                   <span className={holder ? 'seat__who' : 'seat__open'}>
                     {holder ? nameOf(holder) : 'open'}
                   </span>

@@ -6,4 +6,5 @@ export * from './guess.js';
 export * from './suggest.js';
 export * from './words/en.js';
 export * from './kungfu/types.js';
+export * from './kungfu/board.js';
 export * from './kungfu/rules.js';

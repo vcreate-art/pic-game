@@ -1,9 +1,12 @@
-export type Side = 'w' | 'b';
+/** Two sides in the classic game, four on the cruciform board. 'b' is black
+ *  in one and blue in the other; the board spec decides which. */
+export type Side = 'w' | 'b' | 'r' | 'y' | 'g';
 export type PieceType = 'p' | 'n' | 'b' | 'r' | 'q' | 'k';
 
 /**
- * Squares are 0..63 with 0 = a1 and 63 = h8, so `file = i % 8` and
- * `rank = (i / 8) | 0`, and white advances by +8.
+ * A square index into a board of `size * size`, counting from the bottom-left:
+ * `file = i % size`, `rank = (i / size) | 0`. On the classic 8x8 that makes
+ * 0 = a1 and 63 = h8.
  */
 export type Square = number;
 
@@ -54,11 +57,9 @@ export function cooldownFor(type: PieceType, base: number): number {
   return Math.round(base * COOLDOWN_SCALE[type]);
 }
 
-export interface KungFuSeats {
-  /** playerId, or null while the seat is open. */
-  w: string | null;
-  b: string | null;
-}
+/** playerId per side; absent or null while a seat is open. Which sides exist
+ *  depends on the board, so this is keyed loosely rather than by fixed fields. */
+export type KungFuSeats = Partial<Record<Side, string | null>>;
 
 export interface KungFuPublic {
   phase: KungFuPhase;

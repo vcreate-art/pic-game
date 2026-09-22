@@ -4,9 +4,10 @@ import {
 } from '@pic-game/shared';
 import { serverNow } from '../../net/clock.js';
 
-const GLYPH: Record<Side, Record<Piece['type'], string>> = {
-  w: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
-  b: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' },
+/** One silhouette per piece, tinted per side in CSS. Unicode has a white set
+ *  and a black set, which is no help once there are four players. */
+const GLYPH: Record<Piece['type'], string> = {
+  k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟',
 };
 
 export function ChessBoard({
@@ -106,7 +107,7 @@ export function ChessBoard({
           >
             {piece && (
               <span className={`pc pc--${piece.side} ${cooling ? 'is-cooling' : ''}`}>
-                {GLYPH[piece.side][piece.type]}
+                {GLYPH[piece.type]}
                 {/* Described by its FULL duration plus a negative delay for the
                     part already elapsed, never by the time remaining. Changing
                     an animation's duration does not reset how far it has run,
