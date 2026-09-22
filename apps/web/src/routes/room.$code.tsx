@@ -122,14 +122,14 @@ function RoomPage() {
 
   if (phase === 'lobby') {
     return (
-      <>
+      <div className="lobbyscreen">
         <Lobby />
         <div className="leavebar">
-          <button className="btn btn--ghost" type="button" onClick={leave}>
+          <button className="btn btn--danger" type="button" onClick={leave}>
             Leave room
           </button>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -148,7 +148,7 @@ function RoomPage() {
           {phase === 'drawing' && room.turn && (
             <Timer endsAt={room.turn.endsAt} total={room.settings.drawTime} />
           )}
-          <button className="tool" type="button" onClick={leave}>
+          <button className="tool tool--leave" type="button" onClick={leave}>
             Leave
           </button>
         </div>

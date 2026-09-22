@@ -79,6 +79,10 @@ button, input { font: inherit; color: inherit; }
 .btn--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn--primary:hover:not(:disabled) { background: #4b3cc4; }
 .btn--ghost { background: transparent; }
+/* Leaving a room is destructive and hard to undo mid-game, so it reads as such
+   rather than sitting quietly among the neutral buttons. */
+.btn--danger { border-color: #fecaca; background: #fef2f2; color: var(--warn); }
+.btn--danger:hover:not(:disabled) { background: var(--warn); border-color: var(--warn); color: #fff; }
 .btn--lg { padding: 13px 22px; font-size: 16px; width: 100%; }
 
 /* ---------------------------------------------------------------- landing */
@@ -143,6 +147,10 @@ button, input { font: inherit; color: inherit; }
 .lobby__invite { grid-area: invite; text-align: center; }
 .lobby__players { grid-area: players; }
 .lobby__settings { grid-area: settings; display: flex; flex-direction: column; gap: 16px; }
+/* The card stretches to the column height, so an auto margin drops the action to
+   its foot rather than leaving it floating under the sliders. */
+.lobby__settings > .btn--lg,
+.lobby__settings > .settings__note { margin-top: auto; }
 
 .lobby__code {
   font-family: var(--display); font-size: 42px; font-weight: 800;
@@ -292,6 +300,8 @@ button, input { font: inherit; color: inherit; }
 .tool:hover { border-color: var(--accent); }
 .tool.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .tool--danger:hover { border-color: var(--warn); color: var(--warn); }
+.tool--leave { border-color: #fecaca; background: #fef2f2; color: var(--warn); }
+.tool--leave:hover { background: var(--warn); border-color: var(--warn); color: #fff; }
 
 /* ---------------------------------------------------------------- scores */
 
@@ -426,7 +436,17 @@ button, input { font: inherit; color: inherit; }
   .toolbar { gap: 8px 10px; }
 }
 
-.leavebar { display: flex; justify-content: center; margin-top: 16px; }
+/* Cards stay put at the top; the Leave button sits in the middle of whatever
+   height is left below them. The min-height keeps a gap from the cards on short
+   viewports, where there is no leftover space to centre within. */
+.lobbyscreen {
+  flex: 1; width: 100%;
+  display: flex; flex-direction: column;
+}
+.leavebar {
+  flex: 1; min-height: 72px;
+  display: flex; align-items: center; justify-content: center;
+}
 
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
