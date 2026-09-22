@@ -47,7 +47,7 @@ export function Toolbar() {
         </button>
       </div>
 
-      <div className="toolbar__group toolbar__group--end">
+      <div className="toolbar__group">
         <button type="button" className="tool" onClick={() => socket.emit('canvas:undo')}>
           Undo
         </button>
