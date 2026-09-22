@@ -1,0 +1,40 @@
+import { createServer } from 'node:http';
+import express from 'express';
+import cors from 'cors';
+import { Server } from 'socket.io';
+import type { ClientToServerEvents, ServerToClientEvents } from '@pic-game/shared';
+import { CLIENT_ORIGIN, PORT } from './config.js';
+import { RoomManager } from './game/RoomManager.js';
+import { makeRoutes } from './http/routes.js';
+import { attachSocket } from './socket/index.js';
+
+const app = express();
+app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
+app.use(express.json({ limit: '32kb' }));
+
+const http = createServer(app);
+const io = new Server<ClientToServerEvents, ServerToClientEvents>(http, {
+  cors: { origin: CLIENT_ORIGIN, credentials: true },
+  // Strokes are small and frequent; a short interval keeps a dropped drawer
+  // from freezing the canvas for everyone else for long.
+  pingInterval: 10_000,
+  pingTimeout: 20_000,
+  maxHttpBufferSize: 64_000,
+});
+
+const rooms = new RoomManager(io);
+app.use(makeRoutes(rooms));
+attachSocket(io, rooms);
+
+http.listen(PORT, () => {
+  console.log(`[pic-game] server listening on http://localhost:${PORT}`);
+  console.log(`[pic-game] accepting browser origin ${CLIENT_ORIGIN}`);
+});
+
+for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(sig, () => {
+    console.log(`\n[pic-game] ${sig} — shutting down`);
+    io.close();
+    http.close(() => process.exit(0));
+  });
+}
