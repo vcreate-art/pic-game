@@ -10,7 +10,7 @@ function RootLayout() {
     <div className="app">
       <header className="topbar">
         <a className="brand" href="/">
-          <span className="brand__mark">✏️</span>
+          <span className="brand__mark is-flipped">✏️</span>
           <span className="brand__name">pic-game</span>
         </a>
         {inRoom && (

@@ -69,25 +69,25 @@ function Landing() {
       </div>
 
       <div className={`landing__cols ${code.trim() ? 'is-single' : ''}`}>
-      {/* Hidden once a code is typed: joining an existing room inherits
+      {/* Each game is its own cell alongside the form, rather than a nested
+          block. Hidden once a code is typed: joining an existing room inherits
           whichever game that room was created with. */}
-      {!code.trim() && (
-        <div className="picker">
-          {GAME_KINDS.map((k) => (
-            <button
-              key={k}
-              type="button"
-              className={`pick ${game === k ? 'is-active' : ''}`}
-              aria-pressed={game === k}
-              onClick={() => setGame(k)}
-            >
-              <span className="pick__art" aria-hidden="true">{k === 'skribbl' ? '✏️' : '♞'}</span>
-              <strong>{GAME_LABELS[k].name}</strong>
-              <span>{GAME_LABELS[k].blurb}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {!code.trim() &&
+        GAME_KINDS.map((k) => (
+          <button
+            key={k}
+            type="button"
+            className={`pick ${game === k ? 'is-active' : ''}`}
+            aria-pressed={game === k}
+            onClick={() => setGame(k)}
+          >
+            <span className={`pick__art ${k === 'skribbl' ? 'is-flipped' : ''}`} aria-hidden="true">
+              {k === 'skribbl' ? '✏️' : '♞'}
+            </span>
+            <strong>{GAME_LABELS[k].name}</strong>
+            <span>{GAME_LABELS[k].blurb}</span>
+          </button>
+        ))}
 
       <div className="card landing__card">
         <JoinPanel

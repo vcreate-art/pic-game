@@ -41,6 +41,9 @@ button, input { font: inherit; color: inherit; }
 }
 .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: inherit; }
 .brand__mark { font-size: 20px; }
+/* The pencil emoji points up-right, which reads as leaning away from the
+   wordmark; mirrored it leans into it. */
+.is-flipped { display: inline-block; transform: scaleX(-1); }
 .brand__name { font-family: var(--display); font-weight: 800; font-size: 20px; letter-spacing: -.01em; }
 
 .conn { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
@@ -88,13 +91,13 @@ button, input { font: inherit; color: inherit; }
 /* ---------------------------------------------------------------- landing */
 
 .landing {
-  margin: 0 auto; width: 100%; max-width: 880px;
+  margin: 0 auto; width: 100%; max-width: 960px;
   display: flex; flex-direction: column; gap: 20px; padding: 28px 0 24px;
 }
-/* Games beside the join form rather than stacked above it, so neither is
-   pushed below the fold. */
+/* Three cells across: a card per game, then the join form, which gets a little
+   more width because it carries the most content. */
 .landing__cols {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start;
+  display: grid; grid-template-columns: 1fr 1fr 1.45fr; gap: 16px; align-items: stretch;
 }
 /* Typing a code hides the picker, so the form takes the middle on its own. */
 .landing__cols.is-single {
@@ -525,10 +528,9 @@ button, input { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- game picker */
 
-.picker { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-content: start; }
 .pick {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 16px 12px; text-align: center; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  padding: 18px 14px; text-align: center; cursor: pointer;
   background: var(--card); border: 1px solid var(--line);
   border-radius: var(--radius); box-shadow: var(--shadow);
   transition: border-color .15s ease, transform .08s ease;
@@ -536,8 +538,8 @@ button, input { font: inherit; color: inherit; }
 .pick:hover { border-color: var(--accent); }
 .pick:active { transform: translateY(1px); }
 .pick.is-active { border-color: var(--accent); background: var(--accent-soft); }
-.pick__art { font-size: 30px; line-height: 1; margin-bottom: 2px; }
-.pick strong { font-family: var(--display); font-size: 16px; }
+.pick__art { font-size: 46px; line-height: 1; margin-bottom: 10px; }
+.pick strong { font-family: var(--display); font-size: 17px; }
 .pick span:not(.pick__art) { font-size: 11.5px; color: var(--ink-soft); line-height: 1.35; }
 .pick.is-active strong { color: var(--accent); }
 
@@ -616,7 +618,11 @@ button, input { font: inherit; color: inherit; }
 .seat__who { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0; }
 .seat__open { font-size: 13px; color: var(--ink-soft); font-style: italic; }
 
-@media (max-width: 760px) {
+@media (max-width: 860px) {
+  .landing__cols { grid-template-columns: 1fr 1fr; }
+  .landing__card { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
   .landing__cols { grid-template-columns: 1fr; }
 }
 
