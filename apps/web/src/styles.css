@@ -537,6 +537,9 @@ button, input { font: inherit; color: inherit; }
 .chess {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
+  /* Rows must be declared too. Without this they size to their content, so a
+     rank holding pieces is tall and an empty rank collapses. */
+  grid-template-rows: repeat(8, 1fr);
   aspect-ratio: 1;
   /* Square, and never taller than the viewport — a wide stage column would
      otherwise push the bottom ranks off the screen. */
@@ -551,6 +554,8 @@ button, input { font: inherit; color: inherit; }
 .sq {
   position: relative; border: 0; padding: 0; cursor: pointer;
   display: grid; place-items: center;
+  /* Lets the 1fr row win over the glyph's intrinsic height. */
+  min-width: 0; min-height: 0;
   font-size: clamp(18px, 4.4vw, 44px); line-height: 1;
 }
 .sq:disabled { cursor: default; }
