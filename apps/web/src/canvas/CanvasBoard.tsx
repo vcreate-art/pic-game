@@ -5,6 +5,7 @@ import { selectIsDrawer, useGame } from '../store/game.js';
 import { useTools } from '../store/tools.js';
 import { getEngine } from './engineInstance.js';
 import { DrawInput, type DrawSink } from './input.js';
+import { uid } from '../lib/uid.js';
 
 export function CanvasBoard() {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -34,7 +35,7 @@ export function CanvasBoard() {
         socket.emit('draw:end', { id });
       },
       fill(x, y, color) {
-        engine.applyFill({ kind: 'fill', id: crypto.randomUUID(), by: 'me', x, y, color });
+        engine.applyFill({ kind: 'fill', id: uid(), by: 'me', x, y, color });
         socket.emit('draw:fill', { x, y, color });
       },
     };

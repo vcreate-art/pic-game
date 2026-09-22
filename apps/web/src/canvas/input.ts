@@ -1,4 +1,5 @@
 import { LOGICAL_W, LOGICAL_H, quantize, type PenTool } from '@pic-game/shared';
+import { uid } from '../lib/uid.js';
 
 /** One network message per pointermove would be ~120/sec on a good mouse.
  *  Batching to 50ms frames keeps it near 20/sec with no visible difference. */
@@ -77,7 +78,7 @@ export class DrawInput {
       return;
     }
 
-    this.strokeId = crypto.randomUUID();
+    this.strokeId = uid();
     this.lastQ = [qx, qy];
     this.sink.start({ id: this.strokeId, tool: t.tool, color: t.color, size: t.size, pts: [qx, qy] });
     this.startTimer();
