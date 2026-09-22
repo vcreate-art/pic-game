@@ -3,8 +3,8 @@ import { getSocket } from '../../net/socket.js';
 import { selectIsHost, selectKungFu, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { Chat } from '../Chat.js';
-import { InviteCard } from '../InviteCard.js';
 import { ChessBoard } from './ChessBoard.js';
+import { KungFuLobby } from './KungFuLobby.js';
 
 const SIDE_NAME: Record<Side, string> = { w: 'White', b: 'Black' };
 
@@ -16,6 +16,10 @@ export function KungFuGame({ onLeave }: { onLeave: () => void }) {
   if (!room || !me) return null;
 
   const { game } = room;
+  // Setting up is its own screen. An empty board behind an overlay was
+  // decoration standing where the settings should be.
+  if (game.phase === 'lobby') return <KungFuLobby onLeave={onLeave} />;
+
   const mySide: Side | null = game.seats.w === me ? 'w' : game.seats.b === me ? 'b' : null;
   const playing = game.phase === 'playing';
   const nameOf = (id: string | null) =>
@@ -25,7 +29,6 @@ export function KungFuGame({ onLeave }: { onLeave: () => void }) {
     <div className="game game--chess">
       <div className="game__body">
         <div className="chess__side">
-        {!playing && <InviteCard />}
         <section className="scores card">
           <h2 className="card__title">
             {playing ? (mySide ? `You are ${SIDE_NAME[mySide]}` : 'Spectating') : 'Sides'}
@@ -63,24 +66,6 @@ export function KungFuGame({ onLeave }: { onLeave: () => void }) {
             })}
           </div>
 
-          {!playing && isHost && (
-            <button
-              type="button"
-              className="btn btn--primary btn--lg"
-              disabled={!game.seats.w || !game.seats.b}
-              onClick={() => socket.emit(game.phase === 'ended' ? 'chess:rematch' : 'game:start')}
-            >
-              {!game.seats.w || !game.seats.b
-                ? 'Both sides needed'
-                : game.phase === 'ended'
-                  ? 'Play again'
-                  : 'Start game'}
-            </button>
-          )}
-          {!playing && !isHost && (
-            <p className="settings__note">Waiting for the host to start…</p>
-          )}
-
           <p className="settings__note">
             No turns. Move whenever you like — each piece rests after it moves.
             Take the king to win.
@@ -117,15 +102,6 @@ export function KungFuGame({ onLeave }: { onLeave: () => void }) {
                       Play again
                     </button>
                   )}
-                </div>
-              </div>
-            )}
-            {game.phase === 'lobby' && (
-              <div className="overlay">
-                <div className="overlay__card">
-                  <p className="overlay__kicker">Kung Fu Chess</p>
-                  <h3 className="overlay__title">Take a side to begin</h3>
-                  <p className="overlay__hint">{GAME_LABELS.kungfu.blurb}</p>
                 </div>
               </div>
             )}
