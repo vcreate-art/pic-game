@@ -38,8 +38,8 @@ export function Lobby() {
         </h2>
         <ul className="lobby__grid">
           {room.players.map((p) => (
-            <li key={p.id} className={`lobby__player ${p.id === room.hostId ? 'is-host' : ''}`}>
-              <Avatar data={p.avatar} size={44} />
+            <li key={p.id} className="lobby__player">
+              <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
               <span>{p.name}</span>
               {p.id === room.hostId && <span className="tag tag--host">host</span>}
             </li>

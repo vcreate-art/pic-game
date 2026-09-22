@@ -24,16 +24,12 @@ export function Scoreboard() {
                 'scores__row',
                 guessed ? 'is-guessed' : '',
                 p.connected ? '' : 'is-away',
-                isHost ? 'is-host' : '',
               ].join(' ')}
             >
               <span className="scores__rank">{i + 1}</span>
-              {/* The host is marked with a ring on the avatar rather than a tag:
-                  it sits left of the name and costs the cramped sidebar no width. */}
-              <span className="scores__avatar" title={isHost ? 'Host' : undefined}>
-                <Avatar data={p.avatar} size={32} />
-                {isHost && <span className="visually-hidden">Host</span>}
-              </span>
+              {/* Host is a badge on the avatar corner, so it costs the cramped
+                  sidebar no width and leaves the tag row for per-turn states. */}
+              <Avatar data={p.avatar} size={32} host={isHost} />
               {/* Name and tags stack, so a long name is never squeezed out by a
                   status tag in the narrow sidebar. */}
               <span className="scores__meta">
