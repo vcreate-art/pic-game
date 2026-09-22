@@ -15,6 +15,7 @@ export function Chat() {
   const haveGuessed = useGame(selectHaveGuessed);
   const phase = useGame((s) => selectSkribbl(s)?.phase);
   const mask = useGame((s) => selectSkribbl(s)?.turn?.mask ?? '');
+  const isSkribbl = useGame((s) => s.room?.kind === 'skribbl');
   const [text, setText] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
   const socket = getSocket();
@@ -26,15 +27,18 @@ export function Chat() {
 
   const drawing = phase === 'drawing';
   const locked = drawing && isDrawer;
-  const placeholder = locked
-    ? "You're drawing — no chatting!"
-    : haveGuessed && drawing
-      ? 'Chat with others who guessed it'
-      : 'Type your guess...';
+  // Only the drawing game has guesses; elsewhere this is ordinary chat.
+  const placeholder = !isSkribbl
+    ? 'Say something…'
+    : locked
+      ? "You're drawing — no chatting!"
+      : haveGuessed && drawing
+        ? 'Chat with others who guessed it'
+        : 'Type your guess...';
 
   const target = (mask.match(/_/g) ?? []).length;
   const typed = letterCount(text);
-  const showCount = drawing && !locked && !haveGuessed && target > 0 && typed > 0;
+  const showCount = isSkribbl && drawing && !locked && !haveGuessed && target > 0 && typed > 0;
   const matches = typed === target;
 
   const send = (e: React.FormEvent) => {
@@ -71,7 +75,7 @@ export function Chat() {
             disabled={locked}
             placeholder={placeholder}
             onChange={(e) => setText(e.target.value)}
-            aria-label="Your guess"
+            aria-label={isSkribbl ? 'Your guess' : 'Your message'}
             autoComplete="off"
           />
           {showCount && (

@@ -541,9 +541,9 @@ button, input { font: inherit; color: inherit; }
      rank holding pieces is tall and an empty rank collapses. */
   grid-template-rows: repeat(8, 1fr);
   aspect-ratio: 1;
-  /* Square, and never taller than the viewport — a wide stage column would
-     otherwise push the bottom ranks off the screen. */
-  width: min(100%, 68vh);
+  /* Square, and bounded by whichever runs out first: the column's width, or
+     the viewport height once the app header and page padding are taken out. */
+  width: min(100%, calc(100vh - 116px));
   margin: 0 auto;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -612,4 +612,11 @@ button, input { font: inherit; color: inherit; }
 }
 
 .chess__side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.chess__side .scores { display: flex; flex-direction: column; }
+/* Pushes Leave to the foot of the panel rather than letting it float under
+   the blurb. */
+.chess__side .btn--danger { margin-top: auto; }
+
+/* Chess wants less chrome around the board than the drawing game does. */
+.game--chess .game__body { grid-template-columns: 230px minmax(0, 1fr) 250px; }
 .chess__side .lobby__invite { text-align: center; }

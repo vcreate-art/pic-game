@@ -22,39 +22,14 @@ export function KungFuGame({ onLeave }: { onLeave: () => void }) {
     id ? room.players.find((p) => p.id === id)?.name ?? 'someone' : null;
 
   return (
-    <div className="game">
-      <div className="game__head">
-        <div className="game__head-side">
-          <span className="game__round">{GAME_LABELS.kungfu.name}</span>
-        </div>
-        <div className="wordmask">
-          <span className="wordmask__label">
-            {playing
-              ? mySide
-                ? `You are ${SIDE_NAME[mySide]}`
-                : 'Spectating'
-              : game.phase === 'ended'
-                ? 'Game over'
-                : 'Pick a side'}
-          </span>
-          {playing && (
-            <span className="chess__vs">
-              {nameOf(game.seats.w)} <em>vs</em> {nameOf(game.seats.b)}
-            </span>
-          )}
-        </div>
-        <div className="game__head-side game__head-side--end">
-          <button className="tool tool--leave" type="button" onClick={onLeave}>
-            Leave
-          </button>
-        </div>
-      </div>
-
+    <div className="game game--chess">
       <div className="game__body">
         <div className="chess__side">
         {!playing && <InviteCard />}
         <section className="scores card">
-          <h2 className="card__title">Sides</h2>
+          <h2 className="card__title">
+            {playing ? (mySide ? `You are ${SIDE_NAME[mySide]}` : 'Spectating') : 'Sides'}
+          </h2>
           <div className="seats">
             {(['w', 'b'] as Side[]).map((side) => {
               const holder = game.seats[side];
@@ -110,6 +85,9 @@ export function KungFuGame({ onLeave }: { onLeave: () => void }) {
             No turns. Move whenever you like — each piece rests after it moves.
             Take the king to win.
           </p>
+          <button className="btn btn--danger" type="button" onClick={onLeave}>
+            Leave room
+          </button>
         </section>
         </div>
 
