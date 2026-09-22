@@ -23,15 +23,19 @@ export function Scoreboard() {
             >
               <span className="scores__rank">{i + 1}</span>
               <Avatar data={p.avatar} size={32} />
-              <span className="scores__name">
-                {p.name}
-                {p.id === me && <em> (you)</em>}
-                {p.id === hostId && <span className="tag tag--host">host</span>}
-              </span>
-              <span className="scores__icons">
-                {isDrawer && <span className="tag tag--drawing">drawing</span>}
-                {guessed && <span className="tag tag--ok">guessed</span>}
-                {!p.connected && <span className="tag tag--away">away</span>}
+              {/* Name and tags stack, so a long name is never squeezed out by a
+                  status tag in the narrow sidebar. */}
+              <span className="scores__meta">
+                <span className="scores__name">
+                  {p.name}
+                  {p.id === me && <em> (you)</em>}
+                </span>
+                <span className="scores__tags">
+                  {p.id === hostId && <span className="tag tag--host">host</span>}
+                  {isDrawer && <span className="tag tag--drawing">drawing</span>}
+                  {guessed && <span className="tag tag--ok">guessed</span>}
+                  {!p.connected && <span className="tag tag--away">away</span>}
+                </span>
               </span>
               <span className="scores__pts">{p.score}</span>
             </li>
