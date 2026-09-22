@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ChatMessage, Player, RoomSettings, RoomState } from '@pic-game/shared';
+import type { ChatMessage, Player, RoomSettings, RoomState, WordOption } from '@pic-game/shared';
 
 const MAX_MESSAGES = 200;
 
@@ -8,6 +8,14 @@ export interface TurnResult {
   deltas: Record<string, number>;
   players: Player[];
   reason: 'timeout' | 'all-guessed' | 'drawer-left';
+  /** Present only in the player-suggested mode, and only once the turn is over. */
+  authorId?: string;
+}
+
+export interface SuggestState {
+  open: boolean;
+  endsAt: number;
+  count: number;
 }
 
 interface GameStore {
@@ -17,8 +25,13 @@ interface GameStore {
   room: RoomState | null;
   /** Populated only when we are the drawer. Everyone else holds null. */
   secret: string | null;
-  choices: string[] | null;
+  /** Populated only on the drawer's client. */
+  choices: WordOption[] | null;
   chooseEndsAt: number | null;
+  suggest: SuggestState | null;
+  /** Our own submitted word, echoed back by the server. Nobody else's. */
+  mySuggestion: string | null;
+  suggestError: string | null;
   messages: ChatMessage[];
   turnResult: TurnResult | null;
   final: Player[] | null;
@@ -31,7 +44,10 @@ interface GameStore {
   dropPlayer: (id: string) => void;
   setSettings: (s: RoomSettings) => void;
   setHost: (id: string) => void;
-  beginChoosing: (p: { drawerId: string; round: number; endsAt: number; words?: string[] }) => void;
+  beginChoosing: (p: { drawerId: string; round: number; endsAt: number; words?: WordOption[] }) => void;
+  setSuggest: (s: SuggestState) => void;
+  setMySuggestion: (text: string | null) => void;
+  setSuggestError: (e: string | null) => void;
   setSecret: (w: string) => void;
   beginDrawing: (turn: NonNullable<RoomState['turn']>) => void;
   reveal: (index: number, char: string) => void;
@@ -50,6 +66,9 @@ export const useGame = create<GameStore>((set) => ({
   secret: null,
   choices: null,
   chooseEndsAt: null,
+  suggest: null,
+  mySuggestion: null,
+  suggestError: null,
   messages: [],
   turnResult: null,
   final: null,
@@ -90,6 +109,8 @@ export const useGame = create<GameStore>((set) => ({
       chooseEndsAt: p.endsAt,
       secret: null,
       turnResult: null,
+      mySuggestion: null,
+      suggestError: null,
       room: s.room
         ? {
             ...s.room,
@@ -111,10 +132,15 @@ export const useGame = create<GameStore>((set) => ({
 
   setSecret: (secret) => set({ secret }),
 
+  setSuggest: (suggest) => set({ suggest }),
+  setMySuggestion: (mySuggestion) => set({ mySuggestion, suggestError: null }),
+  setSuggestError: (suggestError) => set({ suggestError }),
+
   beginDrawing: (turn) =>
     set((s) => ({
       choices: null,
       chooseEndsAt: null,
+      suggest: null,
       room: s.room ? { ...s.room, phase: 'drawing', turn } : null,
     })),
 
@@ -165,6 +191,7 @@ export const useGame = create<GameStore>((set) => ({
   reset: () =>
     set({
       me: null, room: null, secret: null, choices: null, chooseEndsAt: null,
+      suggest: null, mySuggestion: null, suggestError: null,
       messages: [], turnResult: null, final: null, notice: null,
     }),
 }));

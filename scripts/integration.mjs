@@ -67,7 +67,7 @@ ok(`turn started, drawer is ${drawerLabel}`);
 
 // Only the drawer should have been offered words.
 const drawerChoosing = drawer.saw('turn:choosing').map(e => e.args[0]).find(a => a.words);
-if (drawerChoosing?.words?.length) ok(`drawer received ${drawerChoosing.words.length} candidate words`);
+if (drawerChoosing?.words?.length) ok(`drawer received ${drawerChoosing.words.length} candidate words (${drawerChoosing.words.map(w => w.text).join(', ')})`);
 else bad('drawer got no word choices');
 
 let leaked = guessers.filter(g => g.saw('turn:choosing').some(e => e.args[0].words));
@@ -75,12 +75,13 @@ if (leaked.length === 0) ok('guessers received NO candidate words');
 else bad('candidate words leaked to guessers', leaked.map(g => g.label).join(','));
 
 console.log('\n\x1b[1m4. A non-drawer cannot choose the word\x1b[0m');
-guessers[0].emit('word:choose', { index: 1 });
+guessers[0].emit('word:choose', { id: 'not-a-real-option' });
 await sleep(250);
 if (guessers[0].saw('turn:drawing').length === 0) ok('non-drawer word:choose ignored');
 else bad('non-drawer started the turn');
 
-drawer.emit('word:choose', { index: 0 });
+// Options are addressed by id now, since the list can grow under the drawer.
+drawer.emit('word:choose', { id: drawerChoosing.words[0].id });
 const secret = await waitFor(drawer, 'word:secret');
 const word = secret.word;
 ok(`drawer received the secret word privately ("${word}")`);

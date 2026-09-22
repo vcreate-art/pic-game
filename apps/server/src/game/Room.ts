@@ -1,15 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import type { Server } from 'socket.io';
 import {
-  DEFAULT_SETTINGS, SETTINGS_BOUNDS,
-  drawerPoints, guessPoints, judge, maskOf, pickHintPositions,
+  DEFAULT_SETTINGS, SETTINGS_BOUNDS, WORD_MODES,
+  authorPoints, drawerPoints, guessPoints, judge, maskOf, pickHintPositions,
+  suggestionKey, validateSuggestion,
   type Avatar, type CanvasOp, type ChatMessage, type ClientToServerEvents,
   type Phase, type Player, type RoomSettings, type RoomState,
-  type ServerToClientEvents, type TurnPublic,
+  type ServerToClientEvents, type SuggestAck, type TurnPublic, type WordOption,
 } from '@pic-game/shared';
 import {
   CHOOSE_SECONDS, GAME_END_SECONDS, MAX_CHAT_LEN, MAX_OPS_PER_TURN,
-  RECONNECT_GRACE_MS, TURN_END_SECONDS, EMPTY_ROOM_TTL_MS,
+  RECONNECT_GRACE_MS, SUGGEST_SECONDS, TURN_END_SECONDS, EMPTY_ROOM_TTL_MS,
 } from '../config.js';
 import { pickWords } from './words.js';
 
@@ -39,7 +40,18 @@ export class Room {
 
   // ---- current turn (word is private to this object and the drawer's socket) ----
   private word: string | null = null;
-  private wordChoices: string[] = [];
+  /** Built-in words offered when there are not enough suggestions to fill the
+   *  list. Indistinguishable from suggestions on the wire — labelling them would
+   *  tell the drawer which options belong to somebody. */
+  private padding: WordOption[] = [];
+  /** playerId -> their current suggestion. A Map keeps insertion order when a
+   *  key is overwritten, so re-suggesting does not jump the list. */
+  private suggestions = new Map<string, WordOption>();
+  /** Every option shown this turn, by id. Append-only, so a pick still resolves
+   *  even after the option scrolled off the drawer's visible list. */
+  private offered = new Map<string, { text: string; authorId: string | null }>();
+  /** Who suggested the chosen word. Null in builtin mode or on a padded pick. */
+  private authorId: string | null = null;
   drawerId: string | null = null;
   private mask = '';
   private revealed: Record<number, string> = {};
@@ -157,12 +169,20 @@ export class Room {
   updateSettings(patch: Partial<RoomSettings>): void {
     if (this.phase !== 'lobby') return;
     for (const [k, bounds] of Object.entries(SETTINGS_BOUNDS)) {
-      const key = k as keyof RoomSettings;
+      const key = k as keyof typeof SETTINGS_BOUNDS;
       const v = patch[key];
       if (typeof v !== 'number' || !Number.isFinite(v)) continue;
       this.settings[key] = Math.round(Math.max(bounds.min, Math.min(bounds.max, v)));
     }
+    // Handled apart from the numeric bounds loop above.
+    if (patch.wordMode && WORD_MODES.includes(patch.wordMode)) {
+      this.settings.wordMode = patch.wordMode;
+    }
     this.io.to(this.code).emit('room:settings', this.settings);
+  }
+
+  private get playerWords(): boolean {
+    return this.settings.wordMode === 'players';
   }
 
   // ------------------------------------------------------------------ game loop
@@ -194,8 +214,17 @@ export class Room {
     this.drawerId = drawer.id;
     this.phase = 'choosing';
     this.ops = [];
-    this.wordChoices = pickWords(this.settings.wordChoices, this.usedWords);
-    this.endsAt = Date.now() + CHOOSE_SECONDS * 1000;
+
+    // Always stock a full list of built-ins. In players mode these are padding
+    // that suggestions push out; in builtin mode they are the whole list.
+    this.padding = pickWords(this.settings.wordChoices, this.usedWords).map((text) => {
+      const id = randomUUID();
+      this.offered.set(id, { text, authorId: null });
+      return { id, text };
+    });
+
+    const window = this.playerWords ? SUGGEST_SECONDS : CHOOSE_SECONDS;
+    this.endsAt = Date.now() + window * 1000;
 
     this.io.to(this.code).emit('canvas:cleared');
     // Everyone learns WHO is drawing; only the drawer learns the candidate words.
@@ -204,14 +233,63 @@ export class Room {
       round: this.round,
       endsAt: this.endsAt,
     });
-    this.emitTo(drawer.id, 'turn:choosing', {
-      drawerId: drawer.id,
+    this.sendOptions();
+    if (this.playerWords) this.broadcastSuggestState();
+
+    this.phaseTimer = setTimeout(() => this.autoChoose(), window * 1000);
+  }
+
+  /** The drawer's visible list: suggestions first, topped up with padding. */
+  private optionsForDrawer(): WordOption[] {
+    const suggested = [...this.suggestions.values()];
+    const shortfall = Math.max(0, this.settings.wordChoices - suggested.length);
+    return [...suggested, ...this.padding.slice(0, shortfall)];
+  }
+
+  private sendOptions(): void {
+    if (!this.drawerId || this.phase !== 'choosing') return;
+    this.emitTo(this.drawerId, 'turn:choosing', {
+      drawerId: this.drawerId,
       round: this.round,
       endsAt: this.endsAt,
-      words: this.wordChoices,
+      words: this.optionsForDrawer(),
     });
+  }
 
-    this.phaseTimer = setTimeout(() => this.chooseWord(drawer.id, 0), CHOOSE_SECONDS * 1000);
+  private broadcastSuggestState(): void {
+    this.io.to(this.code).emit('suggest:state', {
+      open: this.phase === 'choosing' && this.playerWords,
+      endsAt: this.endsAt,
+      count: this.suggestions.size,
+    });
+  }
+
+  /**
+   * Records a player's word for this turn. Replacing an earlier suggestion keeps
+   * the old id registered in `offered` rather than deleting it, so a pick that
+   * crosses in flight still resolves instead of silently failing.
+   */
+  suggestWord(playerId: string, raw: unknown): SuggestAck {
+    if (!this.playerWords) return { ok: false, message: 'This room uses the built-in words.' };
+    if (this.phase !== 'choosing') return { ok: false, message: 'Not taking suggestions right now.' };
+    if (playerId === this.drawerId) return { ok: false, message: "You're picking this turn, not suggesting." };
+    if (!this.players.has(playerId)) return { ok: false, message: 'You are not in this room.' };
+
+    const taken = new Set<string>();
+    for (const [pid, opt] of this.suggestions) {
+      if (pid !== playerId) taken.add(suggestionKey(opt.text));
+    }
+
+    const result = validateSuggestion(raw, taken);
+    if (!result.ok) return { ok: false, message: result.message };
+
+    const id = randomUUID();
+    this.offered.set(id, { text: result.text, authorId: playerId });
+    this.suggestions.set(playerId, { id, text: result.text });
+
+    this.sendOptions();
+    this.broadcastSuggestState();
+    return { ok: true, text: result.text };
   }
 
   private nextConnectedDrawer(): ServerPlayer | null {
@@ -226,12 +304,44 @@ export class Room {
     return null;
   }
 
-  chooseWord(playerId: string, index: number): void {
+  chooseWord(playerId: string, id: string): void {
     if (this.phase !== 'choosing' || playerId !== this.drawerId) return;
-    const word = this.wordChoices[index] ?? this.wordChoices[0];
-    if (!word) return;
+    const option = this.offered.get(id);
+    if (!option) return;
+    this.commitWord(option);
+  }
+
+  /**
+   * Deadline reached with no pick from the drawer.
+   *
+   * Real suggestions win over padding whenever any exist: the built-ins are only
+   * there so the drawer always has something to choose between, and letting them
+   * take the auto-pick would throw away a word somebody bothered to write — with
+   * one suggestion against two padded slots, it would do so two times in three.
+   *
+   * Random within that set rather than first, so suggesting early cannot farm a
+   * predictable slot.
+   */
+  private autoChoose(): void {
+    if (this.phase !== 'choosing') return;
+    const suggested = [...this.suggestions.values()];
+    const options = suggested.length > 0 ? suggested : this.optionsForDrawer();
+    const pick = options[Math.floor(Math.random() * options.length)];
+    const option = pick ? this.offered.get(pick.id) : undefined;
+    if (!option) {
+      this.abortToLobby();
+      return;
+    }
+    this.commitWord(option);
+  }
+
+  private commitWord(option: { text: string; authorId: string | null }): void {
+    const playerId = this.drawerId;
+    if (!playerId) return;
+    const word = option.text;
 
     this.clearTimers();
+    this.authorId = option.authorId;
     this.word = word;
     this.usedWords.add(word);
     this.mask = maskOf(word);
@@ -243,6 +353,7 @@ export class Room {
 
     // The one place the word leaves this object, addressed to a single socket.
     this.emitTo(playerId, 'word:secret', { word });
+    if (this.playerWords) this.broadcastSuggestState();
     const turn = this.turnPublic();
     if (turn) this.io.to(this.code).emit('turn:drawing', turn);
 
@@ -271,14 +382,28 @@ export class Room {
     this.clearTimers();
     const word = this.word ?? '';
 
+    const authorId = this.authorId;
+
     if (reason !== 'drawer-left' && this.drawerId) {
-      const drawer = this.players.get(this.drawerId);
       const guessers = this.eligibleGuessers();
       const got = guessers.filter((p) => p.guessedAt !== null).length;
+
+      const drawer = this.players.get(this.drawerId);
       if (drawer && got > 0) {
         const pts = drawerPoints(got, guessers.length);
         drawer.score += pts;
         this.deltas[drawer.id] = (this.deltas[drawer.id] ?? 0) + pts;
+      }
+
+      // Pays more the fewer people cracked it, and nothing at all when nobody
+      // did — which is what stops "submit gibberish" being the winning play.
+      const author = authorId ? this.players.get(authorId) : undefined;
+      if (author) {
+        const pts = authorPoints(got, guessers.length);
+        if (pts > 0) {
+          author.score += pts;
+          this.deltas[author.id] = (this.deltas[author.id] ?? 0) + pts;
+        }
       }
     }
 
@@ -288,6 +413,8 @@ export class Room {
       deltas: this.deltas,
       players: this.publicPlayers(),
       reason,
+      // First and only moment authorship becomes public.
+      ...(authorId ? { authorId } : {}),
     });
     this.word = null;
     this.phaseTimer = setTimeout(() => this.nextTurn(), TURN_END_SECONDS * 1000);
@@ -329,7 +456,10 @@ export class Room {
 
   private resetTurnState(): void {
     this.word = null;
-    this.wordChoices = [];
+    this.padding = [];
+    this.suggestions.clear();
+    this.offered.clear();
+    this.authorId = null;
     this.drawerId = null;
     this.mask = '';
     this.revealed = {};
@@ -444,6 +574,19 @@ export class Room {
       return;
     }
 
+    // The author wrote this word, so typing it is not a guess. It is swallowed
+    // rather than rejected: falling through would broadcast it as ordinary chat
+    // and print the answer to everyone still guessing.
+    if (playerId === this.authorId && judge(text, this.word) === 'correct') {
+      this.emitTo(playerId, 'chat:message', {
+        id: randomUUID(),
+        kind: 'close',
+        text: "That's your own word — you can't score it, but you earn points if others get it.",
+        at: Date.now(),
+      });
+      return;
+    }
+
     const verdict = judge(text, this.word);
 
     if (verdict === 'correct') {
@@ -481,8 +624,16 @@ export class Room {
     this.checkTurnComplete();
   }
 
+  /**
+   * Who can actually win points this turn. The author is excluded along with the
+   * drawer — they already know the word. Leaving them in would also stop the
+   * "everybody guessed" early end from ever firing, since they never register a
+   * correct guess.
+   */
   private eligibleGuessers(): ServerPlayer[] {
-    return [...this.players.values()].filter((p) => p.id !== this.drawerId && p.connected);
+    return [...this.players.values()].filter(
+      (p) => p.id !== this.drawerId && p.id !== this.authorId && p.connected,
+    );
   }
 
   /** Once nobody is left guessing, sitting out the remaining clock is dead time. */
@@ -578,12 +729,10 @@ export class Room {
       this.emitTo(playerId, 'word:secret', { word: this.word });
     }
     if (this.phase === 'choosing' && this.drawerId === playerId) {
-      this.emitTo(playerId, 'turn:choosing', {
-        drawerId: playerId,
-        round: this.round,
-        endsAt: this.endsAt,
-        words: this.wordChoices,
-      });
+      this.sendOptions();
+    }
+    if (this.phase === 'choosing' && this.playerWords) {
+      this.broadcastSuggestState();
     }
   }
 }

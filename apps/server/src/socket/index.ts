@@ -3,7 +3,7 @@ import {
   AVATAR_COLORS, AVATAR_FACES, sanitizePoints, PALETTE, BRUSH_SIZES,
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
-import { CHAT_BUCKET, DRAW_BUCKET, MAX_NAME_LEN } from '../config.js';
+import { CHAT_BUCKET, DRAW_BUCKET, MAX_NAME_LEN, SUGGEST_BUCKET } from '../config.js';
 import type { RoomManager } from '../game/RoomManager.js';
 import type { Room } from '../game/Room.js';
 import { TokenBucket } from '../rateLimit.js';
@@ -18,6 +18,7 @@ interface Session {
   playerId: string | null;
   chat: TokenBucket;
   draw: TokenBucket;
+  suggest: TokenBucket;
 }
 
 function cleanName(raw: unknown): string | null {
@@ -53,6 +54,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       playerId: null,
       chat: new TokenBucket(CHAT_BUCKET.capacity, CHAT_BUCKET.refillPerSec),
       draw: new TokenBucket(DRAW_BUCKET.capacity, DRAW_BUCKET.refillPerSec),
+      suggest: new TokenBucket(SUGGEST_BUCKET.capacity, SUGGEST_BUCKET.refillPerSec),
     };
 
     const bind = (room: Room, playerId: string) => {
@@ -150,9 +152,19 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
 
     socket.on('word:choose', (p) => {
       if (!s.room || !s.playerId) return;
-      const i = Number(p?.index);
-      if (!Number.isInteger(i) || i < 0 || i > 8) return;
-      s.room.chooseWord(s.playerId, i);
+      if (typeof p?.id !== 'string' || p.id.length > 64) return;
+      s.room.chooseWord(s.playerId, p.id);
+    });
+
+    socket.on('word:suggest', (p, cb) => {
+      if (!s.room || !s.playerId) return;
+      if (!s.suggest.tryTake()) {
+        if (typeof cb === 'function') cb({ ok: false, message: 'Slow down a little.' });
+        return;
+      }
+      // Validation lives in the room so it can see what is already suggested.
+      const result = s.room.suggestWord(s.playerId, p?.text);
+      if (typeof cb === 'function') cb(result);
     });
 
     socket.on('draw:start', (p) => {

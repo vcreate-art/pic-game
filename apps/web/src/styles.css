@@ -432,3 +432,27 @@ button, input { font: inherit; color: inherit; }
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* ---------------------------------------------------------------- word mode */
+
+.settings__modes { display: flex; flex-direction: column; gap: 7px; }
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mode {
+  display: flex; flex-direction: column; gap: 2px; text-align: left;
+  border: 1px solid var(--line); background: var(--paper);
+  border-radius: 11px; padding: 9px 11px; cursor: pointer;
+}
+.mode strong { font-size: 13px; }
+.mode span { font-size: 11px; color: var(--ink-soft); line-height: 1.35; }
+.mode.is-active { border-color: var(--accent); background: var(--accent-soft); }
+.mode.is-active strong { color: var(--accent); }
+.mode:disabled { cursor: not-allowed; opacity: .65; }
+
+.suggest { display: flex; gap: 8px; width: 100%; }
+.suggest .field__input { flex: 1; min-width: 0; }
+.suggest__mine { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.suggest__mine strong { color: var(--accent); }
+
+@media (max-width: 640px) {
+  .modes { grid-template-columns: 1fr; }
+}

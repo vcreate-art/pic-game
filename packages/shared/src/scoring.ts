@@ -17,3 +17,24 @@ export function drawerPoints(guessedCount: number, totalGuessers: number): numbe
   const ratio = guessedCount / totalGuessers;
   return Math.round(BASE_GUESS_POINTS + MAX_GUESS_POINTS * ratio * 0.6);
 }
+
+export const AUTHOR_FLOOR = 60;
+export const AUTHOR_RANGE = 180;
+
+/**
+ * Credit for suggesting a word, in the player-suggested mode.
+ *
+ * Rises as fewer people crack it — but pays nothing when nobody does. That zero
+ * is the whole point: on a purely decreasing curve the best possible submission
+ * is gibberish, since the author banks maximum precisely when the turn is ruined
+ * for everyone else. Anchoring it at zero makes "hard but gettable" the winning
+ * play, and overshooting into impossible costs the author everything.
+ *
+ * @param solved  guessers who got it, the author excluded
+ * @param eligible total guessers, the author excluded
+ */
+export function authorPoints(solved: number, eligible: number): number {
+  if (eligible <= 0 || solved <= 0) return 0;
+  const rarity = (eligible - Math.min(solved, eligible)) / eligible;
+  return Math.round(AUTHOR_FLOOR + AUTHOR_RANGE * rarity);
+}

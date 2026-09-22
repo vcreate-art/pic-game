@@ -53,6 +53,34 @@ scripts/          headless multi-client integration suite
 `packages/shared` is the keystone: the Socket.IO generics are instantiated from it
 on both sides, so a protocol change is a compile error rather than a runtime mystery.
 
+## Word modes
+
+**Built-in** (default) — the server picks each turn's candidates from the shipped list.
+
+**Players suggest** — each turn the non-drawing players propose a word and the drawer
+picks from what arrives. The list is topped up with built-in words so the drawer always
+has a real choice, and the padding is indistinguishable from the suggestions.
+
+That mode has one structural hazard: whoever suggested the chosen word knows the answer.
+Three rules keep it from wrecking the game:
+
+- **Authorship stays hidden until the turn ends**, so a drawer cannot deliberately hand
+  a turn to a friend.
+- **The author cannot score on their own word.** Typing it is swallowed rather than
+  rejected — letting it fall through to ordinary chat would print the answer to everyone
+  still guessing. They are excluded from the guesser count too, or the "everybody
+  guessed" early end could never fire.
+- **The author earns more the fewer people solve it, and nothing at all when nobody
+  does.** That zero is load-bearing. On a purely decreasing curve the best possible
+  submission is gibberish: the author banks maximum precisely when the turn is ruined for
+  everyone else, which makes griefing the dominant strategy. Anchoring zero guesses at
+  zero points makes "hard but gettable" the winning play instead.
+
+Because the bonus also collapses when *everyone* gets it, the author has no reason to
+blurt the answer — the incentives police the leak, so no chat restriction is needed.
+The mode wants 4+ players: with three, there is a single eligible guesser and the curve
+collapses to all-or-nothing.
+
 ## How the secret stays secret
 
 The whole game hinges on hiding the word from the people trying to guess it, which

@@ -25,6 +25,12 @@ export interface Player {
   connected: boolean;
 }
 
+/** `builtin` draws from the shipped word list; `players` has the non-drawing
+ *  players suggest the words the drawer picks from. */
+export type WordMode = 'builtin' | 'players';
+
+export const WORD_MODES: readonly WordMode[] = ['builtin', 'players'];
+
 export interface RoomSettings {
   rounds: number;
   /** seconds */
@@ -32,6 +38,7 @@ export interface RoomSettings {
   wordChoices: number;
   hints: number;
   maxPlayers: number;
+  wordMode: WordMode;
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
@@ -40,7 +47,15 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   wordChoices: 3,
   hints: 2,
   maxPlayers: 12,
+  wordMode: 'builtin',
 };
+
+/** One option on the drawer's pick list. Carries an id because the list grows
+ *  while the drawer is looking at it, so a positional index is not stable. */
+export interface WordOption {
+  id: string;
+  text: string;
+}
 
 export const SETTINGS_BOUNDS = {
   rounds: { min: 1, max: 10 },

@@ -28,6 +28,9 @@ export function isAllowedOrigin(origin: string | undefined): boolean {
 
 /** Seconds the drawer gets to pick from the offered words before one is auto-picked. */
 export const CHOOSE_SECONDS = 15;
+/** Longer in the player-suggested mode: the window also has to cover everyone
+ *  else typing a word in. */
+export const SUGGEST_SECONDS = 20;
 /** Scoreboard pause between turns. */
 export const TURN_END_SECONDS = 6;
 /** Podium display before the room falls back to the lobby. */
@@ -44,4 +47,5 @@ export const MAX_OPS_PER_TURN = 4000;
 
 /** Token buckets, sized so normal play never notices and a scripted flood does. */
 export const CHAT_BUCKET = { capacity: 6, refillPerSec: 1.5 };
+export const SUGGEST_BUCKET = { capacity: 5, refillPerSec: 0.8 };
 export const DRAW_BUCKET = { capacity: 120, refillPerSec: 60 };

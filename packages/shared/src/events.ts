@@ -1,6 +1,6 @@
 import type {
   Avatar, CanvasOp, ChatMessage, PenTool, Player,
-  RoomSettings, RoomState, TurnPublic,
+  RoomSettings, RoomState, TurnPublic, WordOption,
 } from './types.js';
 
 export interface JoinOk {
@@ -16,6 +16,10 @@ export interface JoinErr {
   message: string;
 }
 export type JoinAck = JoinOk | JoinErr;
+
+export type SuggestAck =
+  | { ok: true; text: string }
+  | { ok: false; message: string };
 
 export interface DrawStart {
   id: string;
@@ -35,7 +39,12 @@ export interface ClientToServerEvents {
   'room:settings': (p: Partial<RoomSettings>) => void;
   'game:start': () => void;
 
-  'word:choose': (p: { index: number }) => void;
+  /** Identified by id, not position: in the player-suggested mode the option
+   *  list grows while the drawer is reading it, so an index picked at one moment
+   *  can point at a different word by the time it arrives. */
+  'word:choose': (p: { id: string }) => void;
+  /** One per player per turn; sending again replaces the previous suggestion. */
+  'word:suggest': (p: { text: string }, cb?: (r: SuggestAck) => void) => void;
 
   'draw:start': (p: DrawStart) => void;
   'draw:append': (p: { id: string; pts: number[] }) => void;
@@ -62,9 +71,13 @@ export interface ServerToClientEvents {
     drawerId: string;
     round: number;
     endsAt: number;
-    /** Present ONLY on the drawer's own socket. */
-    words?: string[];
+    /** Present ONLY on the drawer's own socket, and deliberately carries no
+     *  authorship — otherwise the drawer could hand a turn to a friend. */
+    words?: WordOption[];
   }) => void;
+  /** Suggestion window status. Carries a COUNT, never the suggested words —
+   *  those go to the drawer alone. A sender's own word comes back in the ack. */
+  'suggest:state': (p: { open: boolean; endsAt: number; count: number }) => void;
   /** Emitted to the drawer's socket alone. Never broadcast. */
   'word:secret': (p: { word: string }) => void;
   'turn:drawing': (p: TurnPublic) => void;
@@ -74,6 +87,8 @@ export interface ServerToClientEvents {
     deltas: Record<string, number>;
     players: Player[];
     reason: 'timeout' | 'all-guessed' | 'drawer-left';
+    /** Who suggested the word, revealed only now that the turn is over. */
+    authorId?: string;
   }) => void;
   'game:end': (p: { players: Player[] }) => void;
 
