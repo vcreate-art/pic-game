@@ -1,6 +1,6 @@
 import { SETTINGS_BOUNDS, type RoomSettings, type WordMode } from '@pic-game/shared';
 import { getSocket } from '../net/socket.js';
-import { selectIsHost, useGame } from '../store/game.js';
+import { selectIsHost, selectSkribbl, useGame } from '../store/game.js';
 
 const FIELDS: Array<{ key: keyof typeof SETTINGS_BOUNDS; label: string; step: number }> = [
   { key: 'rounds', label: 'Rounds', step: 1 },
@@ -11,7 +11,7 @@ const FIELDS: Array<{ key: keyof typeof SETTINGS_BOUNDS; label: string; step: nu
 ];
 
 export function Settings() {
-  const settings = useGame((s) => s.room?.settings);
+  const settings = useGame((s) => selectSkribbl(s)?.settings);
   const isHost = useGame(selectIsHost);
   const socket = getSocket();
   if (!settings) return null;

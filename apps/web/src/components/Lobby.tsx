@@ -1,41 +1,29 @@
 import { useState } from 'react';
-import { copyText } from '../lib/clipboard.js';
 import { getSocket } from '../net/socket.js';
-import { selectIsHost, useGame } from '../store/game.js';
+import { selectIsHost, selectSkribbl, useGame } from '../store/game.js';
 import { Avatar } from './Avatar.js';
+import { InviteCard } from './InviteCard.js';
 import { KickButton } from './KickButton.js';
 import { Settings } from './Settings.js';
 
 export function Lobby() {
   const room = useGame((s) => s.room);
   const isHost = useGame(selectIsHost);
-  const [copyState, setCopyState] = useState<'idle' | 'ok' | 'failed'>('idle');
+  const maxPlayers = useGame((s) => selectSkribbl(s)?.settings.maxPlayers);
   const socket = getSocket();
   if (!room) return null;
 
-  const link = `${window.location.origin}/room/${room.code}`;
   const enough = room.players.filter((p) => p.connected).length >= 2;
 
-  const copy = async () => {
-    const ok = await copyText(link);
-    setCopyState(ok ? 'ok' : 'failed');
-    setTimeout(() => setCopyState('idle'), 2400);
-  };
 
   return (
     <div className="lobby">
-      <div className="lobby__invite card">
-        <h2 className="card__title">Invite friends</h2>
-        <div className="lobby__code">{room.code}</div>
-        <button type="button" className="btn btn--ghost" onClick={copy}>
-          {copyState === 'ok' ? 'Link copied' : copyState === 'failed' ? 'Copy it below' : 'Copy invite link'}
-        </button>
-        <p className="lobby__link">{link}</p>
-      </div>
+      <InviteCard />
 
       <div className="lobby__players card">
         <h2 className="card__title">
-          In the room · {room.players.length}/{room.settings.maxPlayers}
+          In the room · {room.players.length}
+          {maxPlayers ? `/${maxPlayers}` : ''}
         </h2>
         <ul className="lobby__grid">
           {room.players.map((p) => (

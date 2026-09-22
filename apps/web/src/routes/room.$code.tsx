@@ -1,20 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoute, useNavigate, useParams } from '@tanstack/react-router';
-import { CanvasBoard } from '../canvas/CanvasBoard.js';
 import { getEngine } from '../canvas/engineInstance.js';
-import { Chat } from '../components/Chat.js';
 import { JoinPanel, type Identity } from '../components/JoinPanel.js';
+import { KungFuGame } from '../components/kungfu/KungFuGame.js';
 import { Lobby } from '../components/Lobby.js';
-import { Podium } from '../components/Podium.js';
-import { Scoreboard } from '../components/Scoreboard.js';
-import { Timer } from '../components/Timer.js';
-import { Toolbar } from '../components/Toolbar.js';
-import { TurnResult } from '../components/TurnResult.js';
-import { WordChoice } from '../components/WordChoice.js';
-import { WordMask } from '../components/WordMask.js';
+import { SkribblGame } from '../components/skribbl/SkribblGame.js';
 import { bindSocket } from '../net/bindings.js';
 import { clearSeat, getSocket, loadProfile, loadSeat, saveSeat } from '../net/socket.js';
-import { selectIsDrawer, useGame } from '../store/game.js';
+import { useGame } from '../store/game.js';
 import { Route as rootRoute } from './__root.js';
 
 function RoomPage() {
@@ -22,8 +15,7 @@ function RoomPage() {
   const navigate = useNavigate();
   const me = useGame((s) => s.me);
   const room = useGame((s) => s.room);
-  const phase = room?.phase;
-  const isDrawer = useGame(selectIsDrawer);
+  const phase = room?.kind === 'skribbl' ? room.phase : room?.game.phase;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const identity = useRef<Identity | null>(loadProfile());
@@ -130,6 +122,10 @@ function RoomPage() {
     );
   }
 
+  // Chess runs its own lobby, because "waiting to start" there means choosing
+  // sides on the board rather than setting up a word list.
+  if (room.kind === 'kungfu') return <KungFuGame onLeave={leave} />;
+
   if (phase === 'lobby') {
     return (
       <div className="lobbyscreen">
@@ -143,44 +139,7 @@ function RoomPage() {
     );
   }
 
-  return (
-    <div className="game">
-      {/* Three tracks, with the word in the middle one, so it centres against
-          the header itself rather than against whatever space is left over. */}
-      <div className="game__head">
-        <div className="game__head-side">
-          <span className="game__round">
-            Round {room.round}/{room.settings.rounds}
-          </span>
-        </div>
-        <WordMask />
-        <div className="game__head-side game__head-side--end">
-          {phase === 'drawing' && room.turn && (
-            <Timer endsAt={room.turn.endsAt} total={room.settings.drawTime} />
-          )}
-          <button className="tool tool--leave" type="button" onClick={leave}>
-            Leave
-          </button>
-        </div>
-      </div>
-
-      <div className="game__body">
-        <Scoreboard />
-
-        <div className="game__stage">
-          <div className="board__wrap">
-            <CanvasBoard />
-            {phase === 'choosing' && <WordChoice />}
-            {phase === 'turnEnd' && <TurnResult />}
-            {phase === 'gameEnd' && <Podium />}
-          </div>
-          {isDrawer && phase === 'drawing' && <Toolbar />}
-        </div>
-
-        <Chat />
-      </div>
-    </div>
-  );
+  return <SkribblGame onLeave={leave} />;
 }
 
 export const Route = createRoute({

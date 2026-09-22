@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { maskOf } from '@pic-game/shared';
-import { useGame, selectIsDrawer } from '../store/game.js';
+import { useGame, selectIsDrawer, selectSkribbl } from '../store/game.js';
 
 function EyeIcon({ off }: { off: boolean }) {
   return (
@@ -46,7 +46,7 @@ function Slots({ mask, revealed }: { mask: string; revealed: Record<number, stri
 export function WordMask() {
   const isDrawer = useGame(selectIsDrawer);
   const secret = useGame((s) => s.secret);
-  const turn = useGame((s) => s.room?.turn);
+  const turn = useGame((s) => selectSkribbl(s)?.turn);
   const [hidden, setHidden] = useState(false);
 
   // Every new word starts visible — you cannot draw what you cannot read. The

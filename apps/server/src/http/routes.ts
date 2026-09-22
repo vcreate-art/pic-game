@@ -21,8 +21,9 @@ export function makeRoutes(rooms: RoomManager): Router {
       exists: true,
       code: room.code,
       players: room.activeCount(),
-      maxPlayers: room.settings.maxPlayers,
-      phase: room.phase,
+      maxPlayers: room.maxPlayers,
+      kind: room.kind,
+      inLobby: room.isLobby(),
     });
   });
 

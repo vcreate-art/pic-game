@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MAX_CHAT_LEN } from '../constants.js';
 import { getSocket } from '../net/socket.js';
-import { selectHaveGuessed, selectIsDrawer, useGame } from '../store/game.js';
+import { selectHaveGuessed, selectIsDrawer, selectSkribbl, useGame } from '../store/game.js';
 
 /** Counts what the word mask counts: letters and digits, not spaces or hyphens,
  *  so "yo-yo" reads as 4 against 4 rather than 5. */
@@ -13,8 +13,8 @@ export function Chat() {
   const messages = useGame((s) => s.messages);
   const isDrawer = useGame(selectIsDrawer);
   const haveGuessed = useGame(selectHaveGuessed);
-  const phase = useGame((s) => s.room?.phase);
-  const mask = useGame((s) => s.room?.turn?.mask ?? '');
+  const phase = useGame((s) => selectSkribbl(s)?.phase);
+  const mask = useGame((s) => selectSkribbl(s)?.turn?.mask ?? '');
   const [text, setText] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
   const socket = getSocket();
@@ -56,7 +56,7 @@ export function Chat() {
             <span className="msg__text">{m.text}</span>
           </div>
         ))}
-        {messages.length === 0 && <p className="chat__empty">Guesses show up here.</p>}
+        {messages.length === 0 && <p className="chat__empty">Messages show up here.</p>}
       </div>
 
       {/* No send button: a single-input form submits on Enter, and the on-screen

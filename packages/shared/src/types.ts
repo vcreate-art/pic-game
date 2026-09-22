@@ -8,6 +8,8 @@ export const QUANT = 4095;
 
 export type Phase = 'lobby' | 'choosing' | 'drawing' | 'turnEnd' | 'gameEnd';
 
+import type { KungFuPublic } from './kungfu/types.js';
+
 export interface Avatar {
   /** index into AVATAR_COLORS */
   color: number;
@@ -114,19 +116,44 @@ export interface TurnPublic {
   guessed: string[];
 }
 
-export interface RoomState {
+/** Which game a room is playing. Fixed when the room is created. */
+export type GameKind = 'skribbl' | 'kungfu';
+
+export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu'];
+
+export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
+  skribbl: { name: 'Draw & Guess', blurb: 'One player draws a secret word, everyone races to guess it.' },
+  kungfu: { name: 'Kung Fu Chess', blurb: 'Chess with no turns. Move whenever you like — each piece needs to catch its breath.' },
+};
+
+/** What every room reports, whichever game it is running. */
+export interface RoomStateBase {
   code: string;
-  phase: Phase;
-  settings: RoomSettings;
+  kind: GameKind;
   players: Player[];
   hostId: string;
+  /** server epoch ms at send time, for clock-offset estimation */
+  serverTime: number;
+}
+
+export interface SkribblRoomState extends RoomStateBase {
+  kind: 'skribbl';
+  phase: Phase;
+  settings: RoomSettings;
   round: number;
   turn: TurnPublic | null;
   /** full canvas history, so a late joiner replays the drawing exactly */
   ops: CanvasOp[];
-  /** server epoch ms at send time, for clock-offset estimation */
-  serverTime: number;
 }
+
+export interface KungFuRoomState extends RoomStateBase {
+  kind: 'kungfu';
+  game: KungFuPublic;
+}
+
+/** Discriminated on `kind`, so reading a field the other game does not have is
+ *  a compile error rather than an undefined at runtime. */
+export type RoomState = SkribblRoomState | KungFuRoomState;
 
 export type ChatKind = 'chat' | 'system' | 'correct' | 'close' | 'secret';
 

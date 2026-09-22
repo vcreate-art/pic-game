@@ -1,7 +1,8 @@
 import type {
-  Avatar, CanvasOp, ChatMessage, PenTool, Player,
+  Avatar, CanvasOp, ChatMessage, GameKind, PenTool, Player,
   RoomSettings, RoomState, TurnPublic, WordOption,
 } from './types.js';
+import type { KungFuPublic, KungFuSettings, Piece, Side, Square } from './kungfu/types.js';
 
 export interface JoinOk {
   ok: true;
@@ -30,7 +31,10 @@ export interface DrawStart {
 }
 
 export interface ClientToServerEvents {
-  'room:create': (p: { name: string; avatar: Avatar }, cb: (r: JoinAck) => void) => void;
+  'room:create': (
+    p: { name: string; avatar: Avatar; game?: GameKind },
+    cb: (r: JoinAck) => void,
+  ) => void;
   'room:join': (
     p: { code: string; name: string; avatar: Avatar; token?: string },
     cb: (r: JoinAck) => void,
@@ -56,6 +60,13 @@ export interface ClientToServerEvents {
   'canvas:clear': () => void;
 
   'chat:guess': (p: { text: string }) => void;
+
+  // ---- Kung Fu Chess ----
+  /** Claim or release a side. The host starts the game once both are taken. */
+  'chess:seat': (p: { side: Side | null }) => void;
+  'chess:move': (p: { pieceId: string; to: Square }) => void;
+  'chess:settings': (p: Partial<KungFuSettings>) => void;
+  'chess:rematch': () => void;
 
   /** Round-trip probe used to estimate clock offset against the server. */
   'time:ping': (cb: (serverNow: number) => void) => void;
@@ -117,6 +128,23 @@ export interface ServerToClientEvents {
   /** Carries a player id and nothing else — echoing the guess text would
    *  print the secret word to everyone still guessing. */
   'guess:correct': (p: { playerId: string; placement: number }) => void;
+
+  // ---- Kung Fu Chess ----
+  'chess:state': (p: KungFuPublic) => void;
+  /** A piece moved. `readyAt` is when it may move again, in server time. */
+  'chess:moved': (p: {
+    pieceId: string;
+    from: Square;
+    to: Square;
+    readyAt: number;
+    /** Id of the piece taken, if any. */
+    captured?: string;
+    /** Set when a pawn promoted, so clients can swap the sprite. */
+    promotedTo?: Piece['type'];
+  }) => void;
+  /** The mover's own attempt was refused; nobody else needs to know. */
+  'chess:rejected': (p: { pieceId: string; reason: string }) => void;
+  'chess:over': (p: { winner: Side | null; reason: KungFuPublic['reason'] }) => void;
 
   'error': (p: { code: string; message: string }) => void;
 }

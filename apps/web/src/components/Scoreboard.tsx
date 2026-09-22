@@ -1,10 +1,10 @@
-import { selectIsHost, useGame } from '../store/game.js';
+import { selectIsHost, selectSkribbl, useGame } from '../store/game.js';
 import { Avatar } from './Avatar.js';
 import { KickButton } from './KickButton.js';
 
 export function Scoreboard() {
   const players = useGame((s) => s.room?.players ?? []);
-  const turn = useGame((s) => s.room?.turn);
+  const turn = useGame((s) => selectSkribbl(s)?.turn);
   const hostId = useGame((s) => s.room?.hostId);
   const me = useGame((s) => s.me);
   /** Whether *we* are the host, as distinct from the per-row `isHost`. */

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { GAME_KINDS, GAME_LABELS, type GameKind } from '@pic-game/shared';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { JoinPanel, type Identity } from '../components/JoinPanel.js';
 import { peekRoom } from '../api/client.js';
@@ -11,6 +12,7 @@ function Landing() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState('');
+  const [game, setGame] = useState<GameKind>('skribbl');
 
   const go = (id: Identity) => {
     setBusy(true);
@@ -46,7 +48,7 @@ function Landing() {
       return;
     }
 
-    socket.emit('room:create', { name: id.name, avatar: id.avatar }, (res) => {
+    socket.emit('room:create', { name: id.name, avatar: id.avatar, game }, (res) => {
       setBusy(false);
       if (!res.ok) {
         setError(res.message);
@@ -62,14 +64,37 @@ function Landing() {
   return (
     <div className="landing">
       <div className="landing__hero">
-        <h1 className="landing__title">Draw. Guess. Win.</h1>
-        <p className="landing__sub">
-          One player draws a secret word, everyone else races to guess it. Fastest guess scores most.
-        </p>
+        <h1 className="landing__title">Pick your game.</h1>
+        <p className="landing__sub">Grab some friends. One link, everyone's in.</p>
       </div>
 
+      {/* Hidden once a code is typed: joining an existing room inherits
+          whichever game that room was created with. */}
+      {!code.trim() && (
+        <div className="picker">
+          {GAME_KINDS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              className={`pick ${game === k ? 'is-active' : ''}`}
+              aria-pressed={game === k}
+              onClick={() => setGame(k)}
+            >
+              <span className="pick__art" aria-hidden="true">{k === 'skribbl' ? '✏️' : '♞'}</span>
+              <strong>{GAME_LABELS[k].name}</strong>
+              <span>{GAME_LABELS[k].blurb}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="card landing__card">
-        <JoinPanel submitLabel={code.trim() ? 'Join room' : 'Create room'} busy={busy} error={error} onSubmit={go}>
+        <JoinPanel
+          submitLabel={code.trim() ? 'Join room' : `Create ${GAME_LABELS[game].name}`}
+          busy={busy}
+          error={error}
+          onSubmit={go}
+        >
           <label className="field">
             <span className="field__label">Room code <em>— leave blank to start a new one</em></span>
             <input

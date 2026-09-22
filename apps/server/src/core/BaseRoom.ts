@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Server } from 'socket.io';
 import type {
-  Avatar, ChatMessage, ClientToServerEvents, Player, ServerToClientEvents,
+  Avatar, ChatMessage, ClientToServerEvents, GameKind, Player, RoomState,
+  ServerToClientEvents,
 } from '@pic-game/shared';
 import { EMPTY_ROOM_TTL_MS, RECONNECT_GRACE_MS } from '../config.js';
 
@@ -54,6 +55,12 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
 
   // ---------------------------------------------------------------- game hooks
 
+  /** Which game this room is running. Fixed at creation. */
+  abstract readonly kind: GameKind;
+  /** Capacity, which each game sets for itself. */
+  abstract get maxPlayers(): number;
+  /** The full snapshot sent on join and reconnect. */
+  abstract publicState(): RoomState;
   /** Games that are mid-play should say so; the lobby is handled generically. */
   abstract isLobby(): boolean;
   /** Below this, an in-progress game gives up and returns to the lobby. */

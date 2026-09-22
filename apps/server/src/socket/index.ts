@@ -4,7 +4,8 @@ import {
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
 import { CHAT_BUCKET, DRAW_BUCKET, MAX_NAME_LEN, SUGGEST_BUCKET } from '../config.js';
-import type { RoomManager } from '../core/RoomManager.js';
+import type { AnyRoom, RoomManager } from '../core/RoomManager.js';
+import type { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
 import type { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
 import { TokenBucket } from '../rateLimit.js';
 
@@ -14,7 +15,7 @@ type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
 /** Per-connection session. The room/player binding lives here rather than on the
  *  socket id, which is not stable across reconnects. */
 interface Session {
-  room: SkribblRoom | null;
+  room: AnyRoom | null;
   playerId: string | null;
   chat: TokenBucket;
   draw: TokenBucket;
@@ -57,11 +58,17 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       suggest: new TokenBucket(SUGGEST_BUCKET.capacity, SUGGEST_BUCKET.refillPerSec),
     };
 
-    const bind = (room: SkribblRoom, playerId: string) => {
+    const bind = (room: AnyRoom, playerId: string) => {
       s.room = room;
       s.playerId = playerId;
       socket.join(room.code);
     };
+
+    /** The room this socket is in, if it is the drawing game. */
+    const skribbl = (): SkribblRoom | null =>
+      s.room?.kind === 'skribbl' && s.playerId ? s.room : null;
+    const chess = (): KungFuRoom | null =>
+      s.room?.kind === 'kungfu' && s.playerId ? s.room : null;
 
     socket.on('time:ping', (cb) => {
       if (typeof cb === 'function') cb(Date.now());
@@ -82,7 +89,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
         prev.removePlayer(prevId);
       }
 
-      const room = rooms.create();
+      const room = rooms.create(p?.game === 'kungfu' ? 'kungfu' : 'skribbl');
       const player = room.addPlayer(name, cleanAvatar(p?.avatar), socket.id);
       bind(room, player.id);
       cb({ ok: true, playerId: player.id, token: player.token, state: room.publicState() });
@@ -128,12 +135,12 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
           bind(room, reclaimed.id);
           cb({ ok: true, playerId: reclaimed.id, token: reclaimed.token, state: room.publicState() });
           io.to(room.code).emit('player:updated', room.publicPlayers().find((x) => x.id === reclaimed.id)!);
-          room.resendSecretIfDrawer(reclaimed.id);
+          if (room.kind === 'skribbl') room.resendSecretIfDrawer(reclaimed.id);
           return;
         }
       }
 
-      if (room.players.size >= room.settings.maxPlayers) {
+      if (room.players.size >= room.maxPlayers) {
         return cb({ ok: false, code: 'FULL', message: 'That room is full.' });
       }
 
@@ -145,8 +152,9 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
     });
 
     socket.on('room:settings', (patch) => {
-      if (!s.room || !s.playerId || s.playerId !== s.room.hostId) return;
-      s.room.updateSettings(patch ?? {});
+      const room = skribbl();
+      if (!room || s.playerId !== room.hostId) return;
+      room.updateSettings(patch ?? {});
     });
 
     socket.on('game:start', () => {
@@ -155,27 +163,30 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
     });
 
     socket.on('word:choose', (p) => {
-      if (!s.room || !s.playerId) return;
+      const room = skribbl();
+      if (!room || !s.playerId) return;
       if (typeof p?.id !== 'string' || p.id.length > 64) return;
-      s.room.chooseWord(s.playerId, p.id);
+      room.chooseWord(s.playerId, p.id);
     });
 
     socket.on('word:suggest', (p, cb) => {
-      if (!s.room || !s.playerId) return;
+      const room = skribbl();
+      if (!room || !s.playerId) return;
       if (!s.suggest.tryTake()) {
         if (typeof cb === 'function') cb({ ok: false, message: 'Slow down a little.' });
         return;
       }
       // Validation lives in the room so it can see what is already suggested.
-      const result = s.room.suggestWord(s.playerId, p?.text);
+      const result = room.suggestWord(s.playerId, p?.text);
       if (typeof cb === 'function') cb(result);
     });
 
     socket.on('draw:start', (p) => {
-      if (!s.room || !s.playerId || !s.draw.tryTake()) return;
+      const room = skribbl();
+      if (!room || !s.playerId || !s.draw.tryTake()) return;
       const pts = sanitizePoints(p?.pts);
       if (!pts || typeof p?.id !== 'string' || p.id.length > 64) return;
-      s.room.strokeStart(s.playerId, {
+      room.strokeStart(s.playerId, {
         id: p.id,
         tool: p.tool === 'eraser' ? 'eraser' : 'pen',
         color: cleanColor(p.color),
@@ -185,32 +196,37 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
     });
 
     socket.on('draw:append', (p) => {
-      if (!s.room || !s.playerId || !s.draw.tryTake()) return;
+      const room = skribbl();
+      if (!room || !s.playerId || !s.draw.tryTake()) return;
       const pts = sanitizePoints(p?.pts);
       if (!pts || typeof p?.id !== 'string') return;
-      s.room.strokeAppend(s.playerId, p.id, pts);
+      room.strokeAppend(s.playerId, p.id, pts);
     });
 
     socket.on('draw:end', (p) => {
-      if (!s.room || !s.playerId || typeof p?.id !== 'string') return;
-      s.room.strokeEnd(s.playerId, p.id);
+      const room = skribbl();
+      if (!room || !s.playerId || typeof p?.id !== 'string') return;
+      room.strokeEnd(s.playerId, p.id);
     });
 
     socket.on('draw:fill', (p) => {
-      if (!s.room || !s.playerId || !s.draw.tryTake(2)) return;
+      const room = skribbl();
+      if (!room || !s.playerId || !s.draw.tryTake(2)) return;
       const pts = sanitizePoints([p?.x, p?.y]);
       if (!pts) return;
-      s.room.fill(s.playerId, pts[0]!, pts[1]!, cleanColor(p?.color));
+      room.fill(s.playerId, pts[0]!, pts[1]!, cleanColor(p?.color));
     });
 
     socket.on('canvas:undo', () => {
-      if (!s.room || !s.playerId || !s.draw.tryTake(4)) return;
-      s.room.undo(s.playerId);
+      const room = skribbl();
+      if (!room || !s.playerId || !s.draw.tryTake(4)) return;
+      room.undo(s.playerId);
     });
 
     socket.on('canvas:clear', () => {
-      if (!s.room || !s.playerId || !s.draw.tryTake(8)) return;
-      s.room.clearCanvas(s.playerId);
+      const room = skribbl();
+      if (!room || !s.playerId || !s.draw.tryTake(8)) return;
+      room.clearCanvas(s.playerId);
     });
 
     socket.on('chat:guess', (p) => {
@@ -227,6 +243,35 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       if (!s.room || !s.playerId) return;
       if (typeof p?.playerId !== 'string') return;
       s.room.kick(s.playerId, p.playerId);
+    });
+
+    socket.on('chess:seat', (p) => {
+      const room = chess();
+      if (!room || !s.playerId) return;
+      const side = p?.side;
+      if (side !== 'w' && side !== 'b' && side !== null) return;
+      room.takeSeat(s.playerId, side);
+    });
+
+    socket.on('chess:move', (p) => {
+      const room = chess();
+      if (!room || !s.playerId) return;
+      // Same bucket as drawing: a move is the chess equivalent of a stroke.
+      if (!s.draw.tryTake()) return;
+      if (typeof p?.pieceId !== 'string' || p.pieceId.length > 64) return;
+      room.move(s.playerId, p.pieceId, Number(p.to));
+    });
+
+    socket.on('chess:settings', (p) => {
+      const room = chess();
+      if (!room || s.playerId !== room.hostId) return;
+      room.updateSettings(p ?? {});
+    });
+
+    socket.on('chess:rematch', () => {
+      const room = chess();
+      if (!room || !s.playerId) return;
+      room.rematch(s.playerId);
     });
 
     socket.on('room:leave', () => {

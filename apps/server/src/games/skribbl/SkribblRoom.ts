@@ -23,6 +23,7 @@ export interface ServerPlayer extends CorePlayer {
 /** Draw-and-guess. Seats, host, presence and chat come from BaseRoom; this
  *  class is the game itself — turns, words, scoring and the canvas. */
 export class SkribblRoom extends BaseRoom<ServerPlayer> {
+  readonly kind = 'skribbl' as const;
   settings: RoomSettings = { ...DEFAULT_SETTINGS };
   phase: Phase = 'lobby';
   round = 0;
@@ -68,6 +69,10 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
   isLobby(): boolean {
     return this.phase === 'lobby';
+  }
+
+  get maxPlayers(): number {
+    return this.settings.maxPlayers;
   }
 
   protected get minPlayers(): number {
@@ -669,6 +674,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
    *  field capable of carrying the word — the type itself enforces the invariant. */
   publicState(): RoomState {
     return {
+      kind: 'skribbl',
       code: this.code,
       phase: this.phase,
       settings: this.settings,

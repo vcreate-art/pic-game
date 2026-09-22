@@ -25,7 +25,8 @@ export function bindSocket(engine: CanvasEngine): () => void {
 
   socket.on('state:sync', (state) => {
     g().sync(state);
-    engine.replay(state.ops);
+    // Only the drawing game has a canvas to restore.
+    if (state.kind === 'skribbl') engine.replay(state.ops);
   });
 
   socket.on('player:joined', (p) => g().patchPlayer(p));
@@ -54,6 +55,17 @@ export function bindSocket(engine: CanvasEngine): () => void {
   socket.on('canvas:undone', ({ ops }) => engine.replay(ops));
   socket.on('canvas:cleared', () => engine.clear());
 
+  // --- kung fu chess ---
+  socket.on('chess:state', (game) => g().setChess(game));
+  socket.on('chess:moved', (m) => g().applyChessMove(m));
+  socket.on('chess:over', ({ winner, reason }) => g().chessOver(winner, reason));
+  socket.on('chess:rejected', ({ reason }) => {
+    g().setNotice(reason);
+    setTimeout(() => {
+      if (useGame.getState().notice === reason) useGame.getState().setNotice(null);
+    }, 1800);
+  });
+
   socket.on('chat:message', (m) => g().pushMessage(m));
   socket.on('guess:correct', ({ playerId }) => g().markGuessed(playerId));
 
@@ -75,6 +87,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
       'turn:drawing', 'hint:reveal', 'turn:end', 'game:end',
       'draw:start', 'draw:append', 'draw:end', 'draw:fill',
       'canvas:undone', 'canvas:cleared', 'chat:message', 'guess:correct', 'error',
+      'chess:state', 'chess:moved', 'chess:over', 'chess:rejected',
     ] as const) {
       socket.off(ev);
     }

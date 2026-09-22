@@ -513,3 +513,98 @@ button, input { font: inherit; color: inherit; }
 .scores__list.is-host .scores__row {
   grid-template-columns: 16px auto minmax(0, 1fr) auto auto;
 }
+
+/* ---------------------------------------------------------------- game picker */
+
+.picker { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pick {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  padding: 14px; text-align: left; cursor: pointer;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  transition: border-color .15s ease, transform .08s ease;
+}
+.pick:hover { border-color: var(--accent); }
+.pick:active { transform: translateY(1px); }
+.pick.is-active { border-color: var(--accent); background: var(--accent-soft); }
+.pick__art { font-size: 26px; line-height: 1; margin-bottom: 4px; }
+.pick strong { font-family: var(--display); font-size: 16px; }
+.pick span:not(.pick__art) { font-size: 12px; color: var(--ink-soft); line-height: 1.4; }
+.pick.is-active strong { color: var(--accent); }
+
+/* ---------------------------------------------------------------- chess */
+
+.chess {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  aspect-ratio: 1;
+  /* Square, and never taller than the viewport — a wide stage column would
+     otherwise push the bottom ranks off the screen. */
+  width: min(100%, 68vh);
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  background: var(--card);
+}
+.sq {
+  position: relative; border: 0; padding: 0; cursor: pointer;
+  display: grid; place-items: center;
+  font-size: clamp(18px, 4.4vw, 44px); line-height: 1;
+}
+.sq:disabled { cursor: default; }
+.sq--light { background: #f1ece1; }
+.sq--dark { background: #b9a88f; }
+.sq.is-selected { box-shadow: inset 0 0 0 3px var(--accent); }
+/* A dot for an empty destination, a ring for a capture — readable without
+   relying on colour alone. */
+.sq.is-target::before {
+  content: ''; position: absolute; width: 26%; height: 26%;
+  border-radius: 50%; background: rgba(91, 75, 219, .45);
+}
+.sq.is-capture::before {
+  content: ''; position: absolute; inset: 6%;
+  border-radius: 50%; border: 3px solid rgba(220, 38, 38, .6);
+}
+
+.pc { position: relative; display: grid; place-items: center; user-select: none; }
+.pc--w { color: #fff; text-shadow: 0 1px 0 #6b6153, 0 0 3px rgba(0,0,0,.45); }
+.pc--b { color: #23201c; text-shadow: 0 1px 0 rgba(255,255,255,.25); }
+.pc.is-cooling { opacity: .55; }
+
+/* The cooldown wipe is a CSS animation so a ticking timer costs no React
+   renders — the piece is repainted only when the board actually changes. */
+.pc__cool {
+  position: absolute; left: 50%; bottom: -14%; translate: -50% 0;
+  width: 62%; height: 4px; border-radius: 999px; background: var(--accent);
+  transform-origin: left center;
+  animation-name: cooldown; animation-timing-function: linear; animation-fill-mode: forwards;
+}
+@keyframes cooldown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+.chess__vs { font-family: var(--display); font-weight: 700; font-size: 15px; }
+.chess__vs em { font-style: normal; color: var(--ink-soft); margin: 0 4px; }
+
+.seats { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.seat {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center; gap: 8px;
+  padding: 8px; border: 1px solid var(--line); border-radius: 11px; background: var(--paper);
+}
+.seat.is-mine { border-color: var(--accent); background: var(--accent-soft); }
+.seat__chip {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  padding: 3px 8px; border-radius: 6px;
+}
+.seat__chip--w { background: #fff; color: #44403c; box-shadow: inset 0 0 0 1px var(--line); }
+.seat__chip--b { background: #2b2825; color: #fff; }
+.seat__who { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0; }
+.seat__open { font-size: 13px; color: var(--ink-soft); font-style: italic; }
+
+@media (max-width: 640px) {
+  .picker { grid-template-columns: 1fr; }
+}
+
+.chess__side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.chess__side .lobby__invite { text-align: center; }

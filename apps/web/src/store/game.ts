@@ -1,5 +1,8 @@
 import { create } from 'zustand';
-import type { ChatMessage, Player, RoomSettings, RoomState, WordOption } from '@pic-game/shared';
+import type {
+  ChatMessage, KungFuPublic, KungFuRoomState, Piece, Player, RoomSettings,
+  RoomState, Side, SkribblRoomState, WordOption,
+} from '@pic-game/shared';
 
 const MAX_MESSAGES = 200;
 
@@ -55,13 +58,19 @@ interface GameStore {
   setMySuggestion: (text: string | null) => void;
   setSuggestError: (e: string | null) => void;
   setSecret: (w: string) => void;
-  beginDrawing: (turn: NonNullable<RoomState['turn']>) => void;
+  beginDrawing: (turn: NonNullable<SkribblRoomState['turn']>) => void;
   reveal: (index: number, char: string) => void;
   markGuessed: (playerId: string) => void;
   endTurn: (r: TurnResult) => void;
   endGame: (players: Player[]) => void;
   pushMessage: (m: ChatMessage) => void;
   setNotice: (n: string | null) => void;
+  setChess: (game: KungFuPublic) => void;
+  applyChessMove: (m: {
+    pieceId: string; to: number; readyAt: number;
+    captured?: string; promotedTo?: Piece['type'];
+  }) => void;
+  chessOver: (winner: Side | null, reason: KungFuPublic['reason']) => void;
   setKickedBy: (name: string) => void;
   reset: () => void;
 }
@@ -106,7 +115,8 @@ export const useGame = create<GameStore>((set) => ({
       s.room ? { room: { ...s.room, players: s.room.players.filter((p) => p.id !== id) } } : {},
     ),
 
-  setSettings: (settings) => set((s) => (s.room ? { room: { ...s.room, settings } } : {})),
+  setSettings: (settings) =>
+    set((s) => (s.room?.kind === 'skribbl' ? { room: { ...s.room, settings } } : {})),
   setHost: (hostId) => set((s) => (s.room ? { room: { ...s.room, hostId } } : {})),
 
   beginChoosing: (p) =>
@@ -119,7 +129,7 @@ export const useGame = create<GameStore>((set) => ({
       turnResult: null,
       mySuggestion: null,
       suggestError: null,
-      room: s.room
+      room: s.room?.kind === 'skribbl'
         ? {
             ...s.room,
             phase: 'choosing',
@@ -149,12 +159,12 @@ export const useGame = create<GameStore>((set) => ({
       choices: null,
       chooseEndsAt: null,
       suggest: null,
-      room: s.room ? { ...s.room, phase: 'drawing', turn } : null,
+      room: s.room?.kind === 'skribbl' ? { ...s.room, phase: 'drawing', turn } : s.room,
     })),
 
   reveal: (index, char) =>
     set((s) =>
-      s.room?.turn
+      s.room?.kind === 'skribbl' && s.room.turn
         ? {
             room: {
               ...s.room,
@@ -166,7 +176,7 @@ export const useGame = create<GameStore>((set) => ({
 
   markGuessed: (playerId) =>
     set((s) =>
-      s.room?.turn && !s.room.turn.guessed.includes(playerId)
+      s.room?.kind === 'skribbl' && s.room.turn && !s.room.turn.guessed.includes(playerId)
         ? {
             room: {
               ...s.room,
@@ -181,20 +191,47 @@ export const useGame = create<GameStore>((set) => ({
       turnResult,
       secret: null,
       choices: null,
-      room: s.room ? { ...s.room, phase: 'turnEnd', players: turnResult.players } : null,
+      room: s.room?.kind === 'skribbl'
+        ? { ...s.room, phase: 'turnEnd', players: turnResult.players }
+        : s.room,
     })),
 
   endGame: (final) =>
     set((s) => ({
       final,
       turnResult: null,
-      room: s.room ? { ...s.room, phase: 'gameEnd', players: final } : null,
+      room: s.room?.kind === 'skribbl' ? { ...s.room, phase: 'gameEnd', players: final } : s.room,
     })),
 
   pushMessage: (m) =>
     set((s) => ({ messages: [...s.messages, m].slice(-MAX_MESSAGES) })),
 
   setNotice: (notice) => set({ notice }),
+
+  setChess: (game) =>
+    set((s) => (s.room?.kind === 'kungfu' ? { room: { ...s.room, game } } : {})),
+
+  /** Applies one move to the local board. Cheap enough to re-render on: a
+   *  handful of moves a second, versus a stroke stream. */
+  applyChessMove: (m) =>
+    set((s) => {
+      if (s.room?.kind !== 'kungfu') return {};
+      const pieces = s.room.game.pieces
+        .filter((p) => p.id !== m.captured)
+        .map((p) =>
+          p.id === m.pieceId
+            ? { ...p, square: m.to, readyAt: m.readyAt, type: m.promotedTo ?? p.type }
+            : p,
+        );
+      return { room: { ...s.room, game: { ...s.room.game, pieces } } };
+    }),
+
+  chessOver: (winner, reason) =>
+    set((s) =>
+      s.room?.kind === 'kungfu'
+        ? { room: { ...s.room, game: { ...s.room.game, phase: 'ended', winner, reason } } }
+        : {},
+    ),
   setKickedBy: (kickedBy) => set({ kickedBy }),
 
   reset: () =>
@@ -205,15 +242,27 @@ export const useGame = create<GameStore>((set) => ({
     }),
 }));
 
-// ---- selectors, kept here so components never reach into `ops` and re-render on strokes ----
+// ---- selectors ----
+
+/** Narrows the room union. Components for one game read through these, so
+ *  touching the other game's fields cannot compile. */
+export const selectSkribbl = (s: GameStore): SkribblRoomState | null =>
+  s.room && s.room.kind === 'skribbl' ? s.room : null;
+
+export const selectKungFu = (s: GameStore): KungFuRoomState | null =>
+  s.room && s.room.kind === 'kungfu' ? s.room : null;
+
+// kept here so components never reach into `ops` and re-render on strokes
 
 export const selectIsDrawer = (s: GameStore): boolean =>
-  !!s.me && s.room?.turn?.drawerId === s.me;
+  !!s.me && selectSkribbl(s)?.turn?.drawerId === s.me;
 
 export const selectIsHost = (s: GameStore): boolean => !!s.me && s.room?.hostId === s.me;
 
-export const selectDrawer = (s: GameStore): Player | null =>
-  s.room?.players.find((p) => p.id === s.room?.turn?.drawerId) ?? null;
+export const selectDrawer = (s: GameStore): Player | null => {
+  const room = selectSkribbl(s);
+  return room?.players.find((p) => p.id === room.turn?.drawerId) ?? null;
+};
 
 export const selectHaveGuessed = (s: GameStore): boolean =>
-  !!s.me && !!s.room?.turn?.guessed.includes(s.me);
+  !!s.me && !!selectSkribbl(s)?.turn?.guessed.includes(s.me);
