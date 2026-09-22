@@ -243,7 +243,8 @@ export class Room {
 
     // The one place the word leaves this object, addressed to a single socket.
     this.emitTo(playerId, 'word:secret', { word });
-    this.io.to(this.code).emit('turn:drawing', this.turnPublic());
+    const turn = this.turnPublic();
+    if (turn) this.io.to(this.code).emit('turn:drawing', turn);
 
     this.phaseTimer = setTimeout(() => this.endTurn('timeout'), this.settings.drawTime * 1000);
     this.hintTimer = setInterval(() => this.maybeReveal(), 1000);

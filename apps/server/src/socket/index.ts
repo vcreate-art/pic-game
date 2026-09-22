@@ -70,6 +70,16 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       const name = cleanName(p?.name);
       if (!name) return cb({ ok: false, code: 'BAD_NAME', message: 'Pick a nickname.' });
 
+      // Creating a room while seated elsewhere gives up the old seat first.
+      if (s.room && s.playerId) {
+        const prev = s.room;
+        const prevId = s.playerId;
+        socket.leave(prev.code);
+        s.room = null;
+        s.playerId = null;
+        prev.removePlayer(prevId);
+      }
+
       const room = rooms.create();
       const player = room.addPlayer(name, cleanAvatar(p?.avatar), socket.id);
       bind(room, player.id);
@@ -84,6 +94,25 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
 
       const room = rooms.get(String(p?.code ?? ''));
       if (!room) return cb({ ok: false, code: 'NOT_FOUND', message: 'No room with that code.' });
+
+      // A socket that already holds a seat must not be handed a second one. Without
+      // this, a duplicate join leaves the first player in the list forever, still
+      // flagged connected — which also means "everybody guessed" never becomes true.
+      if (s.room && s.playerId) {
+        if (s.room.code === room.code) {
+          const seated = room.players.get(s.playerId);
+          if (seated) {
+            return cb({ ok: true, playerId: seated.id, token: seated.token, state: room.publicState() });
+          }
+        } else {
+          const prev = s.room;
+          const prevId = s.playerId;
+          socket.leave(prev.code);
+          s.room = null;
+          s.playerId = null;
+          prev.removePlayer(prevId);
+        }
+      }
 
       // A returning player reclaims their seat and score before any capacity check,
       // so a full room can never lock out someone who is already in it.
