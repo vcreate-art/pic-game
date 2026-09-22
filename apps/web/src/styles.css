@@ -91,13 +91,13 @@ button, input { font: inherit; color: inherit; }
 /* ---------------------------------------------------------------- landing */
 
 .landing {
-  margin: 0 auto; width: 100%; max-width: 960px;
+  margin: 0 auto; width: 100%; max-width: 1020px;
   display: flex; flex-direction: column; gap: 20px; padding: 28px 0 24px;
 }
-/* Three cells across: a card per game, then the join form, which gets a little
-   more width because it carries the most content. */
+/* Games beside the join form. The picker takes the larger share because it
+   holds three cards to the form's one column. */
 .landing__cols {
-  display: grid; grid-template-columns: 1fr 1fr 1.45fr; gap: 16px; align-items: stretch;
+  display: grid; grid-template-columns: 1.55fr 1fr; gap: 16px; align-items: start;
 }
 /* Typing a code hides the picker, so the form takes the middle on its own. */
 .landing__cols.is-single {
@@ -528,9 +528,11 @@ button, input { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- game picker */
 
+.picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
 .pick {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  padding: 18px 14px; text-align: center; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px;
+  padding: 14px 12px; text-align: center; cursor: pointer;
   background: var(--card); border: 1px solid var(--line);
   border-radius: var(--radius); box-shadow: var(--shadow);
   transition: border-color .15s ease, transform .08s ease;
@@ -538,10 +540,26 @@ button, input { font: inherit; color: inherit; }
 .pick:hover { border-color: var(--accent); }
 .pick:active { transform: translateY(1px); }
 .pick.is-active { border-color: var(--accent); background: var(--accent-soft); }
-.pick__art { font-size: 46px; line-height: 1; margin-bottom: 10px; }
-.pick strong { font-family: var(--display); font-size: 17px; }
+.pick__art { font-size: 30px; line-height: 1; margin-bottom: 6px; }
+.pick strong { font-family: var(--display); font-size: 15px; }
 .pick span:not(.pick__art) { font-size: 11.5px; color: var(--ink-soft); line-height: 1.35; }
 .pick.is-active strong { color: var(--accent); }
+
+/* A placeholder, not a choice: no hover, no press, nothing to click. */
+.pick--soon {
+  cursor: default; box-shadow: none; background: transparent;
+  border-style: dashed; opacity: .7;
+}
+.pick--soon:hover { border-color: var(--line); }
+.pick--soon:active { transform: none; }
+/* A text glyph rather than an emoji, so it takes the muted colour instead of
+   greyscaling to nearly nothing. */
+.pick--soon .pick__art {
+  font-family: var(--display); font-weight: 700; color: var(--ink-soft);
+  width: 36px; height: 36px; display: grid; place-items: center;
+  border: 2px dashed var(--line); border-radius: 50%; font-size: 21px;
+}
+.pick--soon strong { color: var(--ink-soft); }
 
 /* ---------------------------------------------------------------- chess */
 
@@ -618,12 +636,11 @@ button, input { font: inherit; color: inherit; }
 .seat__who { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0; }
 .seat__open { font-size: 13px; color: var(--ink-soft); font-style: italic; }
 
-@media (max-width: 860px) {
-  .landing__cols { grid-template-columns: 1fr 1fr; }
-  .landing__card { grid-column: 1 / -1; }
+@media (max-width: 900px) {
+  .landing__cols { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
-  .landing__cols { grid-template-columns: 1fr; }
+  .picker { grid-template-columns: 1fr; }
 }
 
 .chess__side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }

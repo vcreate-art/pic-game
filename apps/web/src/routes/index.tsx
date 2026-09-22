@@ -69,25 +69,36 @@ function Landing() {
       </div>
 
       <div className={`landing__cols ${code.trim() ? 'is-single' : ''}`}>
-      {/* Each game is its own cell alongside the form, rather than a nested
-          block. Hidden once a code is typed: joining an existing room inherits
+      {/* Hidden once a code is typed: joining an existing room inherits
           whichever game that room was created with. */}
-      {!code.trim() &&
-        GAME_KINDS.map((k) => (
-          <button
-            key={k}
-            type="button"
-            className={`pick ${game === k ? 'is-active' : ''}`}
-            aria-pressed={game === k}
-            onClick={() => setGame(k)}
-          >
-            <span className={`pick__art ${k === 'skribbl' ? 'is-flipped' : ''}`} aria-hidden="true">
-              {k === 'skribbl' ? '✏️' : '♞'}
-            </span>
-            <strong>{GAME_LABELS[k].name}</strong>
-            <span>{GAME_LABELS[k].blurb}</span>
-          </button>
-        ))}
+      {!code.trim() && (
+        <div className="picker">
+          {GAME_KINDS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              className={`pick ${game === k ? 'is-active' : ''}`}
+              aria-pressed={game === k}
+              onClick={() => setGame(k)}
+            >
+              <span className={`pick__art ${k === 'skribbl' ? 'is-flipped' : ''}`} aria-hidden="true">
+                {k === 'skribbl' ? '✏️' : '♞'}
+              </span>
+              <strong>{GAME_LABELS[k].name}</strong>
+              <span>{GAME_LABELS[k].blurb}</span>
+            </button>
+          ))}
+          {/* Holds the third slot so the row reads as a set with room to grow,
+              rather than as two games that happen to be all there is. */}
+          <div className="pick pick--soon">
+            {/* Only the glyph is decorative; "Coming soon" is real information
+                and should still be announced. */}
+            <span className="pick__art" aria-hidden="true">+</span>
+            <strong>Coming soon</strong>
+            <span>Another one's on the way.</span>
+          </div>
+        </div>
+      )}
 
       <div className="card landing__card">
         <JoinPanel
