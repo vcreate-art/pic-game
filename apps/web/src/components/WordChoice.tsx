@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { SUGGEST_MAX_LEN, type SuggestAck } from '@pic-game/shared';
+import {
+  CHOOSE_SECONDS, SUGGEST_SECONDS, SUGGEST_MAX_LEN, type SuggestAck,
+} from '@pic-game/shared';
 import { getSocket } from '../net/socket.js';
 import { selectDrawer, selectIsDrawer, useGame } from '../store/game.js';
 import { Timer } from './Timer.js';
 
 /**
- * Shown over the canvas while the word is being settled.
+ * Shown over the canvas while the word is being settled. Four views: the drawer
+ * waiting on suggestions, the drawer picking, a player writing a suggestion, and
+ * everyone else waiting.
  *
- * Three different views: the drawer picks, the other players suggest, and in
- * builtin mode everyone else just waits. Note the guessers' branches have no
- * access to the candidate words at all — the server sends `words` to the
- * drawer's socket alone, so there is nothing here to leak.
+ * The guesser branches have no access to the candidate words at all — the server
+ * sends them to the drawer's socket alone, and only once collecting has closed.
  */
 export function WordChoice() {
   const choices = useGame((s) => s.choices);
@@ -20,17 +22,39 @@ export function WordChoice() {
   const suggest = useGame((s) => s.suggest);
   const mine = useGame((s) => s.mySuggestion);
   const error = useGame((s) => s.suggestError);
-  const drawTotal = useGame((s) => s.room?.settings.wordChoices ?? 3);
   const [text, setText] = useState('');
   const socket = getSocket();
 
-  if (isDrawer) {
-    const waiting = suggest?.open && (choices?.length ?? 0) === 0;
+  const collecting = !!suggest && !suggest.ready;
+  const total = collecting ? SUGGEST_SECONDS : CHOOSE_SECONDS;
+  const remaining = suggest ? Math.max(0, suggest.expected - suggest.count) : 0;
+
+  // --- drawer, still waiting on the others ---
+  if (isDrawer && collecting) {
     return (
       <div className="overlay">
         <div className="overlay__card">
           <p className="overlay__kicker">Your turn</p>
-          <h3 className="overlay__title">{waiting ? 'Waiting for words…' : 'Pick a word'}</h3>
+          <h3 className="overlay__title">Waiting for words…</h3>
+          <Tally count={suggest.count} expected={suggest.expected} />
+          <p className="overlay__hint">
+            {remaining === 0
+              ? 'Everyone is in — here we go.'
+              : `${remaining} more ${remaining === 1 ? 'player' : 'players'} to go. Anyone who drops out stops counting.`}
+          </p>
+          {endsAt && <Timer endsAt={endsAt} total={total} />}
+        </div>
+      </div>
+    );
+  }
+
+  // --- drawer, picking ---
+  if (isDrawer) {
+    return (
+      <div className="overlay">
+        <div className="overlay__card">
+          <p className="overlay__kicker">Your turn</p>
+          <h3 className="overlay__title">Pick a word</h3>
           <div className="wordchoice">
             {choices?.map((w) => (
               <button
@@ -43,21 +67,14 @@ export function WordChoice() {
               </button>
             ))}
           </div>
-          {suggest?.open && (
-            <p className="overlay__hint">
-              {suggest.count === 0
-                ? 'The others are thinking of words for you.'
-                : `${suggest.count} suggested so far — more may still arrive.`}
-            </p>
-          )}
-          {!suggest?.open && <p className="overlay__hint">One is picked for you when time runs out.</p>}
-          {endsAt && <Timer endsAt={endsAt} total={suggest?.open ? 20 : 15} />}
+          <p className="overlay__hint">One is picked for you when time runs out.</p>
+          {endsAt && <Timer endsAt={endsAt} total={total} />}
         </div>
       </div>
     );
   }
 
-  // Non-drawer, player-suggested mode: offer a word.
+  // --- a player writing their suggestion ---
   if (suggest?.open) {
     const send = (e: React.FormEvent) => {
       e.preventDefault();
@@ -77,9 +94,7 @@ export function WordChoice() {
       <div className="overlay">
         <div className="overlay__card">
           <p className="overlay__kicker">Set the challenge</p>
-          <h3 className="overlay__title">
-            Suggest a word for {drawer?.name ?? 'the drawer'}
-          </h3>
+          <h3 className="overlay__title">Suggest a word for {drawer?.name ?? 'the drawer'}</h3>
           <form className="suggest" onSubmit={send}>
             <input
               className="field__input"
@@ -97,28 +112,47 @@ export function WordChoice() {
           {error && <p className="field__error">{error}</p>}
           {mine && (
             <p className="suggest__mine">
-              Yours: <strong>{mine}</strong>
-              {' — '}
-              <span>you can’t score it, but you earn points if others get it.</span>
+              Yours: <strong>{mine}</strong> — you can’t score it, but you earn points if
+              others get it.
             </p>
           )}
+          <Tally count={suggest.count} expected={suggest.expected} />
           <p className="overlay__hint">
-            {suggest.count} of {drawTotal} slots filled. Hardest word that someone can still
-            get wins you the most.
+            {mine
+              ? remaining === 0
+                ? 'Everyone is in.'
+                : `Waiting for ${remaining} more. You can still change yours.`
+              : 'Hardest word that someone can still get wins you the most.'}
           </p>
-          {endsAt && <Timer endsAt={endsAt} total={20} />}
+          {endsAt && <Timer endsAt={endsAt} total={total} />}
         </div>
       </div>
     );
   }
 
+  // --- everyone else, while the drawer picks ---
   return (
     <div className="overlay">
       <div className="overlay__card">
         <p className="overlay__kicker">Get ready</p>
         <h3 className="overlay__title">{drawer?.name ?? 'Someone'} is choosing a word</h3>
-        {endsAt && <Timer endsAt={endsAt} total={15} />}
+        {endsAt && <Timer endsAt={endsAt} total={total} />}
       </div>
+    </div>
+  );
+}
+
+/** One pip per expected player, filled as their word lands. */
+function Tally({ count, expected }: { count: number; expected: number }) {
+  if (expected <= 0) return null;
+  return (
+    <div className="tally" role="img" aria-label={`${count} of ${expected} players have suggested`}>
+      {Array.from({ length: expected }, (_, i) => (
+        <span key={i} className={`tally__pip ${i < count ? 'is-in' : ''}`} />
+      ))}
+      <span className="tally__label">
+        {count}/{expected}
+      </span>
     </div>
   );
 }

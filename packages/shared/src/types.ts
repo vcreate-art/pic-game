@@ -31,6 +31,12 @@ export type WordMode = 'builtin' | 'players';
 
 export const WORD_MODES: readonly WordMode[] = ['builtin', 'players'];
 
+/** Seconds the drawer gets to pick, once the options are on the table. */
+export const CHOOSE_SECONDS = 15;
+/** Backstop for the suggestion window. It normally closes early, the moment
+ *  every connected player has sent a word. */
+export const SUGGEST_SECONDS = 25;
+
 export interface RoomSettings {
   rounds: number;
   /** seconds */

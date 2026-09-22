@@ -75,9 +75,19 @@ export interface ServerToClientEvents {
      *  authorship — otherwise the drawer could hand a turn to a friend. */
     words?: WordOption[];
   }) => void;
-  /** Suggestion window status. Carries a COUNT, never the suggested words —
-   *  those go to the drawer alone. A sender's own word comes back in the ack. */
-  'suggest:state': (p: { open: boolean; endsAt: number; count: number }) => void;
+  /** Suggestion window status. Carries COUNTS, never the suggested words —
+   *  those go to the drawer alone, and only once `ready` is true. A sender's own
+   *  word comes back in the ack. */
+  'suggest:state': (p: {
+    open: boolean;
+    endsAt: number;
+    /** How many have been sent. */
+    count: number;
+    /** How many are still expected, i.e. connected non-drawers. */
+    expected: number;
+    /** Everyone is in (or timed out): the drawer may now pick. */
+    ready: boolean;
+  }) => void;
   /** Emitted to the drawer's socket alone. Never broadcast. */
   'word:secret': (p: { word: string }) => void;
   'turn:drawing': (p: TurnPublic) => void;

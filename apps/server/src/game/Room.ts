@@ -52,6 +52,10 @@ export class Room {
   private offered = new Map<string, { text: string; authorId: string | null }>();
   /** Who suggested the chosen word. Null in builtin mode or on a padded pick. */
   private authorId: string | null = null;
+  /** Within the `choosing` phase: false while suggestions are still being
+   *  collected, true once the drawer has the list in front of them. Always true
+   *  straight away in builtin mode. */
+  private picking = false;
   drawerId: string | null = null;
   private mask = '';
   private revealed: Record<number, string> = {};
@@ -107,6 +111,10 @@ export class Room {
       p.socketId = socketId;
       p.connected = true;
       p.disconnectedAt = null;
+      if (this.phase === 'choosing' && this.playerWords) {
+        // They count again — reflected in `expected` on the next broadcast.
+        queueMicrotask(() => this.broadcastSuggestState());
+      }
       if (this.emptyTimer) {
         clearTimeout(this.emptyTimer);
         this.emptyTimer = null;
@@ -128,6 +136,9 @@ export class Room {
       this.endTurn('drawer-left');
     } else {
       this.checkTurnComplete();
+      // Nobody waits on a player who dropped out mid-window.
+      this.broadcastSuggestState();
+      this.maybeOpenPicking();
     }
     if (this.activeCount() === 0) this.scheduleEmptyCollection();
   }
@@ -145,6 +156,10 @@ export class Room {
     }
     if (this.drawerId === playerId && (this.phase === 'drawing' || this.phase === 'choosing')) {
       this.endTurn('drawer-left');
+    } else if (this.phase === 'choosing') {
+      this.suggestions.delete(playerId);
+      this.broadcastSuggestState();
+      this.maybeOpenPicking();
     }
     if (this.players.size < 2 && this.phase !== 'lobby') this.abortToLobby();
     if (this.activeCount() === 0) this.scheduleEmptyCollection();
@@ -223,20 +238,65 @@ export class Room {
       return { id, text };
     });
 
-    const window = this.playerWords ? SUGGEST_SECONDS : CHOOSE_SECONDS;
-    this.endsAt = Date.now() + window * 1000;
-
     this.io.to(this.code).emit('canvas:cleared');
-    // Everyone learns WHO is drawing; only the drawer learns the candidate words.
+
+    if (!this.playerWords) {
+      this.openPicking();
+      return;
+    }
+
+    // Collect first. The drawer is shown nothing until everyone has had their
+    // say, so no one's word can be beaten to the punch by a faster typist.
+    this.picking = false;
+    this.endsAt = Date.now() + SUGGEST_SECONDS * 1000;
     this.io.to(this.code).emit('turn:choosing', {
       drawerId: drawer.id,
+      round: this.round,
+      endsAt: this.endsAt,
+    });
+    this.broadcastSuggestState();
+
+    // Backstop only: the window normally closes early, as soon as everyone is in.
+    this.phaseTimer = setTimeout(() => this.openPicking(), SUGGEST_SECONDS * 1000);
+
+    // A room where the drawer is the only one connected has nobody to wait for.
+    this.maybeOpenPicking();
+  }
+
+  /** Connected players who are expected to suggest this turn. */
+  private expectedSuggesters(): ServerPlayer[] {
+    return [...this.players.values()].filter((p) => p.connected && p.id !== this.drawerId);
+  }
+
+  /** Someone who drops out mid-window is no longer waited on. */
+  private everyoneSuggested(): boolean {
+    const expected = this.expectedSuggesters();
+    if (expected.length === 0) return true;
+    return expected.every((p) => this.suggestions.has(p.id));
+  }
+
+  maybeOpenPicking(): void {
+    if (this.phase !== 'choosing' || this.picking || !this.playerWords) return;
+    if (this.everyoneSuggested()) this.openPicking();
+  }
+
+  /** Closes the suggestion window and hands the list to the drawer, restarting
+   *  the clock so they get a full turn to choose however long collecting took. */
+  private openPicking(): void {
+    if (this.phase !== 'choosing' || this.picking || !this.drawerId) return;
+    this.picking = true;
+    this.clearTimers();
+    this.endsAt = Date.now() + CHOOSE_SECONDS * 1000;
+
+    this.io.to(this.code).emit('turn:choosing', {
+      drawerId: this.drawerId,
       round: this.round,
       endsAt: this.endsAt,
     });
     this.sendOptions();
     if (this.playerWords) this.broadcastSuggestState();
 
-    this.phaseTimer = setTimeout(() => this.autoChoose(), window * 1000);
+    this.phaseTimer = setTimeout(() => this.autoChoose(), CHOOSE_SECONDS * 1000);
   }
 
   /** The drawer's visible list: suggestions first, topped up with padding. */
@@ -246,8 +306,10 @@ export class Room {
     return [...suggested, ...this.padding.slice(0, shortfall)];
   }
 
+  /** Nothing is sent before `picking`: the option list is the one thing that
+   *  must not reach the drawer while people are still writing. */
   private sendOptions(): void {
-    if (!this.drawerId || this.phase !== 'choosing') return;
+    if (!this.drawerId || this.phase !== 'choosing' || !this.picking) return;
     this.emitTo(this.drawerId, 'turn:choosing', {
       drawerId: this.drawerId,
       round: this.round,
@@ -258,9 +320,11 @@ export class Room {
 
   private broadcastSuggestState(): void {
     this.io.to(this.code).emit('suggest:state', {
-      open: this.phase === 'choosing' && this.playerWords,
+      open: this.phase === 'choosing' && this.playerWords && !this.picking,
       endsAt: this.endsAt,
       count: this.suggestions.size,
+      expected: this.expectedSuggesters().length,
+      ready: this.picking,
     });
   }
 
@@ -271,7 +335,9 @@ export class Room {
    */
   suggestWord(playerId: string, raw: unknown): SuggestAck {
     if (!this.playerWords) return { ok: false, message: 'This room uses the built-in words.' };
-    if (this.phase !== 'choosing') return { ok: false, message: 'Not taking suggestions right now.' };
+    if (this.phase !== 'choosing' || this.picking) {
+      return { ok: false, message: 'Not taking suggestions right now.' };
+    }
     if (playerId === this.drawerId) return { ok: false, message: "You're picking this turn, not suggesting." };
     if (!this.players.has(playerId)) return { ok: false, message: 'You are not in this room.' };
 
@@ -287,8 +353,9 @@ export class Room {
     this.offered.set(id, { text: result.text, authorId: playerId });
     this.suggestions.set(playerId, { id, text: result.text });
 
-    this.sendOptions();
     this.broadcastSuggestState();
+    // Last one in closes the window immediately rather than burning the backstop.
+    this.maybeOpenPicking();
     return { ok: true, text: result.text };
   }
 
@@ -466,6 +533,7 @@ export class Room {
     this.hintPositions = [];
     this.hintsShown = 0;
     this.deltas = {};
+    this.picking = false;
     this.openStrokes.clear();
     for (const p of this.players.values()) {
       p.guessedAt = null;

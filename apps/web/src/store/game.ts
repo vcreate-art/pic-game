@@ -16,6 +16,10 @@ export interface SuggestState {
   open: boolean;
   endsAt: number;
   count: number;
+  /** Connected non-drawers still expected to send a word. */
+  expected: number;
+  /** Everyone is in: the drawer may pick. */
+  ready: boolean;
 }
 
 interface GameStore {

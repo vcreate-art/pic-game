@@ -5,6 +5,8 @@ const pass = [], fail = [];
 const ok = (m) => { pass.push(m); console.log(`  \x1b[32mPASS\x1b[0m ${m}`); };
 const bad = (m, d = '') => { fail.push(m); console.log(`  \x1b[31mFAIL\x1b[0m ${m}${d ? ` — ${d}` : ''}`); };
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+/** Mirrors SUGGEST_SECONDS, plus slack. */
+const SUGGEST_BACKSTOP_MS = 32_000;
 
 function mk(label) {
   const s = io(URL, { transports: ['websocket'] });
@@ -17,6 +19,16 @@ function mk(label) {
 }
 const ready = (s) => new Promise(r => s.on('connect', r));
 const emitAck = (s, ev, p) => new Promise(r => s.emit(ev, p, r));
+/** Polls a getter until it returns something truthy, or gives up. */
+const pollFor = async (get, ms = 30000) => {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    const v = get();
+    if (v) return v;
+    await sleep(250);
+  }
+  return null;
+};
 const waitFor = (s, ev, ms = 9000) => new Promise((res, rej) => {
   const hit = s.saw(ev);
   if (hit.length) return res(hit[0].args[0]);
@@ -68,9 +80,25 @@ if (sb.ok && sb.text === 'lighthouse') ok('B suggested "lighthouse"'); else bad(
 const dup = await emitAck(C, 'word:suggest', { text: 'LIGHT HOUSE' });
 if (!dup.ok) ok('duplicate refused across case and spacing'); else bad('duplicate accepted');
 const sc = await emitAck(C, 'word:suggest', { text: 'trombone' });
+if (sc.ok) ok('C suggested "trombone"'); else bad('C suggestion rejected');
+await sleep(350);
+
+console.log('\n\x1b[1m5b. The drawer waits until everyone is in\x1b[0m');
+if (A.saw('turn:choosing').every(e => !e.args[0].words)) ok('drawer shown NO options while a player is still writing');
+else bad('drawer was handed the list early');
+const mid = A.saw('suggest:state').at(-1).args[0];
+if (mid.ready === false && mid.count === 2 && mid.expected === 3) ok(`progress reported as ${mid.count}/${mid.expected}, not ready`);
+else bad('suggest:state wrong mid-window', JSON.stringify(mid));
+
 const sd = await emitAck(D, 'word:suggest', { text: 'windmill' });
-if (sc.ok && sd.ok) ok('C and D suggested too'); else bad('C/D suggestions rejected');
-await sleep(300);
+if (sd.ok) ok('D completed the set'); else bad('D suggestion rejected');
+await sleep(400);
+const readyState = A.saw('suggest:state').at(-1).args[0];
+if (readyState.ready === true && readyState.open === false) ok('window closed the moment the last word landed');
+else bad('window stayed open after everyone suggested', JSON.stringify(readyState));
+
+const late = await emitAck(B, 'word:suggest', { text: 'afterthought' });
+if (!late.ok) ok('suggestions refused once the drawer is picking'); else bad('accepted a late suggestion');
 
 console.log('\n\x1b[1m6. Suggestions reach the drawer ONLY\x1b[0m');
 const opts = A.saw('turn:choosing').map(e => e.args[0]).filter(a => a.words).at(-1);
@@ -135,7 +163,38 @@ else bad('author earned nothing despite both guessers solving it');
 if ((end.deltas[ca.playerId] ?? 0) > 0) ok(`drawer still paid normally (+${end.deltas[ca.playerId]})`);
 else bad('drawer earned nothing');
 
-console.log('\n\x1b[1m12. Auto-pick prefers a real suggestion over padding\x1b[0m');
+console.log('\n\x1b[1m12. A dropout stops the room waiting\x1b[0m');
+{
+  const [P, Q, R] = [mk('P'), mk('Q'), mk('R')];
+  await Promise.all([ready(P), ready(Q), ready(R)]);
+  const cp = await emitAck(P, 'room:create', { name: 'Pat', avatar: {} });
+  const rc = cp.state.code;
+  await emitAck(Q, 'room:join', { code: rc, name: 'Quinn', avatar: {} });
+  await emitAck(R, 'room:join', { code: rc, name: 'Rae', avatar: {} });
+  P.emit('room:settings', { wordMode: 'players', rounds: 1, drawTime: 30 });
+  await sleep(200);
+  P.emit('game:start');
+  await waitFor(P, 'turn:choosing');
+  await sleep(300);
+
+  await emitAck(Q, 'word:suggest', { text: 'porcupine' });
+  await sleep(300);
+  if (P.saw('turn:choosing').every(e => !e.args[0].words)) ok('still waiting on R');
+  else bad('opened picking before R suggested');
+
+  // R walks away without ever suggesting.
+  R.disconnect();
+  await sleep(700);
+  const opts = P.saw('turn:choosing').map(e => e.args[0]).filter(a => a.words).at(-1);
+  if (opts) ok('dropout stopped the wait — drawer got the list without the backstop');
+  else bad('room kept waiting on a disconnected player');
+  const st = P.saw('suggest:state').at(-1).args[0];
+  if (st.expected === 1) ok('the departed player is no longer counted as expected');
+  else bad('expected count still includes the dropout', JSON.stringify(st));
+  P.disconnect(); Q.disconnect();
+}
+
+console.log('\n\x1b[1m13. Auto-pick prefers a real suggestion over padding\x1b[0m');
 {
   const [G, H] = [mk('G'), mk('H')];
   await Promise.all([ready(G), ready(H)]);
@@ -158,7 +217,7 @@ console.log('\n\x1b[1m12. Auto-pick prefers a real suggestion over padding\x1b[0
   G.disconnect(); H.disconnect();
 }
 
-console.log('\n\x1b[1m13. Built-in top-up when nobody suggests\x1b[0m');
+console.log('\n\x1b[1m14. Built-in top-up when nobody suggests\x1b[0m');
 const E = mk('E'), F = mk('F');
 await Promise.all([ready(E), ready(F)]);
 const ce = await emitAck(E, 'room:create', { name: 'Eve', avatar: {} });
@@ -168,12 +227,18 @@ E.emit('room:settings', { wordMode: 'players', rounds: 1, drawTime: 30 });
 await sleep(200);
 E.emit('game:start');
 await waitFor(E, 'turn:choosing');
-// The room-wide turn:choosing and the drawer-only one carrying `words` are two
-// separate emits; give the second a moment to land before reading the log.
-await sleep(400);
-const opts2 = E.saw('turn:choosing').map(e => e.args[0]).filter(a => a.words).at(-1);
-if ((opts2?.words?.length ?? 0) >= 3) ok(`drawer offered ${opts2.words.length} built-in words with zero suggestions`);
-else bad('no fallback options offered', JSON.stringify(opts2?.words));
+// F is connected but silent, so the room has to sit out the full backstop
+// before it gives up waiting — which is the point of the gate.
+const early = E.saw('turn:choosing').filter(e => e.args[0].words);
+if (early.length === 0) ok('drawer still waiting while a connected player stays silent');
+else bad('drawer was handed the list before the backstop expired');
+
+const opts2 = await pollFor(
+  () => E.saw('turn:choosing').map(e => e.args[0]).filter(a => a.words).at(-1),
+  SUGGEST_BACKSTOP_MS,
+);
+if ((opts2?.words?.length ?? 0) >= 3) ok(`backstop expired: drawer offered ${opts2.words.length} built-in words`);
+else bad('no fallback options after the backstop', JSON.stringify(opts2?.words));
 
 E.emit('word:choose', { id: opts2.words[0].id });
 const secret2 = await waitFor(E, 'word:secret', 6000);

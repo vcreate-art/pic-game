@@ -456,3 +456,14 @@ button, input { font: inherit; color: inherit; }
 @media (max-width: 640px) {
   .modes { grid-template-columns: 1fr; }
 }
+
+.tally { display: flex; align-items: center; gap: 5px; }
+.tally__pip {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--line); transition: background .2s ease, transform .2s ease;
+}
+.tally__pip.is-in { background: var(--accent); transform: scale(1.15); }
+.tally__label {
+  margin-left: 4px; font-size: 12px; font-weight: 700; color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}

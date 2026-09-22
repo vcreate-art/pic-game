@@ -26,11 +26,9 @@ export function isAllowedOrigin(origin: string | undefined): boolean {
   return PRIVATE_ORIGIN.test(origin);
 }
 
-/** Seconds the drawer gets to pick from the offered words before one is auto-picked. */
-export const CHOOSE_SECONDS = 15;
-/** Longer in the player-suggested mode: the window also has to cover everyone
- *  else typing a word in. */
-export const SUGGEST_SECONDS = 20;
+// Phase timings live in @pic-game/shared so the client's countdown and the
+// server's timers are driven by the same numbers.
+export { CHOOSE_SECONDS, SUGGEST_SECONDS } from '@pic-game/shared';
 /** Scoreboard pause between turns. */
 export const TURN_END_SECONDS = 6;
 /** Podium display before the room falls back to the lobby. */

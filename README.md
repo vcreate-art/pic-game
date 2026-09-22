@@ -61,6 +61,12 @@ on both sides, so a protocol change is a compile error rather than a runtime mys
 picks from what arrives. The list is topped up with built-in words so the drawer always
 has a real choice, and the padding is indistinguishable from the suggestions.
 
+The `choosing` phase runs in two stages. First everyone writes: the drawer sees only a
+tally, never the words, so nobody's suggestion can be beaten to the punch by a faster
+typist. The moment the last connected player sends theirs, collecting closes and the
+drawer gets a fresh clock to pick. Players who drop out stop being waited on, and a
+backstop timer covers anyone who stays connected but silent.
+
 That mode has one structural hazard: whoever suggested the chosen word knows the answer.
 Three rules keep it from wrecking the game:
 
