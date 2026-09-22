@@ -68,6 +68,7 @@ function Landing() {
         <p className="landing__sub">Grab some friends. One link, everyone's in.</p>
       </div>
 
+      <div className={`landing__cols ${code.trim() ? 'is-single' : ''}`}>
       {/* Hidden once a code is typed: joining an existing room inherits
           whichever game that room was created with. */}
       {!code.trim() && (
@@ -106,6 +107,7 @@ function Landing() {
             />
           </label>
         </JoinPanel>
+      </div>
       </div>
     </div>
   );

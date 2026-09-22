@@ -88,8 +88,17 @@ button, input { font: inherit; color: inherit; }
 /* ---------------------------------------------------------------- landing */
 
 .landing {
-  margin: auto; width: 100%; max-width: 440px;
+  margin: auto; width: 100%; max-width: 880px;
   display: flex; flex-direction: column; gap: 22px; padding: 24px 0;
+}
+/* Games beside the join form rather than stacked above it, so neither is
+   pushed below the fold. */
+.landing__cols {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start;
+}
+/* Typing a code hides the picker, so the form takes the middle on its own. */
+.landing__cols.is-single {
+  grid-template-columns: minmax(0, 420px); justify-content: center;
 }
 .landing__hero { text-align: center; }
 .landing__title {
@@ -516,7 +525,7 @@ button, input { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- game picker */
 
-.picker { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.picker { display: grid; grid-template-columns: 1fr; gap: 12px; align-content: start; }
 .pick {
   display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
   padding: 14px; text-align: left; cursor: pointer;
@@ -607,8 +616,8 @@ button, input { font: inherit; color: inherit; }
 .seat__who { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0; }
 .seat__open { font-size: 13px; color: var(--ink-soft); font-style: italic; }
 
-@media (max-width: 640px) {
-  .picker { grid-template-columns: 1fr; }
+@media (max-width: 760px) {
+  .landing__cols { grid-template-columns: 1fr; }
 }
 
 .chess__side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
