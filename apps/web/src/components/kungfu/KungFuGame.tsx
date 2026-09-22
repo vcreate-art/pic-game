@@ -82,6 +82,7 @@ export function KungFuGame({ onLeave }: { onLeave: () => void }) {
               pieces={game.pieces}
               mySide={mySide}
               live={playing}
+              cooldownMs={game.settings.cooldownMs}
               onMove={(pieceId, to) => socket.emit('chess:move', { pieceId, to })}
             />
             {game.phase === 'ended' && (

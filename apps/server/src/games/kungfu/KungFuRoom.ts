@@ -6,6 +6,9 @@ import {
 } from '@pic-game/shared';
 import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
 
+/** Absorbs clock-estimate drift between a client's countdown and the server. */
+const COOLDOWN_GRACE_MS = 120;
+
 /**
  * Kung Fu Chess: chess with no turns. Both sides move whenever they like, and
  * a piece rests on a cooldown after moving.
@@ -150,8 +153,12 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
     if (!piece) return reject('That piece is gone.');
     if (piece.side !== side) return reject('That is not your piece.');
 
+    // A small grace on the boundary. The client counts down against an
+    // estimate of server time, and a clock off by a few tens of milliseconds
+    // would otherwise show a piece as ready and then have the move bounce.
+    // Against multi-second cooldowns this costs nothing.
     const now = Date.now();
-    if (piece.readyAt > now) return reject('Still catching its breath.');
+    if (piece.readyAt - now > COOLDOWN_GRACE_MS) return reject('Still catching its breath.');
 
     // Re-checked against the live board, which may have changed since the
     // client decided this move was legal.

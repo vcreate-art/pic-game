@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
 import {
-  legalDestinations, squareName, type Piece, type Side, type Square,
+  cooldownFor, legalDestinations, squareName, type Piece, type Side, type Square,
 } from '@pic-game/shared';
 import { serverNow } from '../../net/clock.js';
 
@@ -13,15 +13,19 @@ export function ChessBoard({
   pieces,
   mySide,
   live,
+  cooldownMs,
   onMove,
 }: {
   pieces: Piece[];
   /** null when spectating — the board is then read-only. */
   mySide: Side | null;
   live: boolean;
+  /** Base cooldown, needed to place a running bar on its full timeline. */
+  cooldownMs: number;
   onMove: (pieceId: string, to: Square) => void;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [, tick] = useReducer((n: number) => n + 1, 0);
 
   const bySquare = useMemo(() => {
     const m = new Map<Square, Piece>();
@@ -64,6 +68,19 @@ export function ChessBoard({
 
   const now = serverNow();
 
+  // Nothing else re-renders the board when a cooldown simply runs out, so the
+  // piece would stay dimmed until some other move happened. Wake up once, when
+  // the next one is due.
+  const nextReady = pieces.reduce(
+    (soonest, p) => (p.readyAt > now && p.readyAt < soonest ? p.readyAt : soonest),
+    Number.POSITIVE_INFINITY,
+  );
+  useEffect(() => {
+    if (!Number.isFinite(nextReady)) return;
+    const id = setTimeout(tick, Math.max(50, nextReady - serverNow()) + 40);
+    return () => clearTimeout(id);
+  }, [nextReady]);
+
   return (
     <div className="chess" role="grid" aria-label="Chess board">
       {order.flat().map((sq) => {
@@ -88,22 +105,28 @@ export function ChessBoard({
             disabled={!live || !mySide}
           >
             {piece && (
-              <span
-                className={`pc pc--${piece.side} ${cooling ? 'is-cooling' : ''}`}
-                // The bar is a pure CSS animation so a ticking cooldown costs
-                // no React renders. A negative delay starts it part-way
-                // through, which is what a late joiner needs.
-                style={
-                  cooling
-                    ? ({
-                        '--cd': `${piece.readyAt - (piece.readyAt - cooling)}ms`,
-                        animationDuration: `${cooling}ms`,
-                      } as React.CSSProperties)
-                    : undefined
-                }
-              >
+              <span className={`pc pc--${piece.side} ${cooling ? 'is-cooling' : ''}`}>
                 {GLYPH[piece.side][piece.type]}
-                {cooling > 0 && <span className="pc__cool" style={{ animationDuration: `${cooling}ms` }} />}
+                {/* Described by its FULL duration plus a negative delay for the
+                    part already elapsed, never by the time remaining. Changing
+                    an animation's duration does not reset how far it has run,
+                    so a re-render mid-cooldown used to shorten the timeline
+                    under a bar that had already travelled — and it jumped
+                    straight to empty while the server still said "wait". These
+                    two values describe the same absolute timeline on every
+                    render, so re-rendering cannot move the bar. */}
+                {cooling > 0 && (
+                  <span
+                    className="pc__cool"
+                    style={{
+                      animationDuration: `${cooldownFor(piece.type, cooldownMs)}ms`,
+                      animationDelay: `-${Math.max(
+                        0,
+                        cooldownFor(piece.type, cooldownMs) - cooling,
+                      )}ms`,
+                    }}
+                  />
+                )}
               </span>
             )}
           </button>
