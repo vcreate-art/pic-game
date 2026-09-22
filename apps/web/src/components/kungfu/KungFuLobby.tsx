@@ -91,28 +91,6 @@ export function KungFuLobby({ onLeave }: { onLeave: () => void }) {
               ))}
             </p>
 
-            <div className="settings__modes">
-              <span className="settings__label">Promotion</span>
-              <div className="modes">
-                {([true, false] as const).map((v) => (
-                  <button
-                    key={String(v)}
-                    type="button"
-                    className={`mode ${game.settings.autoQueen === v ? 'is-active' : ''}`}
-                    disabled={!isHost}
-                    aria-pressed={game.settings.autoQueen === v}
-                    onClick={() => socket.emit('chess:settings', { autoQueen: v })}
-                  >
-                    <strong>{v ? 'Auto-queen' : 'Stay a pawn'}</strong>
-                    <span>
-                      {v
-                        ? 'Pawns become queens on the last rank.'
-                        : 'A pawn that reaches the end is stuck there.'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
           {isHost ? (

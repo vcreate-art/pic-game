@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
-  KUNGFU_BOUNDS, KUNGFU_DEFAULTS, cooldownFor, initialPieces, isLegalMove,
-  isPromotion, type KungFuPublic, type KungFuSeats, type KungFuSettings,
+  KUNGFU_BOUNDS, KUNGFU_DEFAULTS, PROMOTES_TO, cooldownFor, initialPieces,
+  isLegalMove, isPromotion, type KungFuPublic, type KungFuSeats, type KungFuSettings,
   type Piece, type RoomState, type Side, type Square,
 } from '@pic-game/shared';
 import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
@@ -107,7 +107,6 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
     if (typeof patch.cooldownMs === 'number' && Number.isFinite(patch.cooldownMs)) {
       this.settings.cooldownMs = Math.round(Math.max(min, Math.min(max, patch.cooldownMs)));
     }
-    if (typeof patch.autoQueen === 'boolean') this.settings.autoQueen = patch.autoQueen;
     this.broadcast();
   }
 
@@ -170,9 +169,9 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
     piece.readyAt = now + cooldownFor(piece.type, this.settings.cooldownMs);
 
     let promotedTo: Piece['type'] | undefined;
-    if (this.settings.autoQueen && isPromotion(piece, to)) {
-      piece.type = 'q';
-      promotedTo = 'q';
+    if (isPromotion(piece, to)) {
+      piece.type = PROMOTES_TO;
+      promotedTo = PROMOTES_TO;
     }
 
     this.io.to(this.code).emit('chess:moved', {

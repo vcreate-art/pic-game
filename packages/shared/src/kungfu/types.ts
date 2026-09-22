@@ -21,14 +21,16 @@ export type KungFuPhase = 'lobby' | 'playing' | 'ended';
 export interface KungFuSettings {
   /** Base cooldown in ms; each piece type scales off this. */
   cooldownMs: number;
-  /** Auto-queen on promotion. Kept as a setting so the rule is visible. */
-  autoQueen: boolean;
 }
 
 export const KUNGFU_DEFAULTS: KungFuSettings = {
   cooldownMs: 4000,
-  autoQueen: true,
 };
+
+/** Pawns always promote to a queen. It is not a setting: with promotion off, a
+ *  pawn reaching the last rank has no legal move at all and is stuck there,
+ *  which is a trap rather than a choice. */
+export const PROMOTES_TO = 'q' as const;
 
 export const KUNGFU_BOUNDS = {
   cooldownMs: { min: 1000, max: 15000 },

@@ -191,6 +191,63 @@ console.log('\n\x1b[1m10. A seated player leaving ends it\x1b[0m');
   X.disconnect();
 }
 
+console.log('\n\x1b[1m11. Pawns always promote\x1b[0m');
+{
+  const [P, Q] = [mk('P'), mk('Q')];
+  await Promise.all([ready(P), ready(Q)]);
+  const cp = await emitAck(P, 'room:create', { name: 'Pia', avatar: {}, game: 'kungfu' });
+  const rc = cp.state.code;
+  await emitAck(Q, 'room:join', { code: rc, name: 'Quinn', avatar: {} });
+  P.emit('chess:seat', { side: 'w' });
+  Q.emit('chess:seat', { side: 'b' });
+  P.emit('chess:settings', { cooldownMs: 1000 }); // pawns rest 600ms
+  await sleep(350);
+  P.emit('game:start');
+  // Seat changes also broadcast chess:state, so wait for the one holding a
+  // full board rather than whichever arrives first.
+  const board = await waitForMatch(P, 'chess:state', (st) => st.pieces.length === 32, 6000);
+  const at = (name) => board.pieces.find(x => x.square === SQ(name));
+
+  const wPawn = at('a2');
+  const bPawn = at('b7');
+  // Clear b7 so the white pawn has a road, then walk it up the b-file and take
+  // the a8 rook diagonally — a pawn cannot capture straight ahead.
+  Q.emit('chess:move', { pieceId: bPawn.id, to: SQ('b5') });
+  await sleep(500);
+  P.emit('chess:move', { pieceId: wPawn.id, to: SQ('a4') });
+  await sleep(800);
+  P.emit('chess:move', { pieceId: wPawn.id, to: SQ('b5') });   // captures
+  await sleep(800);
+  P.emit('chess:move', { pieceId: wPawn.id, to: SQ('b6') });
+  await sleep(800);
+  P.emit('chess:move', { pieceId: wPawn.id, to: SQ('b7') });
+  await sleep(800);
+  P.emit('chess:move', { pieceId: wPawn.id, to: SQ('a8') });   // captures + promotes
+
+  const promo = await waitForMatch(
+    Q, 'chess:moved', (m) => m.pieceId === wPawn.id && m.to === SQ('a8'), 6000,
+  ).catch(() => null);
+  if (promo?.promotedTo === 'q') ok('a pawn reaching the last rank becomes a queen');
+  else bad('no promotion reported', JSON.stringify(promo));
+
+  // Moves travel as deltas — the server does not re-broadcast the whole board
+  // after one. To check its authoritative state really changed, join fresh and
+  // read the snapshot a new arrival is given.
+  await sleep(400);
+  const R = mk('R');
+  await ready(R);
+  const joined = await emitAck(R, 'room:join', { code: rc, name: 'Rae', avatar: {} });
+  const piece = joined.ok && joined.state.kind === 'kungfu'
+    ? joined.state.game.pieces.find(x => x.id === wPawn.id)
+    : null;
+  if (piece?.type === 'q' && piece.square === SQ('a8')) {
+    ok('a late joiner sees a queen on a8, so the server state really changed');
+  } else {
+    bad('server state does not hold the promoted queen', JSON.stringify(piece));
+  }
+  P.disconnect(); Q.disconnect(); R.disconnect();
+}
+
 console.log(`\n\x1b[1mRESULT: ${pass.length} passed, ${fail.length} failed\x1b[0m`);
 if (fail.length) { console.log('\nFailures:'); fail.forEach(f => console.log(`  - ${f}`)); }
 process.exit(fail.length ? 1 : 0);
