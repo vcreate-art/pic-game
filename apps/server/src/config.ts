@@ -1,5 +1,30 @@
 export const PORT = Number(process.env.PORT ?? 3001);
-export const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
+export const IS_PROD = process.env.NODE_ENV === 'production';
+
+/** Explicit allowlist, comma-separated. Required in production. */
+const CONFIGURED_ORIGINS = (process.env.CLIENT_ORIGIN ?? '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+/** localhost plus the RFC1918 private ranges, so phones and laptops on the same
+ *  Wi-Fi can join during development without naming each address. */
+const PRIVATE_ORIGIN =
+  /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+
+/**
+ * A same-origin request (curl, health checks) sends no Origin header at all and
+ * is always allowed; only cross-origin browser traffic is filtered.
+ *
+ * In production nothing is inferred — set CLIENT_ORIGIN explicitly, or only
+ * same-origin requests get through.
+ */
+export function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (CONFIGURED_ORIGINS.includes(origin)) return true;
+  if (IS_PROD) return false;
+  return PRIVATE_ORIGIN.test(origin);
+}
 
 /** Seconds the drawer gets to pick from the offered words before one is auto-picked. */
 export const CHOOSE_SECONDS = 15;

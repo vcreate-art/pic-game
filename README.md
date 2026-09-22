@@ -17,6 +17,22 @@ npm run dev
 Open a second browser window (or an incognito one) to play against yourself —
 a seat is per-tab, so two tabs are two players.
 
+### Playing over your Wi-Fi
+
+Vite binds every interface, so it prints a Network address on startup:
+
+```
+➜  Network: http://<your-lan-ip>:5173/
+```
+
+Share that with anyone on the same Wi-Fi. In development the server accepts
+localhost and the RFC1918 private ranges (10.x, 192.168.x, 172.16–31.x), so no
+configuration is needed. The in-game invite link is built from the address you
+opened, so it already points at the right host.
+
+In production nothing is inferred — set `CLIENT_ORIGIN` (comma-separated) to the
+origins you want to allow, or only same-origin requests get through.
+
 ## Stack
 
 | Layer | Choice |

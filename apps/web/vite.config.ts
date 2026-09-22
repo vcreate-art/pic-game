@@ -5,6 +5,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    // Bind every interface so other devices on the same Wi-Fi can reach it.
+    host: true,
     proxy: {
       // Keeps the browser on one origin in dev, so there are no CORS or
       // cookie surprises between the page and the socket.

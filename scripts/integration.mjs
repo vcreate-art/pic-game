@@ -1,6 +1,8 @@
 import { io } from 'socket.io-client';
 
-const URL = 'http://localhost:3001';
+// Defaults to the server directly; point it at the Vite origin (or a LAN
+// address) to exercise the proxy and the CORS policy the way a browser does.
+const URL = process.env.PIC_GAME_URL ?? 'http://localhost:3001';
 const pass = [], fail = [];
 const ok = (m) => { pass.push(m); console.log(`  \x1b[32mPASS\x1b[0m ${m}`); };
 const bad = (m, d = '') => { fail.push(m); console.log(`  \x1b[31mFAIL\x1b[0m ${m}${d ? ` — ${d}` : ''}`); };

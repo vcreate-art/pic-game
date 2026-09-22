@@ -3,18 +3,21 @@ import express from 'express';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@pic-game/shared';
-import { CLIENT_ORIGIN, PORT } from './config.js';
+import { IS_PROD, PORT, isAllowedOrigin } from './config.js';
 import { RoomManager } from './game/RoomManager.js';
 import { makeRoutes } from './http/routes.js';
 import { attachSocket } from './socket/index.js';
 
 const app = express();
-app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
+const corsOrigin = (origin: string | undefined, cb: (e: Error | null, ok?: boolean) => void) =>
+  isAllowedOrigin(origin) ? cb(null, true) : cb(new Error(`Origin not allowed: ${origin}`));
+
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json({ limit: '32kb' }));
 
 const http = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(http, {
-  cors: { origin: CLIENT_ORIGIN, credentials: true },
+  cors: { origin: corsOrigin, credentials: true },
   // Strokes are small and frequent; a short interval keeps a dropped drawer
   // from freezing the canvas for everyone else for long.
   pingInterval: 10_000,
@@ -28,7 +31,11 @@ attachSocket(io, rooms);
 
 http.listen(PORT, () => {
   console.log(`[pic-game] server listening on http://localhost:${PORT}`);
-  console.log(`[pic-game] accepting browser origin ${CLIENT_ORIGIN}`);
+  console.log(
+    IS_PROD
+      ? '[pic-game] production: only CLIENT_ORIGIN is accepted'
+      : '[pic-game] dev: accepting localhost and private-network origins',
+  );
 });
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
