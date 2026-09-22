@@ -97,7 +97,7 @@ button, input { font: inherit; color: inherit; }
 /* Games beside the join form. The picker takes the larger share because it
    holds three cards to the form's one column. */
 .landing__cols {
-  display: grid; grid-template-columns: 1.55fr 1fr; gap: 16px; align-items: start;
+  display: grid; grid-template-columns: 1.55fr 1fr; gap: 36px; align-items: start;
 }
 /* Typing a code hides the picker, so the form takes the middle on its own. */
 .landing__cols.is-single {
@@ -552,12 +552,12 @@ button, input { font: inherit; color: inherit; }
 }
 .pick--soon:hover { border-color: var(--line); }
 .pick--soon:active { transform: none; }
-/* A text glyph rather than an emoji, so it takes the muted colour instead of
-   greyscaling to nearly nothing. */
-.pick--soon .pick__art {
-  font-family: var(--display); font-weight: 700; color: var(--ink-soft);
-  width: 36px; height: 36px; display: grid; place-items: center;
-  border: 2px dashed var(--line); border-radius: 50%; font-size: 21px;
+.pick--soon .pick__art { opacity: .5; }
+.pick__soon {
+  font-family: var(--display); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em;
+  color: var(--ink-soft); background: var(--line);
+  padding: 2px 8px; border-radius: 999px; margin-top: 2px;
 }
 .pick--soon strong { color: var(--ink-soft); }
 

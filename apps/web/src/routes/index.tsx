@@ -88,14 +88,12 @@ function Landing() {
               <span>{GAME_LABELS[k].blurb}</span>
             </button>
           ))}
-          {/* Holds the third slot so the row reads as a set with room to grow,
-              rather than as two games that happen to be all there is. */}
+          {/* Not selectable yet, but named — a slot with a plan reads better
+              than an anonymous placeholder. */}
           <div className="pick pick--soon">
-            {/* Only the glyph is decorative; "Coming soon" is real information
-                and should still be announced. */}
-            <span className="pick__art" aria-hidden="true">+</span>
-            <strong>Coming soon</strong>
-            <span>Another one's on the way.</span>
+            <span className="pick__art" aria-hidden="true">🚀</span>
+            <strong>Star Realms</strong>
+            <span className="pick__soon">Coming soon</span>
           </div>
         </div>
       )}
