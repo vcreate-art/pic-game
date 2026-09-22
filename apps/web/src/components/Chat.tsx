@@ -3,11 +3,18 @@ import { MAX_CHAT_LEN } from '../constants.js';
 import { getSocket } from '../net/socket.js';
 import { selectHaveGuessed, selectIsDrawer, useGame } from '../store/game.js';
 
+/** Counts what the word mask counts: letters and digits, not spaces or hyphens,
+ *  so "yo-yo" reads as 4 against 4 rather than 5. */
+function letterCount(s: string): number {
+  return (s.match(/[\p{L}\p{N}]/gu) ?? []).length;
+}
+
 export function Chat() {
   const messages = useGame((s) => s.messages);
   const isDrawer = useGame(selectIsDrawer);
   const haveGuessed = useGame(selectHaveGuessed);
   const phase = useGame((s) => s.room?.phase);
+  const mask = useGame((s) => s.room?.turn?.mask ?? '');
   const [text, setText] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
   const socket = getSocket();
@@ -24,6 +31,11 @@ export function Chat() {
     : haveGuessed && drawing
       ? 'Chat with others who guessed it'
       : 'Type your guess...';
+
+  const target = (mask.match(/_/g) ?? []).length;
+  const typed = letterCount(text);
+  const showCount = drawing && !locked && !haveGuessed && target > 0 && typed > 0;
+  const matches = typed === target;
 
   const send = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,17 +58,32 @@ export function Chat() {
         ))}
         {messages.length === 0 && <p className="chat__empty">Guesses show up here.</p>}
       </div>
+
+      {/* No send button: a single-input form submits on Enter, and the on-screen
+          keyboard's Go key does the same on a phone. The hidden button keeps that
+          explicit for assistive tech. */}
       <form className="chat__form" onSubmit={send}>
-        <input
-          className="chat__input"
-          value={text}
-          maxLength={MAX_CHAT_LEN}
-          disabled={locked}
-          placeholder={placeholder}
-          onChange={(e) => setText(e.target.value)}
-          aria-label="Your guess"
-        />
-        <button className="chat__send" type="submit" disabled={locked || !text.trim()}>
+        <div className="chat__field">
+          <input
+            className="chat__input"
+            value={text}
+            maxLength={MAX_CHAT_LEN}
+            disabled={locked}
+            placeholder={placeholder}
+            onChange={(e) => setText(e.target.value)}
+            aria-label="Your guess"
+            autoComplete="off"
+          />
+          {showCount && (
+            <span
+              className={`chat__count ${matches ? 'is-match' : ''}`}
+              title={matches ? 'Same length as the word' : 'Letters typed / letters in the word'}
+            >
+              {typed}/{target}
+            </span>
+          )}
+        </div>
+        <button type="submit" className="visually-hidden" tabIndex={-1}>
           Send
         </button>
       </form>

@@ -135,17 +135,23 @@ function RoomPage() {
 
   return (
     <div className="game">
+      {/* Three tracks, with the word in the middle one, so it centres against
+          the header itself rather than against whatever space is left over. */}
       <div className="game__head">
-        <div className="game__round">
-          Round {room.round}/{room.settings.rounds}
+        <div className="game__head-side">
+          <span className="game__round">
+            Round {room.round}/{room.settings.rounds}
+          </span>
         </div>
         <WordMask />
-        {phase === 'drawing' && room.turn && (
-          <Timer endsAt={room.turn.endsAt} total={room.settings.drawTime} />
-        )}
-        <button className="tool" type="button" onClick={leave}>
-          Leave
-        </button>
+        <div className="game__head-side game__head-side--end">
+          {phase === 'drawing' && room.turn && (
+            <Timer endsAt={room.turn.endsAt} total={room.settings.drawTime} />
+          )}
+          <button className="tool" type="button" onClick={leave}>
+            Leave
+          </button>
+        </div>
       </div>
 
       <div className="game__body">
