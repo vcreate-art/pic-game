@@ -38,6 +38,9 @@ export function judge(guess: string, word: string): GuessVerdict {
   const w = normalize(word);
   if (!g) return 'wrong';
   if (g === w) return 'correct';
+  // Someone who typed every letter in the right order knows the word; the space
+  // in "ice cream" should not cost them the point.
+  if (g.replace(/ /g, '') === w.replace(/ /g, '')) return 'correct';
   // Only long enough words get a near-miss hint; on a 3-letter word,
   // distance 1 covers too much of the answer space to be fair.
   if (w.length >= 4 && levenshtein(g, w, 1) <= 1) return 'close';
