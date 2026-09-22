@@ -5,8 +5,16 @@ import { Avatar } from '../Avatar.js';
 import { InviteCard } from '../InviteCard.js';
 
 const SIDE_NAME: Record<Side, string> = { w: 'White', b: 'Black' };
-/** Shown so the cooldown slider means something concrete. */
-const SAMPLE: Array<[PieceType, string]> = [['p', 'Pawn'], ['n', 'Knight'], ['q', 'Queen']];
+/** Every piece, shortest rest first, so the slider means something concrete and
+ *  the spread between light and heavy pieces is visible at a glance. */
+const PIECE_ROWS: Array<[PieceType, string]> = [
+  ['p', 'Pawn'],
+  ['k', 'King'],
+  ['n', 'Knight'],
+  ['b', 'Bishop'],
+  ['r', 'Rook'],
+  ['q', 'Queen'],
+];
 
 export function KungFuLobby({ onLeave }: { onLeave: () => void }) {
   const room = useGame(selectKungFu);
@@ -83,13 +91,14 @@ export function KungFuLobby({ onLeave }: { onLeave: () => void }) {
 
             {/* The slider sets a base; each piece scales off it, so show the
                 spread rather than a single number that is true of nothing. */}
-            <p className="settings__note settings__note--left">
-              {SAMPLE.map(([t, label]) => (
-                <span key={t} className="cd-chip">
-                  {label} {(cooldownFor(t, game.settings.cooldownMs) / 1000).toFixed(1)}s
-                </span>
+            <ul className="cooldowns">
+              {PIECE_ROWS.map(([t, label]) => (
+                <li key={t} className="cd-chip">
+                  <span>{label}</span>
+                  <strong>{(cooldownFor(t, game.settings.cooldownMs) / 1000).toFixed(1)}s</strong>
+                </li>
               ))}
-            </p>
+            </ul>
 
           </div>
 
