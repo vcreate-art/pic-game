@@ -1,6 +1,7 @@
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@pic-game/shared';
 import type { GameKind } from '@pic-game/shared';
+import { FightRoom } from '../games/fight/FightRoom.js';
 import { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
 import { RealmsRoom } from '../games/realms/RealmsRoom.js';
 import { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
@@ -9,8 +10,8 @@ import { makeRoomCode } from './codes.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 
-/** Either game's room. Callers narrow on `kind`. */
-export type AnyRoom = SkribblRoom | KungFuRoom | RealmsRoom;
+/** Any game's room. Callers narrow on `kind`. */
+export type AnyRoom = SkribblRoom | KungFuRoom | RealmsRoom | FightRoom;
 
 export class RoomManager {
   private readonly rooms = new Map<string, AnyRoom>();
@@ -25,7 +26,9 @@ export class RoomManager {
         ? new KungFuRoom(code, this.io)
         : kind === 'realms'
           ? new RealmsRoom(code, this.io)
-          : new SkribblRoom(code, this.io);
+          : kind === 'fight'
+            ? new FightRoom(code, this.io)
+            : new SkribblRoom(code, this.io);
     room.onEmpty = (r) => this.collect(r);
     this.rooms.set(code, room);
     return room;

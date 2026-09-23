@@ -1123,6 +1123,7 @@ export function toFrame(m: Match): FightFrame {
     pf: m.pf,
     tm: m.timer,
     r: m.round,
+    w: [m.wins.a, m.wins.b],
     fz: m.freeze,
     a: fighterFrame(m, m.a),
     b: fighterFrame(m, m.b),

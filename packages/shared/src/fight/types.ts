@@ -77,7 +77,12 @@ export interface FightPublic {
   reason: FightEnding;
   /** Set while a fighter's connection is gone. The match is frozen until
    *  they come back or `until` passes, at which point they forfeit. */
-  paused: { side: FightSide; until: number } | null;
+  paused: {
+    side: FightSide;
+    until: number;
+    /** They are back, and play resumes at `until`. Otherwise they forfeit then. */
+    resuming: boolean;
+  } | null;
 }
 
 // ------------------------------------------------------------------ the sim
@@ -166,6 +171,8 @@ export interface FightFrame {
   /** Round timer, in frames. */
   tm: number;
   r: number;
+  /** Rounds won so far, a then b. */
+  w: [number, number];
   /** Global hitstop. The client uses it to shake and hold the picture. */
   fz: number;
   a: FighterFrame;

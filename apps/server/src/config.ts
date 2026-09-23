@@ -47,3 +47,12 @@ export const MAX_OPS_PER_TURN = 4000;
 export const CHAT_BUCKET = { capacity: 6, refillPerSec: 1.5 };
 export const SUGGEST_BUCKET = { capacity: 5, refillPerSec: 0.8 };
 export const DRAW_BUCKET = { capacity: 120, refillPerSec: 60 };
+
+/** Controller updates. A fighter sends one per change, which even frantic
+ *  mashing keeps well under this; a script flooding the room does not. */
+export const FIGHT_INPUT_BUCKET = { capacity: 120, refillPerSec: 90 };
+/** A fighter whose connection drops has this long to come back before they
+ *  forfeit. The match is frozen in the meantime. */
+export const FIGHT_FORFEIT_MS = 10_000;
+/** Countdown after a dropped fighter returns, so nobody is hit cold. */
+export const FIGHT_RESUME_MS = 3_000;

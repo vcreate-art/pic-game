@@ -7,6 +7,9 @@ import type {
   CardInstance, RealmsPublic, RealmsSettings, RealmsSide,
 } from './realms/types.js';
 import type { AttackTarget } from './realms/engine.js';
+import type {
+  FightEvent, FightFrame, FightPublic, FightSettings, FightSide, FighterId,
+} from './fight/types.js';
 
 export interface JoinOk {
   ok: true;
@@ -85,6 +88,20 @@ export interface ClientToServerEvents {
   'realms:discard': (p: { cardId: string }) => void;
   'realms:end': () => void;
   'realms:rematch': () => void;
+
+  // ---- Stick Kombat ----
+  'fight:seat': (p: { side: FightSide | null }) => void;
+  'fight:pick': (p: { fighter: FighterId }) => void;
+  'fight:settings': (p: Partial<FightSettings>) => void;
+  /**
+   * Sent whenever the controls change, not every frame. `held` is the full
+   * state; `pressed` carries the buttons that went down since the last send,
+   * so a tap shorter than a tick is not lost.
+   */
+  'fight:input': (p: { seq: number; held: number; pressed: number }) => void;
+  'fight:rematch': () => void;
+  /** Host only, after a match: back to the lobby to pick again. */
+  'fight:toSelect': () => void;
 
   /** Round-trip probe used to estimate clock offset against the server. */
   'time:ping': (cb: (serverNow: number) => void) => void;
@@ -175,6 +192,16 @@ export interface ServerToClientEvents {
   'realms:hand': (p: { hand: CardInstance[]; owedDiscards: number }) => void;
   'realms:rejected': (p: { reason: string }) => void;
   'realms:over': (p: { winner: RealmsSide | null }) => void;
+
+  // ---- Stick Kombat ----
+  /** Seats, picks, settings and the match result. Sent on change only. */
+  'fight:state': (p: FightPublic) => void;
+  /** One tick of the match. Sent volatile: a late frame is useless, so a
+   *  congested client skips it rather than queueing behind it. */
+  'fight:frame': (p: FightFrame) => void;
+  /** What happened on those ticks. Reliable, unlike the frames, so no hit,
+   *  KO or announcer call is ever skipped. */
+  'fight:events': (p: FightEvent[]) => void;
 
   'error': (p: { code: string; message: string }) => void;
 }

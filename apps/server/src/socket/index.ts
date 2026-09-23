@@ -4,8 +4,11 @@ import {
   type GameKind, type Side,
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
-import { CHAT_BUCKET, DRAW_BUCKET, MAX_NAME_LEN, SUGGEST_BUCKET } from '../config.js';
+import {
+  CHAT_BUCKET, DRAW_BUCKET, FIGHT_INPUT_BUCKET, MAX_NAME_LEN, SUGGEST_BUCKET,
+} from '../config.js';
 import type { AnyRoom, RoomManager } from '../core/RoomManager.js';
+import type { FightRoom } from '../games/fight/FightRoom.js';
 import type { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
 import type { RealmsRoom } from '../games/realms/RealmsRoom.js';
 import type { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
@@ -25,6 +28,7 @@ interface Session {
   chat: TokenBucket;
   draw: TokenBucket;
   suggest: TokenBucket;
+  fight: TokenBucket;
 }
 
 function cleanName(raw: unknown): string | null {
@@ -61,6 +65,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       chat: new TokenBucket(CHAT_BUCKET.capacity, CHAT_BUCKET.refillPerSec),
       draw: new TokenBucket(DRAW_BUCKET.capacity, DRAW_BUCKET.refillPerSec),
       suggest: new TokenBucket(SUGGEST_BUCKET.capacity, SUGGEST_BUCKET.refillPerSec),
+      fight: new TokenBucket(FIGHT_INPUT_BUCKET.capacity, FIGHT_INPUT_BUCKET.refillPerSec),
     };
 
     const bind = (room: AnyRoom, playerId: string) => {
@@ -76,6 +81,8 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.room?.kind === 'kungfu' && s.playerId ? s.room : null;
     const realms = (): RealmsRoom | null =>
       s.room?.kind === 'realms' && s.playerId ? s.room : null;
+    const fight = (): FightRoom | null =>
+      s.room?.kind === 'fight' && s.playerId ? s.room : null;
 
     socket.on('time:ping', (cb) => {
       if (typeof cb === 'function') cb(Date.now());
@@ -345,6 +352,51 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       const room = realms();
       if (!room || !s.playerId) return;
       room.rematch(s.playerId);
+    });
+
+    socket.on('fight:seat', (p) => {
+      const room = fight();
+      if (!room || !s.playerId) return;
+      const side = p?.side;
+      if (side !== null && side !== 'a' && side !== 'b') return;
+      room.takeSeat(s.playerId, side);
+    });
+
+    socket.on('fight:pick', (p) => {
+      const room = fight();
+      if (!room || !s.playerId) return;
+      // The room checks it against the roster; here only the shape.
+      if (typeof p?.fighter !== 'string' || p.fighter.length > 16) return;
+      room.pick(s.playerId, p.fighter);
+    });
+
+    socket.on('fight:settings', (p) => {
+      const room = fight();
+      if (!room || s.playerId !== room.hostId) return;
+      room.updateSettings(p ?? {});
+    });
+
+    socket.on('fight:input', (p) => {
+      const room = fight();
+      if (!room || !s.playerId) return;
+      if (!s.fight.tryTake()) return;
+      const seq = Number(p?.seq);
+      const held = Number(p?.held);
+      const pressed = Number(p?.pressed);
+      if (!Number.isSafeInteger(seq) || !Number.isInteger(held) || !Number.isInteger(pressed)) return;
+      room.input(s.playerId, seq, held, pressed);
+    });
+
+    socket.on('fight:rematch', () => {
+      const room = fight();
+      if (!room || !s.playerId) return;
+      room.rematch(s.playerId);
+    });
+
+    socket.on('fight:toSelect', () => {
+      const room = fight();
+      if (!room || !s.playerId) return;
+      room.toSelect(s.playerId);
     });
 
     socket.on('room:leave', () => {
