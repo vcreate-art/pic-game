@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CLASSIC, CRUCIFORM, isLegalMove, isPromotion, legalDestinations, onBoard,
-  pawnCaptures, sideLabel, squareAt, type Piece, type PieceType, type Side,
+  CLASSIC, CRUCIFORM, isDarkSquare, isLegalMove, isPromotion, legalDestinations,
+  onBoard, pawnCaptures, sideLabel, squareAt, viewOrder,
+  type Piece, type PieceType, type Side,
 } from '../index.js';
 
 const N = 14;
@@ -159,5 +160,62 @@ describe('the classic board is unchanged by all this', () => {
   it('still moves a white pawn up the board', () => {
     const pawn: Piece = { id: 'x', side: 'w', type: 'p', square: 12, readyAt: 0 };
     expect(legalDestinations([pawn], pawn, CLASSIC).sort((a, b) => a - b)).toEqual([20, 28]);
+  });
+});
+
+describe('view rotation', () => {
+  const bottomRow = (side: Side) => {
+    const order = viewOrder(CRUCIFORM, side);
+    return order.slice(order.length - N); // last display row
+  };
+
+  it('puts each side’s home line along the bottom of their view', () => {
+    // Red's home is rank 0, blue's is file 0, yellow's rank 13, green's file 13.
+    expect(bottomRow('r').every((s) => Math.floor(s / N) === 0)).toBe(true);
+    expect(bottomRow('y').every((s) => Math.floor(s / N) === 13)).toBe(true);
+    expect(bottomRow('b').every((s) => s % N === 0)).toBe(true);
+    expect(bottomRow('g').every((s) => s % N === 13)).toBe(true);
+  });
+
+  it('shows every square exactly once, whoever is looking', () => {
+    for (const side of ['r', 'b', 'y', 'g'] as Side[]) {
+      const order = viewOrder(CRUCIFORM, side);
+      expect(order).toHaveLength(N * N);
+      expect(new Set(order).size).toBe(N * N);
+    }
+  });
+
+  it('rotates rather than mirrors, so the board is never handed backwards', () => {
+    // Under a rotation the square diagonally adjacent stays diagonally
+    // adjacent; a mirror would swap the two diagonals.
+    for (const side of ['r', 'b', 'y', 'g'] as Side[]) {
+      const order = viewOrder(CRUCIFORM, side);
+      const at = (dr: number, dc: number) => order[dr * N + dc]!;
+      const a = at(5, 5);
+      const right = at(5, 6);
+      const down = at(6, 5);
+      const df = (x: number, y: number) => (x % N) - (y % N);
+      const dk = (x: number, y: number) => Math.floor(x / N) - Math.floor(y / N);
+      // Moving one cell right and one cell down must be perpendicular steps.
+      const cross = df(right, a) * dk(down, a) - dk(right, a) * df(down, a);
+      expect(Math.abs(cross)).toBe(1);
+    }
+  });
+
+  it('leaves the classic board the way it was: white up, black flipped', () => {
+    const white = viewOrder(CLASSIC, 'w');
+    const black = viewOrder(CLASSIC, 'b');
+    expect(white[0]).toBe(56);           // a8 top-left for white
+    expect(white[63]).toBe(7);           // h1 bottom-right
+    expect(black[0]).toBe(7);            // flipped for black
+    expect(black[63]).toBe(56);
+  });
+});
+
+describe('square colouring', () => {
+  it('is computed from board coordinates, so it does not shift when the view rotates', () => {
+    const sqA = squareAt(CRUCIFORM, 5, 5);
+    expect(isDarkSquare(CRUCIFORM, sqA)).toBe(isDarkSquare(CRUCIFORM, sqA));
+    expect(isDarkSquare(CRUCIFORM, squareAt(CRUCIFORM, 5, 6))).toBe(!isDarkSquare(CRUCIFORM, sqA));
   });
 });

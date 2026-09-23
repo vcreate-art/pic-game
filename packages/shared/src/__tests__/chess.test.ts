@@ -23,7 +23,10 @@ function board(...spec: string[]): Piece[] {
   });
 }
 const at = (pieces: Piece[], sq: string) => pieces.find((p) => squareName(p.square) === sq)!;
-const names = (pieces: Piece[], p: Piece) => legalDestinations(pieces, p).map(squareName).sort();
+// Wrapped, not passed bare: .map hands the index along, which squareName
+// would take as the board size.
+const names = (pieces: Piece[], p: Piece) =>
+  legalDestinations(pieces, p).map((s) => squareName(s)).sort();
 
 describe('squares', () => {
   it('maps index 0 to a1 and 63 to h8', () => {

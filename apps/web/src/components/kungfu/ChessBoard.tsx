@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import {
-  cooldownFor, legalDestinations, squareName, type Piece, type Side, type Square,
+  cooldownFor, isDarkSquare, legalDestinations, squareName, viewOrder,
+  type BoardSpec, type Piece, type Side, type Square,
 } from '@pic-game/shared';
 import { serverNow } from '../../net/clock.js';
 
@@ -11,18 +12,22 @@ const GLYPH: Record<Piece['type'], string> = {
 };
 
 export function ChessBoard({
+  spec,
   pieces,
   mySide,
   live,
   cooldownMs,
+  eliminated,
   onMove,
 }: {
+  spec: BoardSpec;
   pieces: Piece[];
   /** null when spectating — the board is then read-only. */
   mySide: Side | null;
   live: boolean;
   /** Base cooldown, needed to place a running bar on its full timeline. */
   cooldownMs: number;
+  eliminated: Side[];
   onMove: (pieceId: string, to: Square) => void;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -36,21 +41,19 @@ export function ChessBoard({
 
   const selectedPiece = selected ? pieces.find((p) => p.id === selected) ?? null : null;
   const targets = useMemo(
-    () => (selectedPiece ? new Set(legalDestinations(pieces, selectedPiece)) : new Set<Square>()),
-    [pieces, selectedPiece],
+    () => (selectedPiece ? new Set(legalDestinations(pieces, selectedPiece, spec)) : new Set<Square>()),
+    [pieces, selectedPiece, spec],
   );
 
-  // Black plays from the far side, so their pieces sit at the bottom.
-  const order = useMemo(() => {
-    const squares = Array.from({ length: 64 }, (_, i) => i);
-    // Rank 8 first for white; reversed for black.
-    const rows: Square[][] = [];
-    for (let r = 7; r >= 0; r--) rows.push(squares.slice(r * 8, r * 8 + 8));
-    return mySide === 'b' ? rows.reverse().map((row) => [...row].reverse()) : rows;
-  }, [mySide]);
+  // Everyone looks at their own army from behind it, which on a four-way board
+  // means rotating the view rather than flipping it.
+  const order = useMemo(() => viewOrder(spec, mySide), [spec, mySide]);
+
+  const iAmOut = !!mySide && eliminated.includes(mySide);
+  const canPlay = live && !!mySide && !iAmOut;
 
   const clickSquare = (sq: Square) => {
-    if (!live || !mySide) return;
+    if (!canPlay) return;
     const here = bySquare.get(sq);
 
     if (selectedPiece && targets.has(sq)) {
@@ -83,39 +86,47 @@ export function ChessBoard({
   }, [nextReady]);
 
   return (
-    <div className="chess" role="grid" aria-label="Chess board">
-      {order.flat().map((sq) => {
+    <div
+      className={`chess chess--${spec.variant}`}
+      style={{ gridTemplateColumns: `repeat(${spec.size}, 1fr)` }}
+      role="grid"
+      aria-label="Chess board"
+    >
+      {order.map((sq) => {
+        // The cut-away corners of a cruciform board. Rendered as empty cells so
+        // the grid stays rectangular and the arms line up.
+        if (!spec.playable(sq)) return <span key={sq} className="sq sq--void" />;
+
         const piece = bySquare.get(sq);
-        const dark = (((sq / 8) | 0) + (sq % 8)) % 2 === 0;
         const isTarget = targets.has(sq);
         const cooling = piece && piece.readyAt > now ? piece.readyAt - now : 0;
+        const dead = piece ? eliminated.includes(piece.side) : false;
 
         return (
           <button
             key={sq}
             type="button"
             role="gridcell"
-            aria-label={`${squareName(sq)}${piece ? ` ${piece.side}${piece.type}` : ''}`}
+            aria-label={`${squareName(sq, spec.size)}${piece ? ` ${piece.side}${piece.type}` : ''}`}
             className={[
               'sq',
-              dark ? 'sq--dark' : 'sq--light',
+              isDarkSquare(spec, sq) ? 'sq--dark' : 'sq--light',
               isTarget ? (piece ? 'is-capture' : 'is-target') : '',
               piece && piece.id === selected ? 'is-selected' : '',
             ].join(' ')}
             onClick={() => clickSquare(sq)}
-            disabled={!live || !mySide}
+            disabled={!canPlay}
           >
             {piece && (
-              <span className={`pc pc--${piece.side} ${cooling ? 'is-cooling' : ''}`}>
+              <span
+                className={`pc pc--${piece.side} ${cooling ? 'is-cooling' : ''} ${dead ? 'is-dead' : ''}`}
+              >
                 {GLYPH[piece.type]}
                 {/* Described by its FULL duration plus a negative delay for the
                     part already elapsed, never by the time remaining. Changing
                     an animation's duration does not reset how far it has run,
-                    so a re-render mid-cooldown used to shorten the timeline
-                    under a bar that had already travelled — and it jumped
-                    straight to empty while the server still said "wait". These
-                    two values describe the same absolute timeline on every
-                    render, so re-rendering cannot move the bar. */}
+                    so describing it by what is left made a re-render mid-
+                    cooldown snap the bar to empty. */}
                 {cooling > 0 && (
                   <span
                     className="pc__cool"

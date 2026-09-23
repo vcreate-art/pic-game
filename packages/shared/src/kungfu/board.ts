@@ -132,3 +132,44 @@ export const SIDE_LABEL: Record<Side, string> = {
 /** Blue reuses 'b'; which colour it means depends on the variant. */
 export const sideLabel = (spec: BoardSpec, side: Side): string =>
   spec.variant === 'cruciform' && side === 'b' ? 'Blue' : SIDE_LABEL[side];
+
+/**
+ * How many quarter-turns clockwise the board is rotated so this side sits at
+ * the bottom. Every player looks at their own army from behind it, which on a
+ * four-way board means rotating rather than merely flipping.
+ */
+export function viewTurns(spec: BoardSpec, side: Side | null): number {
+  if (spec.variant !== 'cruciform') return side === 'b' ? 2 : 0;
+  return side === 'g' ? 1 : side === 'y' ? 2 : side === 'b' ? 3 : 0;
+}
+
+/**
+ * The squares in reading order — left to right, top to bottom — for a viewer
+ * on `side`. Cut-away corners are included so the grid stays rectangular; the
+ * caller draws them as gaps.
+ */
+export function viewOrder(spec: BoardSpec, side: Side | null): Square[] {
+  const n = spec.size;
+  const turns = viewTurns(spec, side);
+  const out: Square[] = [];
+  for (let dr = 0; dr < n; dr++) {
+    for (let dc = 0; dc < n; dc++) {
+      let file: number;
+      let rank: number;
+      switch (turns) {
+        case 1: file = dr; rank = dc; break;
+        case 2: file = n - 1 - dc; rank = dr; break;
+        case 3: file = n - 1 - dr; rank = n - 1 - dc; break;
+        default: file = dc; rank = n - 1 - dr; break;
+      }
+      out.push(squareAt(spec, file, rank));
+    }
+  }
+  return out;
+}
+
+/** Light and dark squares, in board coordinates so the pattern does not shift
+ *  when the view rotates. */
+export function isDarkSquare(spec: BoardSpec, sq: Square): boolean {
+  return ((sq % spec.size) + Math.floor(sq / spec.size)) % 2 === 0;
+}

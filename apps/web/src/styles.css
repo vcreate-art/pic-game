@@ -565,10 +565,10 @@ button, input { font: inherit; color: inherit; }
 
 .chess {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  /* Rows must be declared too. Without this they size to their content, so a
-     rank holding pieces is tall and an empty rank collapses. */
-  grid-template-rows: repeat(8, 1fr);
+  /* Columns are set inline from the board spec; rows follow automatically and
+     must be declared, or a rank holding pieces is tall and an empty one
+     collapses. */
+  grid-auto-rows: 1fr;
   aspect-ratio: 1;
   /* Square, and bounded by whichever runs out first: the column's width, or
      the viewport height once the app header and page padding are taken out. */
@@ -603,9 +603,22 @@ button, input { font: inherit; color: inherit; }
 }
 
 .pc { position: relative; display: grid; place-items: center; user-select: none; }
-.pc--w { color: #fff; text-shadow: 0 1px 0 #6b6153, 0 0 3px rgba(0,0,0,.45); }
-.pc--b { color: #23201c; text-shadow: 0 1px 0 rgba(255,255,255,.25); }
+/* One glyph tinted per side, with a rim so a light piece reads on a light
+   square and a dark one on a dark square. */
+.pc--w { color: #fdfcfa; text-shadow: 0 0 2px #5c5346, 0 1px 0 #5c5346, 0 0 5px rgba(0,0,0,.35); }
+.pc--r { color: #e02424; }
+.pc--y { color: #eab308; }
+.pc--g { color: #16a34a; }
+.pc--r, .pc--y, .pc--g { text-shadow: 0 0 2px rgba(0,0,0,.5), 0 1px 0 rgba(0,0,0,.35); }
+/* 'b' is black on the classic board and blue on the cruciform one. */
+.chess--classic .pc--b { color: #23201c; text-shadow: 0 1px 0 rgba(255,255,255,.25); }
+.chess--cruciform .pc--b { color: #2563eb; text-shadow: 0 0 2px rgba(0,0,0,.5), 0 1px 0 rgba(0,0,0,.35); }
 .pc.is-cooling { opacity: .55; }
+/* A knocked-out army stays on the board as terrain. */
+.pc.is-dead { opacity: .34; filter: grayscale(.75); }
+
+/* The cut-away corners of a cruciform board: a hole in the grid, not a square. */
+.sq--void { background: transparent; pointer-events: none; }
 
 /* The cooldown wipe is a CSS animation so a ticking timer costs no React
    renders — the piece is repainted only when the board actually changes. */
@@ -632,7 +645,19 @@ button, input { font: inherit; color: inherit; }
   padding: 3px 8px; border-radius: 6px;
 }
 .seat__chip--w { background: #fff; color: #44403c; box-shadow: inset 0 0 0 1px var(--line); }
-.seat__chip--b { background: #2b2825; color: #fff; }
+/* 'b' means black on the classic board and blue on the cruciform one, so the
+   chip is coloured by the variant its container declares. */
+.v--classic .seat__chip--b { background: #2b2825; color: #fff; }
+.v--cruciform .seat__chip--b { background: #2563eb; color: #fff; }
+.seat__chip--r { background: #e02424; color: #fff; }
+.seat__chip--y { background: #eab308; color: #3b2f05; }
+.seat__chip--g { background: #16a34a; color: #fff; }
+
+.seat.is-out { opacity: .5; }
+.seat__out {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--warn); background: #fef2f2; border-radius: 5px; padding: 2px 6px;
+}
 .seat__who { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0; }
 .seat__open { font-size: 13px; color: var(--ink-soft); font-style: italic; }
 

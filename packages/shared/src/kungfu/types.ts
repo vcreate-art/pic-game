@@ -89,8 +89,9 @@ export interface KungFuPublic {
   reason: KungFuEnding;
 }
 
-export const FILES = 'abcdefgh';
+export const FILES = 'abcdefghijkl';
 
-export function squareName(sq: Square): string {
-  return `${FILES[sq % 8]}${((sq / 8) | 0) + 1}`;
+/** a1-style name. Larger boards keep going into i, j, k, l. */
+export function squareName(sq: Square, size = 8): string {
+  return `${FILES[sq % size] ?? '?'}${Math.floor(sq / size) + 1}`;
 }
