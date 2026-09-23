@@ -9,6 +9,7 @@ import { Avatar } from '../Avatar.js';
 import { Chat } from '../Chat.js';
 import { FightLobby, SIDE_LABEL } from './FightLobby.js';
 import { FightStage } from './FightStage.js';
+import { Controls, MoveList } from './MoveList.js';
 
 const ENDING: Record<NonNullable<FightEnding>, string> = {
   ko: 'Knockout',
@@ -72,6 +73,7 @@ export function FightGame({ onLeave }: { onLeave: () => void }) {
   const paused = game.paused;
   const pausedName = paused ? playerOf(paused.side)?.name ?? SIDE_LABEL[paused.side] : '';
   const winnerPick = game.winner ? game.picks[game.winner] : null;
+  const myPick = mySide ? game.picks[mySide] ?? null : null;
 
   return (
     <div className="game game--fight">
@@ -132,6 +134,24 @@ export function FightGame({ onLeave }: { onLeave: () => void }) {
             <kbd>L</kbd>/<kbd>Space</kbd> block · <kbd>H</kbd> throw · <kbd>O</kbd> Fatal Blow ·{' '}
             <kbd>F2</kbd> hitboxes
           </p>
+
+          {/* The move list stays in reach mid-fight: nobody remembers a
+              fatality from the select screen. */}
+          <section className="card roster fight__moves">
+            {myPick ? (
+              <div className="roster__info">
+                <MoveList id={myPick} />
+                <Controls />
+              </div>
+            ) : (
+              <div className="roster__info roster__info--even">
+                {FIGHT_SIDES.map((s) => {
+                  const pick = game.picks[s];
+                  return pick ? <MoveList key={s} id={pick} /> : null;
+                })}
+              </div>
+            )}
+          </section>
         </div>
 
         <div className="fight__side">
