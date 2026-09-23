@@ -531,7 +531,7 @@ button, input { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- game picker */
 
-.picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.picker { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 
 .pick {
   display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px;
@@ -825,4 +825,116 @@ button, input { font: inherit; color: inherit; }
 @media (max-width: 1000px) {
   .realms { grid-template-columns: 1fr; grid-template-areas: 'foe' 'market' 'me' 'chat'; }
   .realms .chat { min-height: 260px; }
+}
+
+/* ---------------------------------------------------------------- stick kombat */
+
+.settings__note--left { text-align: left; }
+.overlay__actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.overlay--soft { background: rgba(10, 4, 6, .45); }
+
+.seat__chip--p1 { background: #b91c1c; color: #fff; }
+.seat__chip--p2 { background: #1d4ed8; color: #fff; }
+.seat__pick {
+  margin-left: auto; padding-left: 6px; font-family: var(--display);
+  font-weight: 800; font-size: 13px; color: var(--ink-soft); white-space: nowrap;
+}
+
+.lobby--fight {
+  max-width: 1240px;
+  grid-template-columns: 350px minmax(0, 1fr);
+  grid-template-areas: 'invite roster' 'settings roster' 'players roster';
+}
+.modes--3 { grid-template-columns: repeat(3, 1fr); }
+
+/* The select screen is the one dark card in the app: it is the arcade cabinet
+   the rest of the lobby sits around. */
+.roster {
+  grid-area: roster; display: flex; flex-direction: column; gap: 14px;
+  background: radial-gradient(120% 80% at 50% 0%, #3a1016 0%, #16070a 60%, #0c0405 100%);
+  border-color: #3b1a1f; color: #f3e7d3;
+}
+.roster .card__title { color: #d6b370; }
+.roster .settings__note { color: #b9a58c; }
+.roster__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+
+.fcard {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 10px 12px; cursor: pointer; text-align: center; color: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.01));
+  border: 2px solid rgba(255,255,255,.08); border-radius: 14px;
+  transition: border-color .15s ease, transform .1s ease, box-shadow .15s ease;
+}
+.fcard:hover:not(:disabled), .fcard:focus-visible { border-color: var(--fc); transform: translateY(-2px); outline: none; }
+.fcard:disabled { cursor: default; }
+.fcard.is-mine {
+  border-color: var(--fc);
+  box-shadow: 0 0 0 1px var(--fc), 0 0 28px -4px var(--fc);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--fc) 22%, transparent), rgba(255,255,255,.01));
+}
+.fcard__art { width: 100%; height: 150px; display: block; }
+.fcard__name {
+  font-family: 'Anton', Impact, sans-serif; font-weight: 400; font-size: 24px;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--fc); line-height: 1.1;
+}
+.fcard__blurb { font-size: 11.5px; line-height: 1.35; color: #c9b8a0; }
+.fcard__badges { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
+.fcard__badge {
+  font-family: var(--display); font-size: 11px; font-weight: 800;
+  padding: 1px 7px; border-radius: 6px; color: #fff;
+}
+.fcard__badge--a { background: #b91c1c; }
+.fcard__badge--b { background: #1d4ed8; }
+
+.roster__info { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; }
+.moves__title {
+  margin: 0 0 8px; font-family: 'Anton', Impact, sans-serif; font-weight: 400;
+  font-size: 18px; letter-spacing: .05em; text-transform: uppercase; color: #d6b370;
+}
+.moves__list { margin: 0; display: flex; flex-direction: column; gap: 5px; }
+.moves__row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  padding: 6px 10px; border-radius: 9px; background: rgba(255,255,255,.04);
+  border-left: 3px solid var(--fc);
+}
+.moves__row dt { font-weight: 600; font-size: 13px; }
+.moves__row dt em { font-style: normal; font-weight: 400; color: #b9a58c; font-size: 12px; margin-left: 4px; }
+.moves__row dd { margin: 0; }
+.moves__row--fatality { border-left-color: #dc2626; background: rgba(220, 38, 38, .12); }
+.roster kbd, .fight__keys kbd {
+  display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; font-weight: 600; padding: 1px 6px; border-radius: 5px;
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); white-space: nowrap;
+}
+.controls__keys { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.controls__keys--soft { color: #b9a58c; }
+
+.game--fight { max-width: 1400px; }
+.fight { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 14px; align-items: start; }
+.fight__main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.fight__stage { position: relative; }
+.fstage {
+  position: relative; width: 100%; border-radius: var(--radius); overflow: hidden;
+  background: #0c0405; box-shadow: var(--shadow), inset 0 0 0 1px rgba(0,0,0,.4);
+}
+.fstage__canvas { display: block; width: 100%; height: 100%; }
+.fstage__note {
+  position: absolute; left: 50%; bottom: 44px; translate: -50% 0; margin: 0;
+  padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  background: rgba(0,0,0,.7); color: #fde68a;
+}
+.fight__keys { margin: 0; font-size: 12px; color: var(--ink-soft); text-align: center; }
+.fight__keys kbd { background: var(--card); border-color: var(--line); color: var(--ink); }
+.fight__side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.fight__card { display: flex; flex-direction: column; gap: 10px; }
+.fight__card .seats { margin-bottom: 0; }
+
+@media (max-width: 1080px) {
+  .fight { grid-template-columns: 1fr; }
+  .lobby--fight { grid-template-columns: 1fr; grid-template-areas: 'invite' 'settings' 'roster' 'players'; }
+  .roster__info { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .roster__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .modes--3 { grid-template-columns: 1fr; }
 }

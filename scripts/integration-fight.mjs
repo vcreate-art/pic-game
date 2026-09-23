@@ -134,7 +134,7 @@ A.send(0);
 B.send(0);
 await sleep(100);
 f1 = S.last('fight:frame');
-if (f1.b.x - f1.a.x < 70) ok(`the fighters walked together (${Math.round(f1.b.x - f1.a.x)} apart)`);
+if (f1.b.x - f1.a.x < 90) ok(`the fighters walked together (${Math.round(f1.b.x - f1.a.x)} apart)`);
 else bad('fighters did not close in', `${f1.a.x} / ${f1.b.x}`);
 
 const before = Date.now();

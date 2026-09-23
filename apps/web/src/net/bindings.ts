@@ -1,4 +1,5 @@
 import type { CanvasEngine } from '../canvas/engine.js';
+import { getFightView } from '../fight/instance.js';
 import { useGame } from '../store/game.js';
 import { getSocket } from './socket.js';
 import { syncClock } from './clock.js';
@@ -27,6 +28,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
     g().sync(state);
     // Only the drawing game has a canvas to restore.
     if (state.kind === 'skribbl') engine.replay(state.ops);
+    if (state.kind === 'fight' && state.frame) getFightView().pushFrame(state.frame);
   });
 
   socket.on('player:joined', (p) => g().patchPlayer(p));
@@ -77,6 +79,11 @@ export function bindSocket(engine: CanvasEngine): () => void {
     }, 2200);
   });
 
+  // --- stick kombat: frames and effects go straight to the view, like strokes ---
+  socket.on('fight:state', (game) => g().setFight(game));
+  socket.on('fight:frame', (f) => getFightView().pushFrame(f));
+  socket.on('fight:events', (evs) => getFightView().pushEvents(evs));
+
   socket.on('chat:message', (m) => g().pushMessage(m));
   socket.on('guess:correct', ({ playerId }) => g().markGuessed(playerId));
 
@@ -100,6 +107,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
       'canvas:undone', 'canvas:cleared', 'chat:message', 'guess:correct', 'error',
       'chess:state', 'chess:moved', 'chess:over', 'chess:rejected',
       'realms:state', 'realms:hand', 'realms:over', 'realms:rejected',
+      'fight:state', 'fight:frame', 'fight:events',
     ] as const) {
       socket.off(ev);
     }

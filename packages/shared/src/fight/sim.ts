@@ -32,7 +32,7 @@ export const GRAVITY = 0.8;
 export const JUMP_VY = 16;
 export const JUMP_VX = 5;
 /** Fighters closer than this are pushed apart. */
-export const PUSH_W = 56;
+export const PUSH_W = 72;
 
 export const INTRO_FRAMES = 150;
 export const FIGHT_CALL_AT = 90;

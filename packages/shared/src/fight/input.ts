@@ -62,9 +62,11 @@ function matches(token: Dir, d: Numpad): boolean {
  * Whether the motion was entered within the last `window` ticks.
  *
  * A token matches a change of direction, not a held one: walking forward for
- * a second and pressing 1 is not "forward + 1". The tokens are matched in
- * order as a subsequence, so passing through neutral or a diagonal in between
- * is allowed.
+ * a second and pressing 1 is not "forward + 1". The exception is the first
+ * direction of a longer motion, which may already be held: backing off and
+ * then going forward + 1 is exactly how a spear gets thrown. The tokens are
+ * matched in order as a subsequence, so passing through neutral or a diagonal
+ * in between is allowed.
  */
 export function matchMotion(h: InputHistory, motion: readonly Dir[], window = MOTION_WINDOW): boolean {
   const start = Math.max(0, h.dirs.length - window);
@@ -72,7 +74,7 @@ export function matchMotion(h: InputHistory, motion: readonly Dir[], window = MO
   for (let k = start; k < h.dirs.length && i < motion.length; k++) {
     const d = h.dirs[k]!;
     const prev = k > 0 ? h.dirs[k - 1]! : 5;
-    const entered = d !== prev;
+    const entered = d !== prev || (i === 0 && motion.length > 1);
     if (entered && matches(motion[i]!, d)) i++;
   }
   return i === motion.length;

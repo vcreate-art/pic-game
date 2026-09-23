@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type {
-  CardInstance, ChatMessage, KungFuPublic, KungFuRoomState, Piece, Player,
+  CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, KungFuRoomState, Piece, Player,
   RealmsPublic, RealmsRoomState, RealmsSide, RoomSettings, RoomState, Side,
   SkribblRoomState, WordOption,
 } from '@pic-game/shared';
@@ -71,6 +71,7 @@ interface GameStore {
   setNotice: (n: string | null) => void;
   setChess: (game: KungFuPublic) => void;
   setRealms: (game: RealmsPublic) => void;
+  setFight: (game: FightPublic) => void;
   setRealmsHand: (hand: CardInstance[], owed: number) => void;
   realmsOver: (winner: RealmsSide | null) => void;
   applyChessMove: (m: {
@@ -223,6 +224,9 @@ export const useGame = create<GameStore>((set) => ({
   setRealms: (game) =>
     set((s) => (s.room?.kind === 'realms' ? { room: { ...s.room, game } } : {})),
 
+  setFight: (game) =>
+    set((s) => (s.room?.kind === 'fight' ? { room: { ...s.room, game } } : {})),
+
   setRealmsHand: (realmsHand, realmsOwed) => set({ realmsHand, realmsOwed }),
 
   realmsOver: (winner) =>
@@ -276,6 +280,9 @@ export const selectKungFu = (s: GameStore): KungFuRoomState | null =>
 
 export const selectRealms = (s: GameStore): RealmsRoomState | null =>
   s.room && s.room.kind === 'realms' ? s.room : null;
+
+export const selectFight = (s: GameStore): FightRoomState | null =>
+  s.room && s.room.kind === 'fight' ? s.room : null;
 
 // kept here so components never reach into `ops` and re-render on strokes
 

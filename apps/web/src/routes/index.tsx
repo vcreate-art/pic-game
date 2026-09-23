@@ -82,7 +82,7 @@ function Landing() {
               onClick={() => setGame(k)}
             >
               <span className={`pick__art ${k === 'skribbl' ? 'is-flipped' : ''}`} aria-hidden="true">
-                {k === 'skribbl' ? '✏️' : k === 'kungfu' ? '♞' : '🚀'}
+                {k === 'skribbl' ? '✏️' : k === 'kungfu' ? '♞' : k === 'realms' ? '🚀' : '🥋'}
               </span>
               <strong>{GAME_LABELS[k].name}</strong>
               <span>{GAME_LABELS[k].blurb}</span>

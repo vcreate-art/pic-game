@@ -140,11 +140,30 @@ Strokes travel as geometry, never pixels:
 - Stroke events go **straight to the canvas engine and never touch React state**,
   so a fast drawer produces zero re-renders.
 
+## Stick Kombat
+
+A two-player MK11-style fighter, and the one real-time game here. The server runs
+the shared sim (`packages/shared/src/fight`) on a fixed 60 Hz step and is the only
+authority on who hit whom; clients send controller changes and draw what comes back.
+
+- **Frames are volatile, events are not.** A snapshot that arrives late is useless,
+  so a congested client skips it rather than queueing. Hits, KOs and announcer calls
+  travel on a separate reliable channel, so none is ever lost.
+- **Inputs carry edges.** Each update has the held buttons plus the ones pressed
+  since the last send, so a tap shorter than a tick still lands.
+- **No client prediction yet.** On home Wi-Fi the round trip is well under a frame.
+  The sim is pure and shared, so prediction can be added without restructuring.
+- A fighter who drops mid-match freezes it for ten seconds before forfeiting.
+
+Controls: WASD to move, U I J K for 1–4, L or Space to block, H to throw, O for
+Fatal Blow. F2 toggles a hitbox overlay.
+
 ## Testing
 
 ```bash
 npm test                      # unit tests for the pure logic in packages/shared
 node scripts/integration.mjs  # 25 checks against a running server
+node scripts/integration-fight.mjs  # the fighter: tick rate, inputs, pause and forfeit
 ```
 
 The integration suite connects three real socket clients and plays a turn, then

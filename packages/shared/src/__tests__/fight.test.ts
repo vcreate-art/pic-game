@@ -58,6 +58,19 @@ describe('input', () => {
     expect(matchMotion(h, ['F'])).toBe(false);
   });
 
+  it('lets the first direction of a motion be one already held', () => {
+    const h = newHistory();
+    for (let i = 0; i < 30; i++) record(h, 4);
+    record(h, 5);
+    record(h, 6);
+    expect(matchMotion(h, ['B', 'F'])).toBe(true);
+    // Still in order: forward held, then back, is not back-forward.
+    const g = newHistory();
+    for (let i = 0; i < 30; i++) record(g, 6);
+    record(g, 4);
+    expect(matchMotion(g, ['B', 'F'])).toBe(false);
+  });
+
   it('forgets a motion once it falls out of the window', () => {
     const h = newHistory();
     for (const d of [4, 5, 6] as const) record(h, d);
@@ -98,7 +111,7 @@ describe('the round starts', () => {
   it('cannot walk through the opponent', () => {
     const m = fight();
     run(m, 200, RIGHT, LEFT);
-    expect(m.b.x - m.a.x).toBeGreaterThanOrEqual(55.9);
+    expect(m.b.x - m.a.x).toBeGreaterThanOrEqual(71.9);
   });
 
   it('jumps and lands', () => {

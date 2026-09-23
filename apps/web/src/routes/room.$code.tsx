@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createRoute, useNavigate, useParams } from '@tanstack/react-router';
 import { getEngine } from '../canvas/engineInstance.js';
 import { JoinPanel, type Identity } from '../components/JoinPanel.js';
+import { FightGame } from '../components/fight/FightGame.js';
 import { KungFuGame } from '../components/kungfu/KungFuGame.js';
 import { Lobby } from '../components/Lobby.js';
 import { RealmsGame } from '../components/realms/RealmsGame.js';
@@ -128,6 +129,8 @@ function RoomPage() {
   if (room.kind === 'kungfu') return <KungFuGame onLeave={leave} />;
 
   if (room.kind === 'realms') return <RealmsGame onLeave={leave} />;
+
+  if (room.kind === 'fight') return <FightGame onLeave={leave} />;
 
   if (phase === 'lobby') {
     return (
