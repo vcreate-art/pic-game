@@ -103,6 +103,9 @@ button, input { font: inherit; color: inherit; }
 .landing__cols.is-single {
   grid-template-columns: minmax(0, 420px); justify-content: center;
 }
+/* The join-by-link screen shares .landing but has no picker beside the form,
+   so it keeps the narrow width the page had before the picker existed. */
+.landing--narrow { max-width: 440px; }
 .landing__hero { text-align: center; }
 .landing__title {
   margin: 0 0 6px; font-family: var(--display); font-size: 36px;
@@ -602,7 +605,12 @@ button, input { font: inherit; color: inherit; }
   border-radius: 50%; border: 3px solid rgba(220, 38, 38, .6);
 }
 
-.pc { position: relative; display: grid; place-items: center; user-select: none; }
+.pc {
+  position: relative; display: grid; place-items: center; user-select: none;
+  /* Fills the square so the cooldown bar is sized against the square rather
+     than against the glyph, which made it 15px wide and easy to miss. */
+  width: 100%; height: 100%;
+}
 /* One glyph tinted per side, with a rim so a light piece reads on a light
    square and a dark one on a dark square. */
 .pc--w { color: #fdfcfa; text-shadow: 0 0 2px #5c5346, 0 1px 0 #5c5346, 0 0 5px rgba(0,0,0,.35); }
@@ -622,9 +630,17 @@ button, input { font: inherit; color: inherit; }
 
 /* The cooldown wipe is a CSS animation so a ticking timer costs no React
    renders — the piece is repainted only when the board actually changes. */
+/* A track behind the bar, so the remaining fraction is readable rather than
+   just "a bar of some length". ::before paints under the element's children. */
+.pc.is-cooling::before {
+  content: ''; position: absolute; left: 50%; bottom: 7%; translate: -50% 0;
+  width: 66%; height: 5px; border-radius: 999px;
+  background: rgba(0, 0, 0, .22);
+}
 .pc__cool {
-  position: absolute; left: 50%; bottom: -14%; translate: -50% 0;
-  width: 62%; height: 4px; border-radius: 999px; background: var(--accent);
+  position: absolute; left: 50%; bottom: 7%; translate: -50% 0;
+  width: 66%; height: 5px; border-radius: 999px; background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .5);
   transform-origin: left center;
   animation-name: cooldown; animation-timing-function: linear; animation-fill-mode: forwards;
 }

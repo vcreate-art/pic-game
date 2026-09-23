@@ -81,14 +81,17 @@ export function KungFuLobby({ onLeave }: { onLeave: () => void }) {
                   <span className={holder ? 'seat__who' : 'seat__open'}>
                     {holder ? nameOf(holder) : 'open'}
                   </span>
-                  <button
-                    type="button"
-                    className="tool"
-                    onClick={() => socket.emit('chess:seat', { side: mine ? null : side })}
-                    disabled={!!holder && !mine}
-                  >
-                    {mine ? 'Leave' : 'Sit'}
-                  </button>
+                  {/* Only offered when the seat is actually yours to take or
+                      to give up; someone else's seat gets no button at all. */}
+                  {(!holder || mine) && (
+                    <button
+                      type="button"
+                      className="tool"
+                      onClick={() => socket.emit('chess:seat', { side: mine ? null : side })}
+                    >
+                      {mine ? 'Leave' : 'Sit'}
+                    </button>
+                  )}
                 </div>
               );
             })}

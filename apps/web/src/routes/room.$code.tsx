@@ -102,7 +102,7 @@ function RoomPage() {
   // Arrived via an invite link with no seat yet — collect a name first.
   if (!me || !room) {
     return (
-      <div className="landing">
+      <div className="landing landing--narrow">
         <div className="landing__hero">
           <h1 className="landing__title">Join room {code}</h1>
           <p className="landing__sub">Pick a nickname to jump in.</p>
