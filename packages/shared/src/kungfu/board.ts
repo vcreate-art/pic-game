@@ -1,6 +1,6 @@
-import type { Piece, PieceType, Side, Square } from './types.js';
+import type { Piece, PieceType, Side, Square, Variant } from './types.js';
 
-export type Variant = 'classic' | 'cruciform';
+export type { Variant };
 
 /** Back-rank order, read along each side's home line. */
 const BACK_RANK: PieceType[] = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];

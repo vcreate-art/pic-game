@@ -144,6 +144,8 @@ export interface ServerToClientEvents {
   }) => void;
   /** The mover's own attempt was refused; nobody else needs to know. */
   'chess:rejected': (p: { pieceId: string; reason: string }) => void;
+  /** Someone is out; the game may still be running for the others. */
+  'chess:eliminated': (p: { side: Side; by: Side | null }) => void;
   'chess:over': (p: { winner: Side | null; reason: KungFuPublic['reason'] }) => void;
 
   'error': (p: { code: string; message: string }) => void;

@@ -1,6 +1,6 @@
 import type { Server, Socket } from 'socket.io';
 import {
-  AVATAR_COLORS, AVATAR_FACES, sanitizePoints, PALETTE, BRUSH_SIZES,
+  AVATAR_COLORS, AVATAR_FACES, sanitizePoints, PALETTE, BRUSH_SIZES, type Side,
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
 import { CHAT_BUCKET, DRAW_BUCKET, MAX_NAME_LEN, SUGGEST_BUCKET } from '../config.js';
@@ -10,6 +10,9 @@ import type { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
 import { TokenBucket } from '../rateLimit.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
+
+/** Every side letter any board uses. */
+const SIDES: readonly Side[] = ['w', 'b', 'r', 'y', 'g'];
 type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
 
 /** Per-connection session. The room/player binding lives here rather than on the
@@ -248,8 +251,10 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
     socket.on('chess:seat', (p) => {
       const room = chess();
       if (!room || !s.playerId) return;
+      // Which sides exist depends on the board, so only shape is checked here;
+      // the room rejects a side its own variant does not have.
       const side = p?.side;
-      if (side !== 'w' && side !== 'b' && side !== null) return;
+      if (side !== null && !SIDES.includes(side as Side)) return;
       room.takeSeat(s.playerId, side);
     });
 

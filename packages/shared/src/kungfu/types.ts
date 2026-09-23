@@ -21,13 +21,26 @@ export interface Piece {
 
 export type KungFuPhase = 'lobby' | 'playing' | 'ended';
 
+/** Which board a room plays on. Declared here rather than in board.ts so the
+ *  settings can name it without the two modules importing each other. */
+export type Variant = 'classic' | 'cruciform';
+
+export const VARIANTS: readonly Variant[] = ['classic', 'cruciform'];
+
+export const VARIANT_LABELS: Record<Variant, { name: string; blurb: string; seats: number }> = {
+  classic: { name: '1 v 1', blurb: 'The usual board, two armies.', seats: 2 },
+  cruciform: { name: '4 player', blurb: 'A cross-shaped board, four armies, last king standing.', seats: 4 },
+};
+
 export interface KungFuSettings {
   /** Base cooldown in ms; each piece type scales off this. */
   cooldownMs: number;
+  variant: Variant;
 }
 
 export const KUNGFU_DEFAULTS: KungFuSettings = {
   cooldownMs: 4000,
+  variant: 'classic',
 };
 
 /** Pawns always promote to a queen. It is not a setting: with promotion off, a
@@ -61,15 +74,19 @@ export function cooldownFor(type: PieceType, base: number): number {
  *  depends on the board, so this is keyed loosely rather than by fixed fields. */
 export type KungFuSeats = Partial<Record<Side, string | null>>;
 
+export type KungFuEnding = 'king-captured' | 'opponent-left' | null;
+
 export interface KungFuPublic {
   phase: KungFuPhase;
   settings: KungFuSettings;
   seats: KungFuSeats;
   pieces: Piece[];
+  /** Sides that are out. Their pieces stay on the board as obstacles. */
+  eliminated: Side[];
   /** Set once the game is over. */
   winner: Side | null;
   /** Why it ended, for the result overlay. */
-  reason: 'king-captured' | 'resigned' | 'opponent-left' | null;
+  reason: KungFuEnding;
 }
 
 export const FILES = 'abcdefgh';

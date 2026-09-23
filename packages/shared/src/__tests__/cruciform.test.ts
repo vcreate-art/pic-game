@@ -102,7 +102,7 @@ describe('pieces respect the cut-away corners', () => {
   it('a rook on the arm cannot slide into a corner', () => {
     // b4 in the left arm: sliding down stops where the board ends at rank 3.
     const rook = pc('r', 'r', 1, 4);
-    const got = dests([rook], rook).map((s) => [s % N, Math.floor(s / N)]);
+    const got: Array<[number, number]> = dests([rook], rook).map((s) => [s % N, Math.floor(s / N)]);
     expect(got.every(([f, r]) => CRUCIFORM.playable(squareAt(CRUCIFORM, f, r)))).toBe(true);
     expect(got).not.toContainEqual([1, 2]); // would be a corner square
     expect(got).toContainEqual([1, 3]);

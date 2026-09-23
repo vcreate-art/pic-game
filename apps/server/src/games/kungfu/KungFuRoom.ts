@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import {
-  KUNGFU_BOUNDS, KUNGFU_DEFAULTS, PROMOTES_TO, cooldownFor, initialPieces,
-  isLegalMove, isPromotion, type KungFuPublic, type KungFuSeats, type KungFuSettings,
-  type Piece, type RoomState, type Side, type Square,
+  KUNGFU_BOUNDS, KUNGFU_DEFAULTS, PROMOTES_TO, SPECS, VARIANTS, cooldownFor,
+  isLegalMove, isPromotion, type BoardSpec, type KungFuEnding, type KungFuPublic,
+  type KungFuSeats, type KungFuSettings, type Piece, type RoomState, type Side,
+  type Square, type Variant,
 } from '@pic-game/shared';
 import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
 
@@ -25,8 +26,15 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
   phase: KungFuPublic['phase'] = 'lobby';
   seats: KungFuSeats = { w: null, b: null };
   private pieces: Piece[] = [];
+  /** Sides that are out. Their pieces stay put as obstacles anyone may take. */
+  private eliminated: Side[] = [];
   private winner: Side | null = null;
-  private reason: KungFuPublic['reason'] = null;
+  private reason: KungFuEnding = null;
+
+  /** The board this room is playing on. */
+  private get spec(): BoardSpec {
+    return SPECS[this.settings.variant];
+  }
 
   constructor(code: string, io: IO) {
     super(code, io);
@@ -44,7 +52,7 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
   }
 
   protected get minPlayers(): number {
-    return 2;
+    return this.spec.sides.length;
   }
 
   protected createPlayer(base: CorePlayer): CorePlayer {
@@ -63,13 +71,15 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
     // Handled by handleDeparture, which knows which side was vacated.
   }
 
-  /** Losing a seated player ends the game; losing a spectator changes nothing. */
+  /** A seated player walking out is an elimination. With four players the game
+   *  carries on; with two there is nobody left and it ends. A spectator leaving
+   *  changes nothing. */
   private handleDeparture(playerId: string): boolean {
     const side = this.sideOf(playerId);
     if (!side) return false;
     this.seats[side] = null;
     if (this.phase === 'playing') {
-      this.finish(side === 'w' ? 'b' : 'w', 'opponent-left');
+      this.eliminate(side, null);
     } else {
       this.broadcast();
     }
@@ -79,9 +89,16 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
   // ------------------------------------------------------------------ seats
 
   sideOf(playerId: string): Side | null {
-    if (this.seats.w === playerId) return 'w';
-    if (this.seats.b === playerId) return 'b';
-    return null;
+    return this.spec.sides.find((side) => this.seats[side] === playerId) ?? null;
+  }
+
+  /** Seated, and not yet knocked out. */
+  private aliveSides(): Side[] {
+    return this.spec.sides.filter((s) => this.seats[s] && !this.eliminated.includes(s));
+  }
+
+  private allSeated(): boolean {
+    return this.spec.sides.every((s) => !!this.seats[s]);
   }
 
   /** Claims a side, or releases whichever one this player holds. */
@@ -92,7 +109,7 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
     const held = this.sideOf(playerId);
     if (held) this.seats[held] = null;
 
-    if (side === 'w' || side === 'b') {
+    if (side && this.spec.sides.includes(side)) {
       if (this.seats[side] && this.seats[side] !== playerId) {
         this.emitError(playerId, 'SEAT_TAKEN', 'Someone is already playing that side.');
         if (held) this.seats[held] = playerId; // put them back where they were
@@ -110,6 +127,12 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
     if (typeof patch.cooldownMs === 'number' && Number.isFinite(patch.cooldownMs)) {
       this.settings.cooldownMs = Math.round(Math.max(min, Math.min(max, patch.cooldownMs)));
     }
+    if (patch.variant && VARIANTS.includes(patch.variant) && patch.variant !== this.settings.variant) {
+      this.settings.variant = patch.variant;
+      // The old board's sides may not exist on the new one, so nobody keeps
+      // a seat across the switch.
+      this.seats = {};
+    }
     this.broadcast();
   }
 
@@ -118,11 +141,13 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
   startGame(byPlayerId: string): void {
     if (byPlayerId !== this.hostId) return;
     if (this.phase === 'playing') return;
-    if (!this.seats.w || !this.seats.b) {
-      this.emitError(byPlayerId, 'NO_SEATS', 'Both sides need a player first.');
+    if (!this.allSeated()) {
+      const open = this.spec.sides.filter((s) => !this.seats[s]).length;
+      this.emitError(byPlayerId, 'NO_SEATS', `${open} side${open > 1 ? 's' : ''} still need a player.`);
       return;
     }
-    this.pieces = initialPieces(() => randomUUID());
+    this.pieces = this.spec.initialPieces(() => randomUUID());
+    this.eliminated = [];
     this.winner = null;
     this.reason = null;
     this.phase = 'playing';
@@ -133,7 +158,7 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
   rematch(byPlayerId: string): void {
     if (this.phase !== 'ended') return;
     if (byPlayerId !== this.hostId && !this.sideOf(byPlayerId)) return;
-    if (!this.seats.w || !this.seats.b) {
+    if (!this.allSeated()) {
       this.phase = 'lobby';
       this.broadcast();
       return;
@@ -148,6 +173,7 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
     if (this.phase !== 'playing') return reject('The game is not running.');
     const side = this.sideOf(playerId);
     if (!side) return reject('You are watching, not playing.');
+    if (this.eliminated.includes(side)) return reject('You are out of this one.');
 
     const piece = this.pieces.find((p) => p.id === pieceId);
     if (!piece) return reject('That piece is gone.');
@@ -162,7 +188,7 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
 
     // Re-checked against the live board, which may have changed since the
     // client decided this move was legal.
-    if (!isLegalMove(this.pieces, piece, to)) return reject('That piece cannot go there.');
+    if (!isLegalMove(this.pieces, piece, to, this.spec)) return reject('That piece cannot go there.');
 
     const from = piece.square;
     const target = this.pieces.find((p) => p.square === to);
@@ -176,7 +202,7 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
     piece.readyAt = now + cooldownFor(piece.type, this.settings.cooldownMs);
 
     let promotedTo: Piece['type'] | undefined;
-    if (isPromotion(piece, to)) {
+    if (isPromotion(piece, to, this.spec)) {
       piece.type = PROMOTES_TO;
       promotedTo = PROMOTES_TO;
     }
@@ -190,11 +216,35 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
       ...(promotedTo ? { promotedTo } : {}),
     });
 
-    // No checkmate in real time — taking the king is the win.
-    if (target?.type === 'k') this.finish(side, 'king-captured');
+    // No checkmate in real time — taking a king knocks that player out.
+    if (target?.type === 'k') this.eliminate(target.side, side);
   }
 
-  private finish(winner: Side | null, reason: KungFuPublic['reason']): void {
+  /**
+   * Knocks a side out and ends the game if only one is left.
+   *
+   * Their pieces stay where they are rather than vanishing: on a four-player
+   * board a dead army is terrain the survivors have to play around, and since
+   * every survivor already sees it as "not mine", it is capturable with no
+   * special handling.
+   */
+  private eliminate(side: Side, by: Side | null): void {
+    if (this.eliminated.includes(side)) return;
+    this.eliminated.push(side);
+    this.io.to(this.code).emit('chess:eliminated', { side, by });
+
+    const alive = this.aliveSides();
+    if (alive.length <= 1) {
+      // The reason names what actually finished it. That the survivor is the
+      // last one standing is something the UI can see for itself from the
+      // number of sides.
+      this.finish(alive[0] ?? null, by === null ? 'opponent-left' : 'king-captured');
+      return;
+    }
+    this.broadcast();
+  }
+
+  private finish(winner: Side | null, reason: KungFuEnding): void {
     if (this.phase === 'ended') return;
     this.phase = 'ended';
     this.winner = winner;
@@ -211,6 +261,7 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
       settings: this.settings,
       seats: { ...this.seats },
       pieces: this.pieces.map((p) => ({ ...p })),
+      eliminated: [...this.eliminated],
       winner: this.winner,
       reason: this.reason,
     };
