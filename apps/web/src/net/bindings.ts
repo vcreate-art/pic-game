@@ -66,6 +66,17 @@ export function bindSocket(engine: CanvasEngine): () => void {
     }, 1800);
   });
 
+  // --- star realms ---
+  socket.on('realms:state', (game) => g().setRealms(game));
+  socket.on('realms:hand', ({ hand, owedDiscards }) => g().setRealmsHand(hand, owedDiscards));
+  socket.on('realms:over', ({ winner }) => g().realmsOver(winner));
+  socket.on('realms:rejected', ({ reason }) => {
+    g().setNotice(reason);
+    setTimeout(() => {
+      if (useGame.getState().notice === reason) useGame.getState().setNotice(null);
+    }, 2200);
+  });
+
   socket.on('chat:message', (m) => g().pushMessage(m));
   socket.on('guess:correct', ({ playerId }) => g().markGuessed(playerId));
 
@@ -88,6 +99,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
       'draw:start', 'draw:append', 'draw:end', 'draw:fill',
       'canvas:undone', 'canvas:cleared', 'chat:message', 'guess:correct', 'error',
       'chess:state', 'chess:moved', 'chess:over', 'chess:rejected',
+      'realms:state', 'realms:hand', 'realms:over', 'realms:rejected',
     ] as const) {
       socket.off(ev);
     }

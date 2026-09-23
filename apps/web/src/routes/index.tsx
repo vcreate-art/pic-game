@@ -82,19 +82,12 @@ function Landing() {
               onClick={() => setGame(k)}
             >
               <span className={`pick__art ${k === 'skribbl' ? 'is-flipped' : ''}`} aria-hidden="true">
-                {k === 'skribbl' ? '✏️' : '♞'}
+                {k === 'skribbl' ? '✏️' : k === 'kungfu' ? '♞' : '🚀'}
               </span>
               <strong>{GAME_LABELS[k].name}</strong>
               <span>{GAME_LABELS[k].blurb}</span>
             </button>
           ))}
-          {/* Not selectable yet, but named — a slot with a plan reads better
-              than an anonymous placeholder. */}
-          <div className="pick pick--soon">
-            <span className="pick__art" aria-hidden="true">🚀</span>
-            <strong>Star Realms</strong>
-            <span className="pick__soon">Coming soon</span>
-          </div>
         </div>
       )}
 

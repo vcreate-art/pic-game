@@ -4,6 +4,7 @@ import { getEngine } from '../canvas/engineInstance.js';
 import { JoinPanel, type Identity } from '../components/JoinPanel.js';
 import { KungFuGame } from '../components/kungfu/KungFuGame.js';
 import { Lobby } from '../components/Lobby.js';
+import { RealmsGame } from '../components/realms/RealmsGame.js';
 import { SkribblGame } from '../components/skribbl/SkribblGame.js';
 import { bindSocket } from '../net/bindings.js';
 import { clearSeat, getSocket, loadProfile, loadSeat, saveSeat } from '../net/socket.js';
@@ -126,23 +127,7 @@ function RoomPage() {
   // sides on the board rather than setting up a word list.
   if (room.kind === 'kungfu') return <KungFuGame onLeave={leave} />;
 
-  // The server can run Star Realms before it has a screen; say so rather than
-  // falling through to another game's lobby.
-  if (room.kind === 'realms') {
-    return (
-      <div className="landing landing--narrow">
-        <div className="landing__hero">
-          <h1 className="landing__title">Star Realms</h1>
-          <p className="landing__sub">The table is set, but the cards have nowhere to be drawn yet.</p>
-        </div>
-        <div className="leavebar">
-          <button className="btn btn--danger" type="button" onClick={leave}>
-            Leave room
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (room.kind === 'realms') return <RealmsGame onLeave={leave} />;
 
   if (phase === 'lobby') {
     return (

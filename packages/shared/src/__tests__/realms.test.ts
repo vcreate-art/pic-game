@@ -343,11 +343,26 @@ describe('ending a turn', () => {
     endTurn(s, seeded());
 
     expect(s.players.a.inPlay).toHaveLength(0);
-    expect(s.players.a.hand).toHaveLength(0);
     expect(s.players.a.bases.map((b) => b.key)).toContain('blob-wheel');
     expect(s.players.a.discard.map((c) => c.id)).toContain(scout.id);
     expect(s.turn).toBe('b');
-    expect(s.players.b.hand.length).toBeGreaterThan(0);
+  });
+
+  it('draws the finishing player a new hand, and leaves the other alone', () => {
+    // The incoming player already holds a hand. Drawing for them here is how
+    // you end up with ten cards on the second turn of every game.
+    const s = game();
+    const beforeB = s.players.b.hand.length;
+    endTurn(s, seeded());
+    expect(s.players.a.hand).toHaveLength(5);
+    expect(s.players.b.hand).toHaveLength(beforeB);
+  });
+
+  it('keeps hands at five across several turns', () => {
+    const s = game();
+    for (let i = 0; i < 6; i++) endTurn(s, seeded(i + 2));
+    expect(s.players.a.hand).toHaveLength(5);
+    expect(s.players.b.hand).toHaveLength(5);
   });
 
   it('clears the pools so nothing carries over', () => {

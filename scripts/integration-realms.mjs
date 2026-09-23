@@ -144,8 +144,11 @@ A.emit('realms:end');
 const handed = await waitForMatch(A, 'realms:state', (s) => s.turn === 'b', 5000);
 if (handed.turn === 'b') ok('the turn passes');
 else bad('turn did not pass');
-if (handed.players.a.inPlay.length === 0 && handed.players.a.handCount === 0) ok('played cards and leftovers are swept away');
+if (handed.players.a.inPlay.length === 0) ok('played cards are swept away');
 else bad('board not cleared');
+// The finishing player draws their next hand; the incoming one keeps theirs.
+if (handed.players.a.handCount === 5 && handed.players.b.handCount === 5) ok('both hands are five, not ten');
+else bad('hand sizes wrong after the turn', JSON.stringify([handed.players.a.handCount, handed.players.b.handCount]));
 if (handed.trade === 0 && handed.combat === 0) ok('the pools are emptied');
 else bad('pools carried over');
 

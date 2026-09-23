@@ -343,10 +343,14 @@ export function endTurn(state: RealmsState, rng: Rng): Result {
   me.allied = [];
   for (const b of me.bases) b.used = false;
 
+  // You draw your OWN next hand as you finish, rather than the incoming player
+  // drawing at the start of theirs — they already hold one, and drawing for
+  // them again hands them ten cards.
+  drawCards(me, 5, rng);
+
   state.trade = 0;
   state.combat = 0;
   state.turn = other(side);
-  drawCards(state.players[state.turn], 5, rng);
   return yes;
 }
 

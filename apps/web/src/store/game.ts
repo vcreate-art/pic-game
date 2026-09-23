@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import type {
-  ChatMessage, KungFuPublic, KungFuRoomState, Piece, Player, RoomSettings,
-  RoomState, Side, SkribblRoomState, WordOption,
+  CardInstance, ChatMessage, KungFuPublic, KungFuRoomState, Piece, Player,
+  RealmsPublic, RealmsRoomState, RealmsSide, RoomSettings, RoomState, Side,
+  SkribblRoomState, WordOption,
 } from '@pic-game/shared';
 
 const MAX_MESSAGES = 200;
@@ -45,6 +46,9 @@ interface GameStore {
   notice: string | null;
   /** Name of whoever removed us, set only when it happens. */
   kickedBy: string | null;
+  /** Our own Star Realms hand. Nobody else's ever arrives. */
+  realmsHand: CardInstance[];
+  realmsOwed: number;
 
   setConnected: (c: boolean) => void;
   setMe: (id: string) => void;
@@ -66,6 +70,9 @@ interface GameStore {
   pushMessage: (m: ChatMessage) => void;
   setNotice: (n: string | null) => void;
   setChess: (game: KungFuPublic) => void;
+  setRealms: (game: RealmsPublic) => void;
+  setRealmsHand: (hand: CardInstance[], owed: number) => void;
+  realmsOver: (winner: RealmsSide | null) => void;
   applyChessMove: (m: {
     pieceId: string; to: number; readyAt: number;
     captured?: string; promotedTo?: Piece['type'];
@@ -90,6 +97,8 @@ export const useGame = create<GameStore>((set) => ({
   final: null,
   notice: null,
   kickedBy: null,
+  realmsHand: [],
+  realmsOwed: 0,
 
   setConnected: (connected) => set({ connected }),
   setMe: (me) => set({ me }),
@@ -211,6 +220,18 @@ export const useGame = create<GameStore>((set) => ({
   setChess: (game) =>
     set((s) => (s.room?.kind === 'kungfu' ? { room: { ...s.room, game } } : {})),
 
+  setRealms: (game) =>
+    set((s) => (s.room?.kind === 'realms' ? { room: { ...s.room, game } } : {})),
+
+  setRealmsHand: (realmsHand, realmsOwed) => set({ realmsHand, realmsOwed }),
+
+  realmsOver: (winner) =>
+    set((s) =>
+      s.room?.kind === 'realms'
+        ? { room: { ...s.room, game: { ...s.room.game, phase: 'ended', winner } } }
+        : {},
+    ),
+
   /** Applies one move to the local board. Cheap enough to re-render on: a
    *  handful of moves a second, versus a stroke stream. */
   applyChessMove: (m) =>
@@ -239,6 +260,7 @@ export const useGame = create<GameStore>((set) => ({
       me: null, room: null, secret: null, choices: null, chooseEndsAt: null,
       suggest: null, mySuggestion: null, suggestError: null,
       messages: [], turnResult: null, final: null, notice: null, kickedBy: null,
+      realmsHand: [], realmsOwed: 0,
     }),
 }));
 
@@ -251,6 +273,9 @@ export const selectSkribbl = (s: GameStore): SkribblRoomState | null =>
 
 export const selectKungFu = (s: GameStore): KungFuRoomState | null =>
   s.room && s.room.kind === 'kungfu' ? s.room : null;
+
+export const selectRealms = (s: GameStore): RealmsRoomState | null =>
+  s.room && s.room.kind === 'realms' ? s.room : null;
 
 // kept here so components never reach into `ops` and re-render on strokes
 
