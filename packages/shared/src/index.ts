@@ -13,3 +13,4 @@ export * from './realms/cards.js';
 export * from './realms/engine.js';
 export * from './realms/format.js';
 export * from './fight/index.js';
+export * from './race/index.js';
