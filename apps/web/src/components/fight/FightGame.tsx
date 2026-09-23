@@ -128,7 +128,7 @@ export function FightGame({ onLeave }: { onLeave: () => void }) {
             )}
           </div>
           <p className="fight__keys">
-            <kbd>WASD</kbd> move · <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> attack 1–4 ·{' '}
+            <kbd>WASD</kbd> move · <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> punch, punch, kick, kick ·{' '}
             <kbd>L</kbd>/<kbd>Space</kbd> block · <kbd>H</kbd> throw · <kbd>O</kbd> Fatal Blow ·{' '}
             <kbd>F2</kbd> hitboxes
           </p>

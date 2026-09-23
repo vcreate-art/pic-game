@@ -1,5 +1,5 @@
 import {
-  BTN, BUTTON_LABEL, FIGHTERS, moveOf, notation, type AttackBtn, type FighterDef,
+  BTN, FIGHTERS, moveOf, type AttackBtn, type Dir, type FighterDef,
   type FighterId, type KrushWhen,
 } from '@pic-game/shared';
 
@@ -11,9 +11,16 @@ const STARTERS: [string, AttackBtn][] = [
   ['bkick', BTN.BK],
 ];
 
-const label = (b: AttackBtn) => BUTTON_LABEL[b] ?? '?';
+/** The keys as they are on the keyboard, not MK's 1–4. */
+const KEY: Record<AttackBtn, string> = { [BTN.FP]: 'U', [BTN.BP]: 'I', [BTN.FK]: 'J', [BTN.BK]: 'K' };
+const label = (b: AttackBtn) => KEY[b] ?? '?';
 
-/** Every string a fighter has, as "1, 1, 2", named by its last hit. */
+/** Directions as arrows, drawn as if facing right: a letter would read as
+ *  a key, and "D" is the key for walking right, not down. */
+const ARROW: Record<Dir, string> = { F: '→', B: '←', D: '↓', U: '↑' };
+const keys = (motion: Dir[], b: AttackBtn) => `${motion.map((d) => ARROW[d]).join(' ')} + ${label(b)}`;
+
+/** Every string a fighter has, as "U, U, I", named by its last hit. */
 function stringsOf(def: FighterDef): { keys: string; name: string }[] {
   const out: { keys: string; name: string }[] = [];
   const walk = (move: string, keys: string[]) => {
@@ -48,7 +55,7 @@ export function MoveList({ id }: { id: FighterId }) {
         {def.specials.map((sp) => (
           <div key={sp.move} className="moves__row">
             <dt>{moveOf(id, sp.move)?.name}</dt>
-            <dd><kbd>{notation(sp.motion, sp.button)}</kbd></dd>
+            <dd><kbd>{keys(sp.motion, sp.button)}</kbd></dd>
           </div>
         ))}
         {stringsOf(def).map((s) => (
@@ -69,7 +76,7 @@ export function MoveList({ id }: { id: FighterId }) {
         ))}
         <div className="moves__row moves__row--fatality">
           <dt>{fat.name} <em>Fatality, {RANGE_LABEL[fat.range]}</em></dt>
-          <dd><kbd>{notation(fat.motion, fat.button)}</kbd></dd>
+          <dd><kbd>{keys(fat.motion, fat.button)}</kbd></dd>
         </div>
       </dl>
     </div>
@@ -83,16 +90,16 @@ export function Controls() {
       <h3 className="moves__title">Controls</h3>
       <ul className="controls__keys">
         <li><kbd>W A S D</kbd> or arrows: move, jump, crouch</li>
-        <li><kbd>U</kbd> 1 front punch · <kbd>I</kbd> 2 back punch</li>
-        <li><kbd>J</kbd> 3 front kick · <kbd>K</kbd> 4 back kick</li>
+        <li><kbd>U</kbd> front punch · <kbd>I</kbd> back punch</li>
+        <li><kbd>J</kbd> front kick · <kbd>K</kbd> back kick</li>
         <li><kbd>L</kbd> or <kbd>Space</kbd>: block (hold <kbd>S</kbd> too for lows)</li>
-        <li><kbd>H</kbd> or <kbd>1 + 3</kbd>: throw · <kbd>O</kbd>: Fatal Blow</li>
+        <li><kbd>H</kbd> or <kbd>U + J</kbd>: throw · <kbd>O</kbd>: Fatal Blow</li>
       </ul>
       <ul className="controls__keys controls__keys--soft">
-        <li><kbd>D + 2</kbd> uppercut · <kbd>B + 4</kbd> sweep · <kbd>F + 2</kbd> overhead</li>
+        <li><kbd>↓ + I</kbd> uppercut · <kbd>← + K</kbd> sweep · <kbd>→ + I</kbd> overhead</li>
         <li>Tap block during a special to amplify it (1 bar)</li>
-        <li><kbd>F + block</kbd> while blocking: Breaker (2 bars)</li>
-        <li>F and B mean toward and away from your opponent. A gamepad works too.</li>
+        <li><kbd>→ + block</kbd> while blocking: Breaker (2 bars)</li>
+        <li>Arrows are shown facing right. On the right-hand side, flip ← and →: they always mean away from and toward your opponent. A gamepad works too.</li>
       </ul>
     </div>
   );
