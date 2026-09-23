@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GAME_KINDS, GAME_LABELS, type GameKind } from '@pic-game/shared';
+import { GAME_LABELS, PLAYABLE_KINDS, type GameKind } from '@pic-game/shared';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { JoinPanel, type Identity } from '../components/JoinPanel.js';
 import { peekRoom } from '../api/client.js';
@@ -73,7 +73,7 @@ function Landing() {
           whichever game that room was created with. */}
       {!code.trim() && (
         <div className="picker">
-          {GAME_KINDS.map((k) => (
+          {PLAYABLE_KINDS.map((k) => (
             <button
               key={k}
               type="button"

@@ -1,11 +1,13 @@
 import type { Server, Socket } from 'socket.io';
 import {
-  AVATAR_COLORS, AVATAR_FACES, sanitizePoints, PALETTE, BRUSH_SIZES, type Side,
+  AVATAR_COLORS, AVATAR_FACES, GAME_KINDS, sanitizePoints, PALETTE, BRUSH_SIZES,
+  type GameKind, type Side,
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
 import { CHAT_BUCKET, DRAW_BUCKET, MAX_NAME_LEN, SUGGEST_BUCKET } from '../config.js';
 import type { AnyRoom, RoomManager } from '../core/RoomManager.js';
 import type { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
+import type { RealmsRoom } from '../games/realms/RealmsRoom.js';
 import type { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
 import { TokenBucket } from '../rateLimit.js';
 
@@ -72,6 +74,8 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.room?.kind === 'skribbl' && s.playerId ? s.room : null;
     const chess = (): KungFuRoom | null =>
       s.room?.kind === 'kungfu' && s.playerId ? s.room : null;
+    const realms = (): RealmsRoom | null =>
+      s.room?.kind === 'realms' && s.playerId ? s.room : null;
 
     socket.on('time:ping', (cb) => {
       if (typeof cb === 'function') cb(Date.now());
@@ -92,7 +96,11 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
         prev.removePlayer(prevId);
       }
 
-      const room = rooms.create(p?.game === 'kungfu' ? 'kungfu' : 'skribbl');
+      // Validated against the list rather than a chain of comparisons, which
+      // silently dropped a new kind into the default the last two times.
+      const asked = p?.game;
+      const kind = GAME_KINDS.includes(asked as GameKind) ? (asked as GameKind) : 'skribbl';
+      const room = rooms.create(kind);
       const player = room.addPlayer(name, cleanAvatar(p?.avatar), socket.id);
       bind(room, player.id);
       cb({ ok: true, playerId: player.id, token: player.token, state: room.publicState() });
@@ -275,6 +283,66 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
 
     socket.on('chess:rematch', () => {
       const room = chess();
+      if (!room || !s.playerId) return;
+      room.rematch(s.playerId);
+    });
+
+    socket.on('realms:seat', (p) => {
+      const room = realms();
+      if (!room || !s.playerId) return;
+      const side = p?.side;
+      if (side !== null && side !== 'a' && side !== 'b') return;
+      room.takeSeat(s.playerId, side);
+    });
+
+    socket.on('realms:settings', (p) => {
+      const room = realms();
+      if (!room || s.playerId !== room.hostId) return;
+      room.updateSettings(p ?? {});
+    });
+
+    // Card ids are opaque strings the server handed out; the room checks that
+    // each one is actually in the zone the action needs it to be in.
+    const cardAction = (fn: (room: RealmsRoom, playerId: string, cardId: string) => void) =>
+      (p: { cardId?: unknown }) => {
+        const room = realms();
+        if (!room || !s.playerId) return;
+        if (typeof p?.cardId !== 'string' || p.cardId.length > 64) return;
+        if (!s.chat.tryTake()) return;
+        fn(room, s.playerId, p.cardId);
+      };
+
+    socket.on('realms:play', cardAction((r, pid, id) => r.play(pid, id)));
+    socket.on('realms:scrap', cardAction((r, pid, id) => r.scrap(pid, id)));
+    socket.on('realms:buy', cardAction((r, pid, id) => r.buy(pid, id)));
+    socket.on('realms:discard', cardAction((r, pid, id) => r.discard(pid, id)));
+
+    socket.on('realms:use', (p) => {
+      const room = realms();
+      if (!room || !s.playerId) return;
+      if (typeof p?.cardId !== 'string' || p.cardId.length > 64) return;
+      const option = Number(p.option);
+      if (!Number.isInteger(option) || option < 0 || option > 4) return;
+      room.use(s.playerId, p.cardId, option);
+    });
+
+    socket.on('realms:attack', (p) => {
+      const room = realms();
+      if (!room || !s.playerId) return;
+      const t = p?.target;
+      if (!t || (t.kind !== 'player' && t.kind !== 'base')) return;
+      if (t.kind === 'base' && typeof t.cardId !== 'string') return;
+      room.attackWith(s.playerId, t);
+    });
+
+    socket.on('realms:end', () => {
+      const room = realms();
+      if (!room || !s.playerId) return;
+      room.end(s.playerId);
+    });
+
+    socket.on('realms:rematch', () => {
+      const room = realms();
       if (!room || !s.playerId) return;
       room.rematch(s.playerId);
     });

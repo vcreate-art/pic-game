@@ -3,6 +3,10 @@ import type {
   RoomSettings, RoomState, TurnPublic, WordOption,
 } from './types.js';
 import type { KungFuPublic, KungFuSettings, Piece, Side, Square } from './kungfu/types.js';
+import type {
+  CardInstance, RealmsPublic, RealmsSettings, RealmsSide,
+} from './realms/types.js';
+import type { AttackTarget } from './realms/engine.js';
 
 export interface JoinOk {
   ok: true;
@@ -67,6 +71,20 @@ export interface ClientToServerEvents {
   'chess:move': (p: { pieceId: string; to: Square }) => void;
   'chess:settings': (p: Partial<KungFuSettings>) => void;
   'chess:rematch': () => void;
+
+  // ---- Star Realms ----
+  'realms:seat': (p: { side: RealmsSide | null }) => void;
+  'realms:settings': (p: Partial<RealmsSettings>) => void;
+  'realms:play': (p: { cardId: string }) => void;
+  /** Uses a base, or picks between a card's options. */
+  'realms:use': (p: { cardId: string; option: number }) => void;
+  'realms:scrap': (p: { cardId: string }) => void;
+  'realms:buy': (p: { cardId: string }) => void;
+  'realms:attack': (p: { target: AttackTarget }) => void;
+  /** Pays down a forced discard owed at the start of your turn. */
+  'realms:discard': (p: { cardId: string }) => void;
+  'realms:end': () => void;
+  'realms:rematch': () => void;
 
   /** Round-trip probe used to estimate clock offset against the server. */
   'time:ping': (cb: (serverNow: number) => void) => void;
@@ -147,6 +165,16 @@ export interface ServerToClientEvents {
   /** Someone is out; the game may still be running for the others. */
   'chess:eliminated': (p: { side: Side; by: Side | null }) => void;
   'chess:over': (p: { winner: Side | null; reason: KungFuPublic['reason'] }) => void;
+
+  // ---- Star Realms ----
+  'realms:state': (p: RealmsPublic) => void;
+  /**
+   * Your own hand, and what you still owe. Sent to one socket only — the
+   * public state has no field that could carry a hand.
+   */
+  'realms:hand': (p: { hand: CardInstance[]; owedDiscards: number }) => void;
+  'realms:rejected': (p: { reason: string }) => void;
+  'realms:over': (p: { winner: RealmsSide | null }) => void;
 
   'error': (p: { code: string; message: string }) => void;
 }

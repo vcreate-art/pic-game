@@ -1,7 +1,7 @@
 import { EXPLORER, EXPLORER_SUPPLY, STARTING_DECK, TRADE_DECK_DEFS, TRADE_ROW_SIZE, cardDef } from './cards.js';
 import {
-  REALMS_SIDES, type CardInstance, type Effect, type RealmsSettings,
-  type RealmsSide,
+  REALMS_SIDES, type CardInstance, type Effect, type PlayerPublic,
+  type RealmsPublic, type RealmsSettings, type RealmsSide,
 } from './types.js';
 
 export interface BaseInPlay extends CardInstance {
@@ -349,3 +349,50 @@ export function endTurn(state: RealmsState, rng: Rng): Result {
   drawCards(state.players[state.turn], 5, rng);
   return yes;
 }
+
+/**
+ * Everything everyone is allowed to see.
+ *
+ * Hands and deck order are absent by construction rather than by being
+ * stripped out: PlayerPublic has no field capable of carrying them, so a
+ * future change cannot leak one by accident. A player's own hand travels
+ * separately, addressed to their socket alone.
+ */
+export function publicView(
+  state: RealmsState,
+  seats: Partial<Record<RealmsSide, string | null>>,
+  phase: 'lobby' | 'playing' | 'ended',
+): RealmsPublic {
+  const project = (p: PlayerZones): PlayerPublic => ({
+    authority: p.authority,
+    deckCount: p.deck.length,
+    handCount: p.hand.length,
+    // The discard pile is face up in this game, so its top card is no secret.
+    discardCount: p.discard.length,
+    discardTop: p.discard.length > 0 ? { ...p.discard[p.discard.length - 1]! } : null,
+    inPlay: p.inPlay.map((c) => ({ ...c })),
+    bases: p.bases.map((b) => ({ id: b.id, key: b.key, used: b.used })),
+  });
+
+  return {
+    phase,
+    settings: state.settings,
+    seats: { ...seats },
+    turn: state.turn,
+    trade: state.trade,
+    combat: state.combat,
+    players: { a: project(state.players.a), b: project(state.players.b) },
+    tradeRow: state.tradeRow.map((c) => ({ ...c })),
+    tradeDeckCount: state.tradeDeck.length,
+    explorersLeft: state.explorersLeft,
+    scrapHeapCount: state.scrapHeap.length,
+    winner: state.winner,
+  };
+}
+
+/** How many discards a side still owes, which the client needs to prompt. */
+export function owedDiscards(state: RealmsState, side: RealmsSide): number {
+  return state.players[side].owedDiscards;
+}
+
+export { REALMS_SIDES };

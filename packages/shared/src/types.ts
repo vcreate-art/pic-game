@@ -9,6 +9,7 @@ export const QUANT = 4095;
 export type Phase = 'lobby' | 'choosing' | 'drawing' | 'turnEnd' | 'gameEnd';
 
 import type { KungFuPublic } from './kungfu/types.js';
+import type { RealmsPublic } from './realms/types.js';
 
 export interface Avatar {
   /** index into AVATAR_COLORS */
@@ -117,13 +118,18 @@ export interface TurnPublic {
 }
 
 /** Which game a room is playing. Fixed when the room is created. */
-export type GameKind = 'skribbl' | 'kungfu';
+export type GameKind = 'skribbl' | 'kungfu' | 'realms';
 
-export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu'];
+export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms'];
+
+/** The ones with a playable interface. A kind can exist on the server before
+ *  it has a screen, and the picker should only offer what can be played. */
+export const PLAYABLE_KINDS: readonly GameKind[] = ['skribbl', 'kungfu'];
 
 export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
   skribbl: { name: 'Draw & Guess', blurb: 'One draws a secret word, everyone else races to guess.' },
   kungfu: { name: 'Kung Fu Chess', blurb: 'Chess with no turns. Every piece has a cooldown.' },
+  realms: { name: 'Star Realms', blurb: 'Build a deck, buy warships, blow up your friend.' },
 };
 
 /** What every room reports, whichever game it is running. */
@@ -151,9 +157,14 @@ export interface KungFuRoomState extends RoomStateBase {
   game: KungFuPublic;
 }
 
+export interface RealmsRoomState extends RoomStateBase {
+  kind: 'realms';
+  game: RealmsPublic;
+}
+
 /** Discriminated on `kind`, so reading a field the other game does not have is
  *  a compile error rather than an undefined at runtime. */
-export type RoomState = SkribblRoomState | KungFuRoomState;
+export type RoomState = SkribblRoomState | KungFuRoomState | RealmsRoomState;
 
 export type ChatKind = 'chat' | 'system' | 'correct' | 'close' | 'secret';
 
