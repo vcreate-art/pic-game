@@ -56,3 +56,6 @@ export const FIGHT_INPUT_BUCKET = { capacity: 120, refillPerSec: 90 };
 export const FIGHT_FORFEIT_MS = 10_000;
 /** Countdown after a dropped fighter returns, so nobody is hit cold. */
 export const FIGHT_RESUME_MS = 3_000;
+
+/** Position updates from a runner: a dozen a second, with plenty of slack. */
+export const RACE_POS_BUCKET = { capacity: 60, refillPerSec: 30 };

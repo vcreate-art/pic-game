@@ -5,11 +5,12 @@ import {
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
 import {
-  CHAT_BUCKET, DRAW_BUCKET, FIGHT_INPUT_BUCKET, MAX_NAME_LEN, SUGGEST_BUCKET,
+  CHAT_BUCKET, DRAW_BUCKET, FIGHT_INPUT_BUCKET, MAX_NAME_LEN, RACE_POS_BUCKET, SUGGEST_BUCKET,
 } from '../config.js';
 import type { AnyRoom, RoomManager } from '../core/RoomManager.js';
 import type { FightRoom } from '../games/fight/FightRoom.js';
 import type { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
+import type { RaceRoom } from '../games/race/RaceRoom.js';
 import type { RealmsRoom } from '../games/realms/RealmsRoom.js';
 import type { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
 import { TokenBucket } from '../rateLimit.js';
@@ -29,6 +30,7 @@ interface Session {
   draw: TokenBucket;
   suggest: TokenBucket;
   fight: TokenBucket;
+  race: TokenBucket;
 }
 
 function cleanName(raw: unknown): string | null {
@@ -66,6 +68,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       draw: new TokenBucket(DRAW_BUCKET.capacity, DRAW_BUCKET.refillPerSec),
       suggest: new TokenBucket(SUGGEST_BUCKET.capacity, SUGGEST_BUCKET.refillPerSec),
       fight: new TokenBucket(FIGHT_INPUT_BUCKET.capacity, FIGHT_INPUT_BUCKET.refillPerSec),
+      race: new TokenBucket(RACE_POS_BUCKET.capacity, RACE_POS_BUCKET.refillPerSec),
     };
 
     const bind = (room: AnyRoom, playerId: string) => {
@@ -83,6 +86,8 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.room?.kind === 'realms' && s.playerId ? s.room : null;
     const fight = (): FightRoom | null =>
       s.room?.kind === 'fight' && s.playerId ? s.room : null;
+    const race = (): RaceRoom | null =>
+      s.room?.kind === 'race' && s.playerId ? s.room : null;
 
     socket.on('time:ping', (cb) => {
       if (typeof cb === 'function') cb(Date.now());
@@ -397,6 +402,52 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       const room = fight();
       if (!room || !s.playerId) return;
       room.toSelect(s.playerId);
+    });
+
+    socket.on('race:settings', (p) => {
+      const room = race();
+      if (!room || s.playerId !== room.hostId) return;
+      room.updateSettings(p ?? {});
+    });
+
+    socket.on('race:pos', (p) => {
+      const room = race();
+      if (!room || !s.playerId || !s.race.tryTake()) return;
+      const g = p?.g;
+      const seq = Number(p?.seq);
+      if (!Array.isArray(g) || g.length !== 5 || !Number.isSafeInteger(seq)) return;
+      if (!g.every((n) => typeof n === 'number' && Number.isFinite(n))) return;
+      room.position(s.playerId, seq, g as [number, number, number, number, number]);
+    });
+
+    socket.on('race:checkpoint', (p) => {
+      const room = race();
+      const n = Number(p?.n);
+      if (!room || !s.playerId || !Number.isInteger(n) || n < 0 || n > 50) return;
+      room.checkpoint(s.playerId, n);
+    });
+
+    socket.on('race:died', (p) => {
+      const room = race();
+      if (!room || !s.playerId || !s.chat.tryTake()) return;
+      const cause = p?.cause;
+      if (!['spikes', 'saw', 'laser', 'cannon', 'pit'].includes(cause as string)) return;
+      room.died(s.playerId, cause);
+    });
+
+    socket.on('race:finish', () => {
+      const room = race();
+      if (room && s.playerId) room.finish(s.playerId);
+    });
+
+    socket.on('race:caught', () => {
+      const room = race();
+      if (room && s.playerId) room.caught(s.playerId);
+    });
+
+    socket.on('race:again', () => {
+      const room = race();
+      if (room && s.playerId) room.again(s.playerId);
     });
 
     socket.on('room:leave', () => {

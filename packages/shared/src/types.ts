@@ -11,6 +11,7 @@ export type Phase = 'lobby' | 'choosing' | 'drawing' | 'turnEnd' | 'gameEnd';
 import type { KungFuPublic } from './kungfu/types.js';
 import type { RealmsPublic } from './realms/types.js';
 import type { FightFrame, FightPublic } from './fight/types.js';
+import type { RacePublic } from './race/types.js';
 
 export interface Avatar {
   /** index into AVATAR_COLORS */
@@ -119,9 +120,9 @@ export interface TurnPublic {
 }
 
 /** Which game a room is playing. Fixed when the room is created. */
-export type GameKind = 'skribbl' | 'kungfu' | 'realms' | 'fight';
+export type GameKind = 'skribbl' | 'kungfu' | 'realms' | 'fight' | 'race';
 
-export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight'];
+export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race'];
 
 /** The ones with a playable interface. A kind can exist on the server before
  *  it has a screen, and the picker should only offer what can be played. */
@@ -132,6 +133,7 @@ export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
   kungfu: { name: 'Kung Fu Chess', blurb: 'Chess with no turns. Every piece has a cooldown.' },
   realms: { name: 'Star Realms', blurb: 'Build a deck, buy warships, blow up your friend.' },
   fight: { name: 'Stick Kombat', blurb: 'Best of three. Then finish them.' },
+  race: { name: 'Meat Race', blurb: 'Run, jump, glide and climb. Beat the saws and each other.' },
 };
 
 /** What every room reports, whichever game it is running. */
@@ -172,9 +174,15 @@ export interface FightRoomState extends RoomStateBase {
   frame: FightFrame | null;
 }
 
+export interface RaceRoomState extends RoomStateBase {
+  kind: 'race';
+  game: RacePublic;
+}
+
 /** Discriminated on `kind`, so reading a field the other game does not have is
  *  a compile error rather than an undefined at runtime. */
-export type RoomState = SkribblRoomState | KungFuRoomState | RealmsRoomState | FightRoomState;
+export type RoomState =
+  | SkribblRoomState | KungFuRoomState | RealmsRoomState | FightRoomState | RaceRoomState;
 
 export type ChatKind = 'chat' | 'system' | 'correct' | 'close' | 'secret';
 

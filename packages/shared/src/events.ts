@@ -10,6 +10,7 @@ import type { AttackTarget } from './realms/engine.js';
 import type {
   FightEvent, FightFrame, FightPublic, FightSettings, FightSide, FighterId,
 } from './fight/types.js';
+import type { DeathCause, Ghost, RaceEvent, RacePublic, RaceSettings } from './race/types.js';
 
 export interface JoinOk {
   ok: true;
@@ -102,6 +103,18 @@ export interface ClientToServerEvents {
   'fight:rematch': () => void;
   /** Host only, after a match: back to the lobby to pick again. */
   'fight:toSelect': () => void;
+
+  // ---- Meat Race ----
+  'race:settings': (p: Partial<RaceSettings>) => void;
+  /** Where our runner is. A dozen a second; only racers are listened to. */
+  'race:pos': (p: { seq: number; g: Ghost }) => void;
+  'race:checkpoint': (p: { n: number }) => void;
+  'race:died': (p: { cause: DeathCause }) => void;
+  /** Claimed on touching the flag; the server checks it was plausible. */
+  'race:finish': () => void;
+  'race:caught': () => void;
+  /** Host only, from the podium: back to the lobby. */
+  'race:again': () => void;
 
   /** Round-trip probe used to estimate clock offset against the server. */
   'time:ping': (cb: (serverNow: number) => void) => void;
@@ -202,6 +215,13 @@ export interface ServerToClientEvents {
   /** What happened on those ticks. Reliable, unlike the frames, so no hit,
    *  KO or announcer call is ever skipped. */
   'fight:events': (p: FightEvent[]) => void;
+
+  // ---- Meat Race ----
+  'race:state': (p: RacePublic) => void;
+  /** Every other racer's latest position. Volatile: a stale one is useless. */
+  'race:ghosts': (p: Record<string, Ghost>) => void;
+  /** Finishes, deaths and checkpoints, for the feed. Reliable. */
+  'race:events': (p: RaceEvent[]) => void;
 
   'error': (p: { code: string; message: string }) => void;
 }
