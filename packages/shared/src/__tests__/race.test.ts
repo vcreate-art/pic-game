@@ -272,3 +272,31 @@ describe('the levels', () => {
     });
   }
 });
+
+describe('the climbs', () => {
+  // Level, a column inside its shaft, the floor row, and the row of the top.
+  const SHAFTS = [[0, 71, 12, 4], [1, 60, 18, 6]] as const;
+
+  for (const [li, col, floor, top] of SHAFTS) {
+    it(`can be climbed in ${LEVELS[li]!.name}`, () => {
+      const lv = LEVELS[li]!;
+      const w = newWorld(lv);
+      const r = newRunner(lv, { x: col * TILE + 6, y: floor * TILE - RH });
+      run(r, w, 10);
+      // Climb one wall until the grip goes, jump off toward the other, repeat.
+      let side: 1 | -1 = 1;
+      press(r, w, JUMP, JUMP);
+      for (let i = 0; i < 900 && !(r.ground && r.y < top * TILE); i++) {
+        const toward = side === 1 ? RIGHT : LEFT;
+        if (r.wall !== 0 && r.stamina === 0) {
+          press(r, w, toward | JUMP, JUMP);
+          side = side === 1 ? -1 : 1;
+        } else {
+          stepRunner(r, toward | UP | JUMP, 0, w);
+        }
+      }
+      expect(r.ground).toBe(true);
+      expect(r.y).toBeLessThan(top * TILE);
+    });
+  }
+});

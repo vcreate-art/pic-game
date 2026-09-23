@@ -4,6 +4,7 @@ import { getEngine } from '../canvas/engineInstance.js';
 import { JoinPanel, type Identity } from '../components/JoinPanel.js';
 import { FightGame } from '../components/fight/FightGame.js';
 import { KungFuGame } from '../components/kungfu/KungFuGame.js';
+import { RaceGame } from '../components/race/RaceGame.js';
 import { Lobby } from '../components/Lobby.js';
 import { RealmsGame } from '../components/realms/RealmsGame.js';
 import { SkribblGame } from '../components/skribbl/SkribblGame.js';
@@ -131,6 +132,8 @@ function RoomPage() {
   if (room.kind === 'realms') return <RealmsGame onLeave={leave} />;
 
   if (room.kind === 'fight') return <FightGame onLeave={leave} />;
+
+  if (room.kind === 'race') return <RaceGame onLeave={leave} />;
 
   if (phase === 'lobby') {
     return (

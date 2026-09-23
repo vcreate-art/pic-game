@@ -1,5 +1,6 @@
 import type { CanvasEngine } from '../canvas/engine.js';
 import { getFightView } from '../fight/instance.js';
+import { getRaceView } from '../race/instance.js';
 import { useGame } from '../store/game.js';
 import { getSocket } from './socket.js';
 import { syncClock } from './clock.js';
@@ -84,6 +85,11 @@ export function bindSocket(engine: CanvasEngine): () => void {
   socket.on('fight:frame', (f) => getFightView().pushFrame(f));
   socket.on('fight:events', (evs) => getFightView().pushEvents(evs));
 
+  // --- meat race: ghosts and the feed go straight to the view ---
+  socket.on('race:state', (game) => g().setRace(game));
+  socket.on('race:ghosts', (gs) => getRaceView().pushGhosts(gs));
+  socket.on('race:events', (evs) => getRaceView().pushEvents(evs));
+
   socket.on('chat:message', (m) => g().pushMessage(m));
   socket.on('guess:correct', ({ playerId }) => g().markGuessed(playerId));
 
@@ -108,6 +114,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
       'chess:state', 'chess:moved', 'chess:over', 'chess:rejected',
       'realms:state', 'realms:hand', 'realms:over', 'realms:rejected',
       'fight:state', 'fight:frame', 'fight:events',
+      'race:state', 'race:ghosts', 'race:events',
     ] as const) {
       socket.off(ev);
     }

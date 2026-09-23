@@ -158,12 +158,35 @@ authority on who hit whom; clients send controller changes and draw what comes b
 Controls: WASD to move, U I J K for 1–4, L or Space to block, H to throw, O for
 Fatal Blow. F2 toggles a hitbox overlay.
 
+## Meat Race
+
+A Super Meat Boy style race for up to eight: run, jump, double jump, glide, wall-jump
+and climb through a cup of levels while saws, lasers, cannons and a chasing wall (the
+grinder) try to stop you. Dying sends you back to your last flag; the grinder ends your
+level. Points go 10, 8, 6, 5, 4, 3, 2, 1 by place.
+
+It is networked the opposite way to Stick Kombat, on purpose:
+
+- **Each client runs its own runner.** Racers are ghosts to each other, so there is
+  nothing for a server to arbitrate, and any lag on your own jumps would ruin a
+  platformer. Positions go up a dozen times a second; the server relays them at 15 Hz
+  and others are drawn a little in the past, blended between updates.
+- **Hazards are functions of the clock.** Every saw, laser, cannon shot and the grinder
+  is computed from milliseconds since GO, so every screen agrees and none of it is sent.
+- **Claims are checked.** The server refuses moves faster than the physics allows, a
+  start anywhere but the start, and checkpoints or finishes claimed from elsewhere.
+
+Levels are built in code (`packages/shared/src/race/levels.ts`) with a small tile
+builder, and the tests check each one: safe spawn and checkpoints, a finish on the
+ground, and climbable shafts.
+
 ## Testing
 
 ```bash
 npm test                      # unit tests for the pure logic in packages/shared
 node scripts/integration.mjs  # 25 checks against a running server
 node scripts/integration-fight.mjs  # the fighter: tick rate, inputs, pause and forfeit
+node scripts/integration-race.mjs   # the race: relay, cheat checks, scoring, the cup
 ```
 
 The integration suite connects three real socket clients and plays a turn, then
