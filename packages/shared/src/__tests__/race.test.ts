@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  LEVELS, LevelBuilder, PHYS, RB, RH, TILE, atFinish, caught, chaserDoneAt, chaserProgress,
+  LEVELS, LevelBuilder, PHYS, RB, RH, T, TILE, atFinish, caught, chaserDoneAt, chaserProgress,
   checkpointAt, pathLength, pathPoint, progressAt,
   crumbleState, dashReady, hazardAt, laserPhase, newRunner, newWorld, pointsFor, sawAt, shotsAt,
-  solidAt, stepRunner, type Level, type Runner, type World,
+  solidAt, stepRunner, tileAt, type Level, type Runner, type World,
 } from '../index.js';
 
 const { LEFT, RIGHT, UP, JUMP, DASH } = RB;
@@ -442,5 +442,30 @@ describe('the grinder follows the route', () => {
     const at = pathPoint(lv, s);
     expect(caught(lv, 'normal', t, at.x - 10 - 3 * TILE * at.dx, at.y - 13 - 3 * TILE * at.dy)).toBe(true);
     expect(caught(lv, 'normal', t, at.x - 10 + 3 * TILE * at.dx, at.y - 13 + 3 * TILE * at.dy)).toBe(false);
+  });
+});
+
+describe('no skipping', () => {
+  it('has a ceiling at the top of every level', () => {
+    const lv = room();
+    const { r, w } = setup(lv);
+    r.y = 4;
+    r.ground = false;
+    press(r, w, JUMP, JUMP, 20);
+    expect(r.y).toBeGreaterThanOrEqual(0);
+  });
+
+  it("will not let the Grinder's stairs be glided over", () => {
+    // Every column of the stair tunnel has rock above and a step below, with
+    // no more than five tiles between: too low to float over the saws in.
+    const lv = LEVELS[0]!;
+    for (let tx = 161; tx <= 180; tx++) {
+      let ty = 0;
+      while (tileAt(lv, tx, ty) === T.SOLID) ty++;
+      const open = ty;
+      while (tileAt(lv, tx, ty) === T.AIR) ty++;
+      expect(ty - open, `column ${tx}`).toBeLessThanOrEqual(5);
+      expect(tileAt(lv, tx, ty), `column ${tx} has a step`).toBe(T.SOLID);
+    }
   });
 });

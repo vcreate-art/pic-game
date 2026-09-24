@@ -45,21 +45,27 @@ const grinder = new LevelBuilder(232, 42)
   .solid(145, 28).solid(148, 19)
   .laser(144, 23, 'right', { on: 800, off: 1600 })
   .checkpoint(151, 5)
-  // Down the steps, between two saws.
-  .solid(163, 9, 3, 1).solid(168, 12, 3, 1).solid(173, 15, 3, 1).solid(178, 18, 3, 1)
-  .saw(166.5, 8, { to: [166.5, 12], period: 1400 })
-  .saw(176.5, 12, { to: [176.5, 17], period: 1300, offset: 500 })
-  .floor(161, 22, 41).spikes(161, 40, 22)
-  .floor(183, 49, 30)
+  // Down the stairs. A rock ceiling follows the steps down, so the way
+  // through is a tunnel that drops faster than a glide: it cannot be
+  // floated over, only taken step by step between the saws.
+  .floor(161, 6, 9).floor(167, 5, 12).floor(172, 5, 15).floor(177, 4, 18)
+  .solid(161, 0, 6, 4).solid(167, 0, 5, 7).solid(172, 0, 5, 10).solid(177, 0, 4, 13)
+  .saw(166.5, 7.5, { to: [166.5, 11], period: 1400 })
+  .saw(171.5, 10.5, { to: [171.5, 14], period: 1300, offset: 450 })
+  .saw(176.5, 13.5, { to: [176.5, 17], period: 1300, offset: 900 })
+  // Then a chute to the floor, and out under the rock.
+  .solid(181, 0, 2, 13)
+  .solid(183, 0, 10, 26)
+  .floor(181, 51, 30)
   .checkpoint(186, 29)
-  .saw(192, 28.9, { to: [200, 28.9], r: 1.1, period: 2400 })
+  .saw(197, 28.9, { to: [205, 28.9], r: 1.1, period: 2400 })
   .clear(206, 30, 6, 12).crumble(206, 30, 6)
   .laser(214, 22, 'down', { on: 900, off: 1300, offset: 300 })
   .cannon(229, 29, -1, { period: 1300 })
   .finish(225, 29)
   .path(
     [3, 37], [51, 37], [60, 33], [70, 33, 0.7], [71, 25], [90, 25], [107, 31], [125, 31],
-    [130, 37], [146, 37, 0.55], [146, 5], [161, 5], [182, 17], [186, 29], [226, 29],
+    [130, 37], [146, 37, 0.55], [146, 5], [161, 5], [180, 17], [182, 29], [226, 29],
   )
   .build('grinder', 'The Grinder', 5000);
 

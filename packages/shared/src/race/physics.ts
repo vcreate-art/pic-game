@@ -116,11 +116,11 @@ function crumbleGone(w: World, idx: number): boolean {
   return age >= PHYS.CRUMBLE_DELAY && age < PHYS.CRUMBLE_DELAY + PHYS.CRUMBLE_GONE;
 }
 
-/** Solid for movement. The level's sides are walls; above and below are open,
- *  and falling out of the bottom is a death. */
+/** Solid for movement. The level's sides and top are walls, so nothing can be
+ *  skipped by going over it; the bottom is open, and falling out is a death. */
 export function solidAt(w: World, tx: number, ty: number): boolean {
   const lv = w.level;
-  if (tx < 0 || tx >= lv.w) return true;
+  if (tx < 0 || tx >= lv.w || ty < 0) return true;
   const t = tileAt(lv, tx, ty);
   if (t === T.SOLID) return true;
   if (t === T.CRUMBLE) return !crumbleGone(w, ty * lv.w + tx);
