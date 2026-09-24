@@ -12,6 +12,7 @@ import type { KungFuPublic } from './kungfu/types.js';
 import type { RealmsPublic } from './realms/types.js';
 import type { FightFrame, FightPublic } from './fight/types.js';
 import type { RacePublic } from './race/types.js';
+import type { SpiesPublic } from './spies/types.js';
 
 export interface Avatar {
   /** index into AVATAR_COLORS */
@@ -120,9 +121,9 @@ export interface TurnPublic {
 }
 
 /** Which game a room is playing. Fixed when the room is created. */
-export type GameKind = 'skribbl' | 'kungfu' | 'realms' | 'fight' | 'race';
+export type GameKind = 'skribbl' | 'kungfu' | 'realms' | 'fight' | 'race' | 'spies';
 
-export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race'];
+export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies'];
 
 /** The ones with a playable interface. A kind can exist on the server before
  *  it has a screen, and the picker should only offer what can be played. */
@@ -134,6 +135,7 @@ export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
   realms: { name: 'Star Realms', blurb: 'Build a deck, buy warships, blow up your friend.' },
   fight: { name: 'Stick Kombat', blurb: 'Best of three. Then finish them.' },
   race: { name: 'Meat Race', blurb: 'Run, jump, glide and climb. Beat the saws and each other.' },
+  spies: { name: 'Word Spies', blurb: 'One-word clues, two teams, and an assassin to avoid.' },
 };
 
 /** What every room reports, whichever game it is running. */
@@ -179,10 +181,16 @@ export interface RaceRoomState extends RoomStateBase {
   game: RacePublic;
 }
 
+export interface SpiesRoomState extends RoomStateBase {
+  kind: 'spies';
+  game: SpiesPublic;
+}
+
 /** Discriminated on `kind`, so reading a field the other game does not have is
  *  a compile error rather than an undefined at runtime. */
 export type RoomState =
-  | SkribblRoomState | KungFuRoomState | RealmsRoomState | FightRoomState | RaceRoomState;
+  | SkribblRoomState | KungFuRoomState | RealmsRoomState | FightRoomState | RaceRoomState
+  | SpiesRoomState;
 
 export type ChatKind = 'chat' | 'system' | 'correct' | 'close' | 'secret';
 

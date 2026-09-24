@@ -11,6 +11,7 @@ import type {
   FightEvent, FightFrame, FightPublic, FightSettings, FightSide, FighterId,
 } from './fight/types.js';
 import type { DeathCause, Ghost, RaceEvent, RacePublic, RaceSettings } from './race/types.js';
+import type { CardColor, SpiesPublic, SpiesSettings, SpyRole, SpyTeam } from './spies/types.js';
 
 export interface JoinOk {
   ok: true;
@@ -115,6 +116,24 @@ export interface ClientToServerEvents {
   'race:caught': () => void;
   /** Host only, from the podium: back to the lobby. */
   'race:again': () => void;
+
+  // ---- Word Spies ----
+  /** Join a team in a role, or `team: null` to watch. */
+  'spies:join': (p: { team: SpyTeam | null; role: SpyRole }) => void;
+  /** Host only: deal everyone into two teams at random. */
+  'spies:shuffle': () => void;
+  'spies:settings': (p: Partial<Omit<SpiesSettings, 'customWords'>>) => void;
+  /** Host only: their own words, pasted as text. */
+  'spies:words': (p: { text: string }) => void;
+  /** The spymaster's clue. `word` is null when clues are spoken aloud. */
+  'spies:clue': (p: { word: string | null; count: number }) => void;
+  /** Point at a card for your team, or stop pointing at it. */
+  'spies:mark': (p: { index: number }) => void;
+  'spies:reveal': (p: { index: number }) => void;
+  /** Stop guessing and hand the turn over. */
+  'spies:pass': () => void;
+  'spies:rematch': () => void;
+  'spies:toLobby': () => void;
 
   /** Round-trip probe used to estimate clock offset against the server. */
   'time:ping': (cb: (serverNow: number) => void) => void;
@@ -222,6 +241,11 @@ export interface ServerToClientEvents {
   'race:ghosts': (p: Record<string, Ghost>) => void;
   /** Finishes, deaths and checkpoints, for the feed. Reliable. */
   'race:events': (p: RaceEvent[]) => void;
+
+  // ---- Word Spies ----
+  'spies:state': (p: SpiesPublic) => void;
+  /** The secret key. Sent to the two spymasters' sockets and nobody else. */
+  'spies:key': (p: { key: CardColor[] }) => void;
 
   'error': (p: { code: string; message: string }) => void;
 }

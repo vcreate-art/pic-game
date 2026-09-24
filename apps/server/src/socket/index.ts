@@ -11,6 +11,7 @@ import type { AnyRoom, RoomManager } from '../core/RoomManager.js';
 import type { FightRoom } from '../games/fight/FightRoom.js';
 import type { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
 import type { RaceRoom } from '../games/race/RaceRoom.js';
+import type { SpiesRoom } from '../games/spies/SpiesRoom.js';
 import type { RealmsRoom } from '../games/realms/RealmsRoom.js';
 import type { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
 import { TokenBucket } from '../rateLimit.js';
@@ -88,6 +89,8 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.room?.kind === 'fight' && s.playerId ? s.room : null;
     const race = (): RaceRoom | null =>
       s.room?.kind === 'race' && s.playerId ? s.room : null;
+    const spies = (): SpiesRoom | null =>
+      s.room?.kind === 'spies' && s.playerId ? s.room : null;
 
     socket.on('time:ping', (cb) => {
       if (typeof cb === 'function') cb(Date.now());
@@ -448,6 +451,75 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
     socket.on('race:again', () => {
       const room = race();
       if (room && s.playerId) room.again(s.playerId);
+    });
+
+    socket.on('spies:join', (p) => {
+      const room = spies();
+      if (!room || !s.playerId) return;
+      const team = p?.team;
+      const role = p?.role;
+      if (team !== null && team !== 'red' && team !== 'blue') return;
+      if (role !== 'spymaster' && role !== 'operative') return;
+      room.join(s.playerId, team, role);
+    });
+
+    socket.on('spies:shuffle', () => {
+      const room = spies();
+      if (room && s.playerId) room.shuffle(s.playerId);
+    });
+
+    socket.on('spies:settings', (p) => {
+      const room = spies();
+      if (room && s.playerId) room.updateSettings(s.playerId, p ?? {});
+    });
+
+    socket.on('spies:words', (p) => {
+      const room = spies();
+      if (!room || !s.playerId || typeof p?.text !== 'string') return;
+      room.setWords(s.playerId, p.text);
+    });
+
+    socket.on('spies:clue', (p) => {
+      const room = spies();
+      if (!room || !s.playerId || !s.chat.tryTake()) return;
+      const word = p?.word;
+      if (word !== null && (typeof word !== 'string' || word.length > 40)) return;
+      room.clue(s.playerId, word, Number(p?.count));
+    });
+
+    // Card indexes are checked for shape here and against the board in the room.
+    const cardIndex = (p: { index?: unknown }) => {
+      const i = Number(p?.index);
+      return Number.isInteger(i) && i >= 0 && i < 25 ? i : null;
+    };
+
+    socket.on('spies:mark', (p) => {
+      const room = spies();
+      const i = cardIndex(p);
+      if (!room || !s.playerId || i === null || !s.chat.tryTake()) return;
+      room.mark(s.playerId, i);
+    });
+
+    socket.on('spies:reveal', (p) => {
+      const room = spies();
+      const i = cardIndex(p);
+      if (!room || !s.playerId || i === null) return;
+      room.revealCard(s.playerId, i);
+    });
+
+    socket.on('spies:pass', () => {
+      const room = spies();
+      if (room && s.playerId) room.pass(s.playerId);
+    });
+
+    socket.on('spies:rematch', () => {
+      const room = spies();
+      if (room && s.playerId) room.rematch(s.playerId);
+    });
+
+    socket.on('spies:toLobby', () => {
+      const room = spies();
+      if (room && s.playerId) room.toLobby(s.playerId);
     });
 
     socket.on('room:leave', () => {
