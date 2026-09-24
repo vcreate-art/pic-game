@@ -992,3 +992,160 @@ button, input { font: inherit; color: inherit; }
   height: auto; border-radius: 0; box-shadow: none;
 }
 .fight__stage:fullscreen .overlay { border-radius: 0; }
+
+/* ---------------------------------------------------------------- word spies */
+
+:root {
+  --spy-red: #dc2626;
+  --spy-red-soft: #fee2e2;
+  --spy-blue: #2563eb;
+  --spy-blue-soft: #dbeafe;
+  --spy-neutral: #d6cdb8;
+  --spy-assassin: #1c1917;
+  --spy-card: #f4ecdb;
+}
+
+.spylobby {
+  margin: 0 auto; width: 100%; max-width: 1100px;
+  display: grid; gap: 18px; grid-template-columns: 1fr 1fr;
+  grid-template-areas: 'invite settings' 'teams settings';
+  align-content: start;
+}
+.spylobby > .lobby__invite { grid-area: invite; }
+.spylobby__teams { grid-area: teams; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-content: start; }
+.spylobby__settings { grid-area: settings; display: flex; flex-direction: column; gap: 14px; }
+.spylobby__settings > .btn--lg, .spylobby__settings > .settings__note:last-child { margin-top: auto; }
+
+.spyteam { display: flex; flex-direction: column; gap: 10px; border-top: 5px solid var(--team); }
+.spyteam--red { --team: var(--spy-red); --team-soft: var(--spy-red-soft); }
+.spyteam--blue { --team: var(--spy-blue); --team-soft: var(--spy-blue-soft); }
+.spyteam.is-turn { box-shadow: 0 0 0 2px var(--team), var(--shadow); }
+.spyteam__head { display: flex; align-items: center; justify-content: space-between; }
+.spyteam__title { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 800; color: var(--team); }
+.spyteam__left {
+  font-family: var(--display); font-weight: 800; font-size: 22px; color: #fff; background: var(--team);
+  min-width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+}
+.spyteam__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.spyteam__member {
+  display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600;
+  padding: 5px 8px; border-radius: 9px; background: var(--paper);
+}
+.spyteam__member.is-me { background: var(--team-soft); }
+.spyteam__member.is-away { opacity: .5; }
+.spyteam__tag {
+  margin-left: auto; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: #fff; background: var(--team); padding: 2px 6px; border-radius: 5px;
+}
+.spyteam__open { font-size: 13px; color: var(--ink-soft); font-style: italic; padding: 5px 8px; }
+.spyteam__actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.spyteam__watch { display: flex; flex-direction: column; gap: 8px; }
+
+.spywords { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.spywords__box {
+  width: 100%; resize: vertical; font: inherit; font-size: 13px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--paper);
+}
+.spywords__foot { display: flex; align-items: center; justify-content: space-between; }
+.spywords__count { font-size: 12px; color: var(--ink-soft); }
+.spywords__count.is-low { color: var(--warn); font-weight: 600; }
+.spytimes { display: flex; flex-direction: column; gap: 8px; }
+.spytimes .settings__row { grid-template-columns: 1fr auto; }
+.spytimes__select, .spyclue__count {
+  font: inherit; font-weight: 600; padding: 7px 10px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card);
+}
+
+.game--spies { max-width: 1400px; }
+.spies { display: grid; grid-template-columns: 230px minmax(0, 1fr) 280px; gap: 14px; align-items: start; }
+.spies__teams, .spies__side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.spies__main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.spybar {
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius);
+  color: #fff; background: var(--ink); box-shadow: var(--shadow);
+}
+.spybar--red { background: var(--spy-red); }
+.spybar--blue { background: var(--spy-blue); }
+.spybar__status { font-family: var(--display); font-weight: 700; font-size: 16px; flex: 1; }
+.spybar__clue {
+  font-family: var(--display); font-weight: 800; font-size: 20px; letter-spacing: .04em;
+  background: rgba(255,255,255,.18); padding: 2px 12px; border-radius: 10px;
+}
+.spybar__clue b { margin-left: 6px; }
+.spybar__time { font-family: var(--display); font-weight: 800; font-variant-numeric: tabular-nums; }
+.spybar__time.is-low { color: #fde68a; }
+
+.spyboard { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.spycard { position: relative; aspect-ratio: 8 / 5; }
+.spycard__face {
+  width: 100%; height: 100%; padding: 6px; cursor: default;
+  display: grid; place-items: center; text-align: center;
+  background: var(--spy-card); border: 2px solid #e2d6bd; border-radius: 12px;
+  box-shadow: 0 2px 0 #cbbd9f, var(--shadow);
+  transition: transform .12s ease, border-color .12s ease, background .2s ease;
+}
+.spycard__word {
+  font-family: var(--display); font-weight: 800; font-size: clamp(11px, 1.35vw, 17px);
+  letter-spacing: .03em; color: #3f3325; word-break: break-word; line-height: 1.1;
+}
+.is-guessing .spycard__face:not(:disabled) { cursor: pointer; }
+.is-guessing .spycard__face:not(:disabled):hover { transform: translateY(-2px); border-color: var(--accent); }
+.spycard.is-marked .spycard__face { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow); }
+
+/* The spymaster's view: every hidden card shows what it really is. */
+.spycard.hint-red .spycard__face { background: #fbd5d5; border-color: var(--spy-red); }
+.spycard.hint-blue .spycard__face { background: #d6e4fd; border-color: var(--spy-blue); }
+.spycard.hint-neutral .spycard__face { background: #ede4d0; }
+.spycard.hint-assassin .spycard__face { background: #3a3632; border-color: #000; }
+.spycard.hint-assassin .spycard__word { color: #f5f5f4; }
+
+/* Turned over: the card is covered by the agent (or bystander) it was. */
+.spycard.is-revealed .spycard__face {
+  border-color: transparent; box-shadow: inset 0 0 0 3px rgba(255,255,255,.25);
+  animation: spyflip .35s ease;
+}
+.spycard.is-revealed .spycard__word { font-size: clamp(9px, 1vw, 12px); opacity: .85; }
+.spycard.is-red .spycard__face { background: repeating-linear-gradient(135deg, var(--spy-red) 0 12px, #c81e1e 12px 24px); }
+.spycard.is-blue .spycard__face { background: repeating-linear-gradient(135deg, var(--spy-blue) 0 12px, #1e50c8 12px 24px); }
+.spycard.is-red .spycard__word, .spycard.is-blue .spycard__word { color: #fff; }
+.spycard.is-neutral .spycard__face { background: repeating-linear-gradient(135deg, var(--spy-neutral) 0 12px, #cbc1a9 12px 24px); }
+.spycard.is-assassin .spycard__face { background: var(--spy-assassin); }
+.spycard.is-assassin .spycard__word { color: #fca5a5; }
+@keyframes spyflip { from { transform: rotateX(90deg); } to { transform: rotateX(0); } }
+
+.spycard__marks { position: absolute; top: -6px; left: -6px; display: flex; gap: 2px; }
+.spycard__reveal {
+  position: absolute; right: 6px; bottom: 6px; font: inherit; font-size: 11px; font-weight: 700;
+  padding: 3px 9px; border-radius: 999px; border: none; cursor: pointer;
+  color: #fff; background: var(--accent); box-shadow: 0 2px 6px rgba(0,0,0,.2);
+}
+
+.spyctl { min-height: 48px; display: flex; align-items: center; justify-content: center; }
+.spyclue { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+.spyclue__word { width: 220px; text-transform: uppercase; font-family: var(--display); font-weight: 700; }
+.spyclue__say { font-weight: 600; }
+.spyclue__problem { flex-basis: 100%; text-align: center; color: var(--warn); font-size: 13px; font-weight: 600; }
+.spyguess { display: flex; align-items: center; gap: 12px; }
+
+.spylog__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow: auto; }
+.spylog__item { padding: 6px 8px; border-left: 4px solid var(--team); border-radius: 6px; background: var(--paper); }
+.spylog__item--red { --team: var(--spy-red); }
+.spylog__item--blue { --team: var(--spy-blue); }
+.spylog__clue { font-family: var(--display); font-weight: 800; }
+.spylog__clue b { color: var(--team); margin-left: 4px; }
+.spylog__guesses { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.spylog__g { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: var(--spy-neutral); }
+.spylog__g.is-red { background: var(--spy-red); color: #fff; }
+.spylog__g.is-blue { background: var(--spy-blue); color: #fff; }
+.spylog__g.is-assassin { background: var(--spy-assassin); color: #fff; }
+
+@media (max-width: 1080px) {
+  .spies { grid-template-columns: 1fr; }
+  .spylobby { grid-template-columns: 1fr; grid-template-areas: 'invite' 'teams' 'settings'; }
+}
+@media (max-width: 560px) {
+  .spyboard { gap: 5px; }
+  .spycard__word { font-size: 10px; }
+  .spylobby__teams { grid-template-columns: 1fr; }
+}

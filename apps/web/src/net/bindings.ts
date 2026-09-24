@@ -90,6 +90,10 @@ export function bindSocket(engine: CanvasEngine): () => void {
   socket.on('race:ghosts', (gs) => getRaceView().pushGhosts(gs));
   socket.on('race:events', (evs) => getRaceView().pushEvents(evs));
 
+  // --- word spies ---
+  socket.on('spies:state', (game) => g().setSpies(game));
+  socket.on('spies:key', ({ key }) => g().setSpiesKey(key));
+
   socket.on('chat:message', (m) => g().pushMessage(m));
   socket.on('guess:correct', ({ playerId }) => g().markGuessed(playerId));
 
@@ -115,6 +119,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
       'realms:state', 'realms:hand', 'realms:over', 'realms:rejected',
       'fight:state', 'fight:frame', 'fight:events',
       'race:state', 'race:ghosts', 'race:events',
+      'spies:state', 'spies:key',
     ] as const) {
       socket.off(ev);
     }

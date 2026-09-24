@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type {
-  CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic, RaceRoomState, KungFuRoomState, Piece, Player,
+  CardColor, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
+  RaceRoomState, SpiesPublic, SpiesRoomState, KungFuRoomState, Piece, Player,
   RealmsPublic, RealmsRoomState, RealmsSide, RoomSettings, RoomState, Side,
   SkribblRoomState, WordOption,
 } from '@pic-game/shared';
@@ -49,6 +50,8 @@ interface GameStore {
   /** Our own Star Realms hand. Nobody else's ever arrives. */
   realmsHand: CardInstance[];
   realmsOwed: number;
+  /** The Word Spies key. Only ever arrives on a spymaster's client. */
+  spiesKey: CardColor[] | null;
 
   setConnected: (c: boolean) => void;
   setMe: (id: string) => void;
@@ -73,6 +76,8 @@ interface GameStore {
   setRealms: (game: RealmsPublic) => void;
   setFight: (game: FightPublic) => void;
   setRace: (game: RacePublic) => void;
+  setSpies: (game: SpiesPublic) => void;
+  setSpiesKey: (key: CardColor[] | null) => void;
   setRealmsHand: (hand: CardInstance[], owed: number) => void;
   realmsOver: (winner: RealmsSide | null) => void;
   applyChessMove: (m: {
@@ -101,6 +106,7 @@ export const useGame = create<GameStore>((set) => ({
   kickedBy: null,
   realmsHand: [],
   realmsOwed: 0,
+  spiesKey: null,
 
   setConnected: (connected) => set({ connected }),
   setMe: (me) => set({ me }),
@@ -231,6 +237,16 @@ export const useGame = create<GameStore>((set) => ({
   setRace: (game) =>
     set((s) => (s.room?.kind === 'race' ? { room: { ...s.room, game } } : {})),
 
+  // Back in the lobby the old key means nothing; drop it so it cannot be
+  // drawn over the next board before the new one arrives.
+  setSpies: (game) =>
+    set((s) =>
+      s.room?.kind === 'spies'
+        ? { room: { ...s.room, game }, ...(game.phase === 'lobby' ? { spiesKey: null } : {}) }
+        : {},
+    ),
+  setSpiesKey: (spiesKey) => set({ spiesKey }),
+
   setRealmsHand: (realmsHand, realmsOwed) => set({ realmsHand, realmsOwed }),
 
   realmsOver: (winner) =>
@@ -268,7 +284,7 @@ export const useGame = create<GameStore>((set) => ({
       me: null, room: null, secret: null, choices: null, chooseEndsAt: null,
       suggest: null, mySuggestion: null, suggestError: null,
       messages: [], turnResult: null, final: null, notice: null, kickedBy: null,
-      realmsHand: [], realmsOwed: 0,
+      realmsHand: [], realmsOwed: 0, spiesKey: null,
     }),
 }));
 
@@ -290,6 +306,9 @@ export const selectFight = (s: GameStore): FightRoomState | null =>
 
 export const selectRace = (s: GameStore): RaceRoomState | null =>
   s.room && s.room.kind === 'race' ? s.room : null;
+
+export const selectSpies = (s: GameStore): SpiesRoomState | null =>
+  s.room && s.room.kind === 'spies' ? s.room : null;
 
 // kept here so components never reach into `ops` and re-render on strokes
 

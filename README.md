@@ -190,6 +190,22 @@ ground, and climbable shafts.
 
 Both real-time games have a full screen button (or press F).
 
+## Word Spies
+
+A Codenames-style team word game for four or more. Two teams, a 5×5 board of words,
+and a key that says which are each team's agents, which are bystanders, and which is
+the assassin. Spymasters give one-word clues with a number; their teammates point at
+cards and reveal them, and the assassin loses the game on the spot.
+
+- **The key goes to two sockets only.** Like the drawer's word, it is sent to each
+  team's spymaster and to nobody else, and `SpiesPublic` carries it only once the game
+  is over. A spymaster cannot leave the seat mid-game, since they cannot unsee it.
+- **Clues are checked.** One word, not on the board and not part of a board word
+  (no WATER while WATERFALL is face down). The host can switch to spoken clues for
+  playing in one room, where only the number is entered.
+- **Words**: the built-in list, the host's own pasted in, or both. Optional timers on
+  giving a clue and on guessing; running out passes the turn.
+
 ## Testing
 
 ```bash
@@ -197,6 +213,7 @@ npm test                      # unit tests for the pure logic in packages/shared
 node scripts/integration.mjs  # 25 checks against a running server
 node scripts/integration-fight.mjs  # the fighter: tick rate, inputs, pause and forfeit
 node scripts/integration-race.mjs   # the race: relay, cheat checks, scoring, the cup
+node scripts/integration-spies.mjs  # the spies: key secrecy, clues, reveals, timers
 ```
 
 The integration suite connects three real socket clients and plays a turn, then

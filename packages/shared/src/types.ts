@@ -127,7 +127,7 @@ export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', '
 
 /** The ones with a playable interface. A kind can exist on the server before
  *  it has a screen, and the picker should only offer what can be played. */
-export const PLAYABLE_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race'];
+export const PLAYABLE_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies'];
 
 export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
   skribbl: { name: 'Draw & Guess', blurb: 'One draws a secret word, everyone else races to guess.' },
