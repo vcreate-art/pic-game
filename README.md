@@ -178,9 +178,17 @@ It is networked the opposite way to Stick Kombat, on purpose:
 - **Claims are checked.** The server refuses moves faster than the physics allows, a
   start anywhere but the start, and checkpoints or finishes claimed from elsewhere.
 
+Levels climb and drop as well as run: a thirty-tile wall-jump shaft, a tower of
+zigzag ledges, and the Drop, a spike-lined pipe with cannons firing across it that is
+taken at a glide. The grinder follows each level's route rather than just its x axis,
+so it comes down a pipe from above and up a shaft from below, easing off on legs that
+have to be taken slowly.
+
 Levels are built in code (`packages/shared/src/race/levels.ts`) with a small tile
 builder, and the tests check each one: safe spawn and checkpoints, a finish on the
 ground, and climbable shafts.
+
+Both real-time games have a full screen button (or press F).
 
 ## Testing
 

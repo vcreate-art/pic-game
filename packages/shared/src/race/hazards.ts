@@ -54,18 +54,104 @@ export function shotsAt(c: Cannon, t: number): Pt[] {
   return out;
 }
 
-/** The chasing wall's leading edge, in pixels. Starts off the left edge. */
-export function chaserX(lv: Level, pace: ChaserPace, t: number): number {
-  const speed = CHASER_SPEED[pace];
-  if (!speed) return -Infinity;
-  return -2 * TILE + Math.max(0, t - lv.chaserDelay) * (speed / 1000);
+interface Leg {
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
+  len: number;
+  /** Distance along the route to the start of this leg. */
+  start: number;
+  pace: number;
 }
 
-/** When the wall passes the finish line and the level is over for everyone. */
+const legCache = new WeakMap<Level, Leg[]>();
+
+function legsOf(lv: Level): Leg[] {
+  let legs = legCache.get(lv);
+  if (legs) return legs;
+  legs = [];
+  let start = 0;
+  for (let i = 0; i + 1 < lv.path.length; i++) {
+    const a = lv.path[i]!;
+    const b = lv.path[i + 1]!;
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    legs.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, len, start, pace: a.pace });
+    start += len;
+  }
+  legCache.set(lv, legs);
+  return legs;
+}
+
+export function pathLength(lv: Level): number {
+  const legs = legsOf(lv);
+  const last = legs.at(-1);
+  return last ? last.start + last.len : 0;
+}
+
+/**
+ * How far along the route a point is: the nearest point on the route, as a
+ * distance from the start. This is what "ahead" and "behind" mean in a level
+ * that climbs and drops rather than only running left to right.
+ */
+export function progressAt(lv: Level, x: number, y: number): number {
+  let best = Infinity;
+  let at = 0;
+  for (const l of legsOf(lv)) {
+    const dx = l.bx - l.ax;
+    const dy = l.by - l.ay;
+    const u = l.len ? Math.max(0, Math.min(1, ((x - l.ax) * dx + (y - l.ay) * dy) / (l.len * l.len))) : 0;
+    const d = Math.hypot(l.ax + dx * u - x, l.ay + dy * u - y);
+    if (d < best) {
+      best = d;
+      at = l.start + u * l.len;
+    }
+  }
+  return at;
+}
+
+/** Where the grinder starts, behind the start of the route. */
+const LEAD_IN = 2 * TILE;
+
+/** How far along the route the grinder has got, in pixels. */
+export function chaserProgress(lv: Level, pace: ChaserPace, t: number): number {
+  const v = CHASER_SPEED[pace] / 1000;
+  if (!v) return -Infinity;
+  let e = t - lv.chaserDelay;
+  if (e <= 0) return -LEAD_IN;
+  if (e < LEAD_IN / v) return -LEAD_IN + e * v;
+  e -= LEAD_IN / v;
+  for (const l of legsOf(lv)) {
+    const lv_ = v * l.pace;
+    if (e < l.len / lv_) return l.start + e * lv_;
+    e -= l.len / lv_;
+  }
+  return pathLength(lv) + e * v;
+}
+
+/** When the grinder passes the end of the route and the level is over for everyone. */
 export function chaserDoneAt(lv: Level, pace: ChaserPace): number {
-  const speed = CHASER_SPEED[pace];
-  if (!speed) return Infinity;
-  return lv.chaserDelay + ((lv.finish.x + lv.finish.w + 2 * TILE) / speed) * 1000;
+  const v = CHASER_SPEED[pace] / 1000;
+  if (!v) return Infinity;
+  let t = lv.chaserDelay + (2 * LEAD_IN) / v;
+  for (const l of legsOf(lv)) t += l.len / (v * l.pace);
+  return t;
+}
+
+/** A point on the route and the way the route runs there. */
+export function pathPoint(lv: Level, s: number): { x: number; y: number; dx: number; dy: number } {
+  const legs = legsOf(lv);
+  const l = legs.find((q) => s <= q.start + q.len) ?? legs.at(-1);
+  if (!l) return { x: 0, y: 0, dx: 1, dy: 0 };
+  const dx = (l.bx - l.ax) / (l.len || 1);
+  const dy = (l.by - l.ay) / (l.len || 1);
+  const u = s - l.start;
+  return { x: l.ax + dx * u, y: l.ay + dy * u, dx, dy };
+}
+
+/** Whether the grinder has overtaken a runner whose top-left is at (x, y). */
+export function caught(lv: Level, pace: ChaserPace, t: number, x: number, y: number): boolean {
+  return progressAt(lv, x + RW / 2, y + RH / 2) < chaserProgress(lv, pace, t);
 }
 
 export function overlaps(a: Rect, b: Rect): boolean {

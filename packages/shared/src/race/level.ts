@@ -42,6 +42,15 @@ export interface Cannon {
   range: number;
 }
 
+/**
+ * The route through a level, which the grinder follows. Each point starts a
+ * leg; `pace` scales the grinder's speed along it, so it can ease off down a
+ * pipe that has to be taken slowly.
+ */
+export interface PathPt extends Pt {
+  pace: number;
+}
+
 export interface Level {
   id: string;
   name: string;
@@ -51,7 +60,7 @@ export interface Level {
   tiles: Uint8Array;
   /** Where a runner's top-left sits at the start. */
   spawn: Pt;
-  /** Respawn points, left to right; each triggers on a column band. */
+  /** Respawn points, in route order; each triggers on a column band. */
   checkpoints: { x: number; y: number; zone: Rect }[];
   finish: Rect;
   saws: Saw[];
@@ -59,6 +68,8 @@ export interface Level {
   cannons: Cannon[];
   /** How long before the chasing wall sets off. */
   chaserDelay: number;
+  /** In pixels, start to finish. */
+  path: PathPt[];
 }
 
 export interface Rect {
@@ -79,18 +90,30 @@ export const tileAt = (lv: Level, tx: number, ty: number): number =>
  * Builds a level in tile coordinates, with rows counted from the top. Every
  * hazard's reach (a laser's length, a cannon's range) is worked out once
  * here, so the per-frame checks never have to walk the grid.
+ *
+ * `offset` shifts everything after it, so a section can be written in its
+ * own coordinates and then placed wherever the level needs it.
  */
 export class LevelBuilder {
   private tiles: Uint8Array;
+  private ox = 0;
+  private oy = 0;
   private spawnAt: Pt = { x: 2, y: 2 };
   private cps: Pt[] = [];
   private fin: Pt = { x: 0, y: 0 };
   private saws: Saw[] = [];
   private lasers: Omit<Laser, 'len'>[] = [];
   private cannons: Omit<Cannon, 'range'>[] = [];
+  private route: PathPt[] = [];
 
   constructor(readonly w: number, readonly h: number) {
     this.tiles = new Uint8Array(w * h);
+  }
+
+  offset(dx: number, dy: number): this {
+    this.ox = dx;
+    this.oy = dy;
+    return this;
   }
 
   private set(x: number, y: number, t: number): void {
@@ -98,45 +121,51 @@ export class LevelBuilder {
     this.tiles[y * this.w + x] = t;
   }
 
-  solid(x: number, y: number, w = 1, h = 1): this {
-    for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) this.set(i, j, T.SOLID);
+  private fill(x: number, y: number, w: number, h: number, t: number): this {
+    const x0 = x + this.ox;
+    const y0 = y + this.oy;
+    for (let j = y0; j < y0 + h; j++) for (let i = x0; i < x0 + w; i++) this.set(i, j, t);
     return this;
   }
 
-  /** Ground from row `top` all the way to the bottom. */
+  solid(x: number, y: number, w = 1, h = 1): this {
+    return this.fill(x, y, w, h, T.SOLID);
+  }
+
+  /** Ground from row `top` all the way to the bottom of the level. */
   floor(x: number, w: number, top: number): this {
-    return this.solid(x, top, w, this.h - top);
+    return this.fill(x, top, w, this.h - (top + this.oy), T.SOLID);
   }
 
   clear(x: number, y: number, w = 1, h = 1): this {
-    for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) this.set(i, j, T.AIR);
-    return this;
+    return this.fill(x, y, w, h, T.AIR);
   }
 
-  spikes(x: number, y: number, w = 1, kind: 'up' | 'down' | 'left' | 'right' = 'up'): this {
+  /** A row of floor or ceiling spikes, or a column of wall spikes. For walls,
+   *  `n` runs downward, and the kind is the way the points face. */
+  spikes(x: number, y: number, n = 1, kind: 'up' | 'down' | 'left' | 'right' = 'up'): this {
     const t = { up: T.SPIKE_UP, down: T.SPIKE_DOWN, left: T.SPIKE_LEFT, right: T.SPIKE_RIGHT }[kind];
-    for (let i = x; i < x + w; i++) this.set(kind === 'left' || kind === 'right' ? x : i, kind === 'left' || kind === 'right' ? y + (i - x) : y, t);
-    return this;
+    const wall = kind === 'left' || kind === 'right';
+    return wall ? this.fill(x, y, 1, n, t) : this.fill(x, y, n, 1, t);
   }
 
   crumble(x: number, y: number, w = 1): this {
-    for (let i = x; i < x + w; i++) this.set(i, y, T.CRUMBLE);
-    return this;
+    return this.fill(x, y, w, 1, T.CRUMBLE);
   }
 
   /** A saw centred on a tile position (fractions allowed). */
   saw(x: number, y: number, o: { to?: [number, number]; r?: number; period?: number; offset?: number } = {}): this {
-    const a = { x: x * TILE, y: y * TILE };
-    const b = o.to ? { x: o.to[0] * TILE, y: o.to[1] * TILE } : a;
+    const a = { x: (x + this.ox) * TILE, y: (y + this.oy) * TILE };
+    const b = o.to ? { x: (o.to[0] + this.ox) * TILE, y: (o.to[1] + this.oy) * TILE } : a;
     this.saws.push({ a, b, r: (o.r ?? 0.7) * TILE, period: o.period ?? 2000, offset: o.offset ?? 0 });
     return this;
   }
 
   /** A laser whose emitter is a solid block at (x, y), firing one way. */
   laser(x: number, y: number, dir: Dir4, o: { on?: number; off?: number; offset?: number } = {}): this {
-    this.set(x, y, T.SOLID);
-    const cx = (x + 0.5) * TILE;
-    const cy = (y + 0.5) * TILE;
+    this.solid(x, y);
+    const cx = (x + this.ox + 0.5) * TILE;
+    const cy = (y + this.oy + 0.5) * TILE;
     const half = TILE / 2;
     const start = {
       up: { x: cx, y: cy - half }, down: { x: cx, y: cy + half },
@@ -147,10 +176,10 @@ export class LevelBuilder {
   }
 
   cannon(x: number, y: number, dir: 1 | -1, o: { period?: number; offset?: number; speed?: number } = {}): this {
-    this.set(x, y, T.SOLID);
+    this.solid(x, y);
     this.cannons.push({
-      x: (x + 0.5 + dir * 0.5) * TILE,
-      y: (y + 0.5) * TILE,
+      x: (x + this.ox + 0.5 + dir * 0.5) * TILE,
+      y: (y + this.oy + 0.5) * TILE,
       dir,
       period: o.period ?? 1500,
       offset: o.offset ?? 0,
@@ -160,17 +189,26 @@ export class LevelBuilder {
   }
 
   spawn(x: number, y: number): this {
-    this.spawnAt = { x, y };
+    this.spawnAt = { x: x + this.ox, y: y + this.oy };
     return this;
   }
 
   checkpoint(x: number, y: number): this {
-    this.cps.push({ x, y });
+    this.cps.push({ x: x + this.ox, y: y + this.oy });
     return this;
   }
 
   finish(x: number, y: number): this {
-    this.fin = { x, y };
+    this.fin = { x: x + this.ox, y: y + this.oy };
+    return this;
+  }
+
+  /** The grinder's route, in tile coordinates. Each point is the start of a
+   *  leg; give it a pace below 1 to slow the grinder down along that leg. */
+  path(...pts: [x: number, y: number, pace?: number][]): this {
+    for (const [x, y, pace] of pts) {
+      this.route.push({ x: (x + this.ox + 0.5) * TILE, y: (y + this.oy + 0.5) * TILE, pace: pace ?? 1 });
+    }
     return this;
   }
 
@@ -178,20 +216,27 @@ export class LevelBuilder {
     const lv: Level = {
       id, name, w: this.w, h: this.h, tiles: this.tiles,
       spawn: standOn(this.spawnAt),
-      checkpoints: this.cps
-        .sort((p, q) => p.x - q.x)
-        .map((c) => ({ ...standOn(c), zone: { x: c.x * TILE, y: (c.y - 3) * TILE, w: TILE, h: 4 * TILE } })),
+      // Kept in the order they were placed, which is the order along the route.
+      checkpoints: this.cps.map((c) => ({
+        ...standOn(c), zone: { x: c.x * TILE, y: (c.y - 3) * TILE, w: TILE, h: 4 * TILE },
+      })),
       finish: { x: this.fin.x * TILE, y: (this.fin.y - 3) * TILE, w: 2 * TILE, h: 4 * TILE },
       saws: this.saws,
       lasers: [],
       cannons: [],
       chaserDelay,
+      path: this.route.length >= 2 ? this.route : [
+        { ...centre(this.spawnAt), pace: 1 },
+        { ...centre(this.fin), pace: 1 },
+      ],
     };
     lv.lasers = this.lasers.map((l) => ({ ...l, len: reach(lv, l.x, l.y, l.dir) }));
     lv.cannons = this.cannons.map((c) => ({ ...c, range: reach(lv, c.x, c.y, c.dir === 1 ? 'right' : 'left') }));
     return lv;
   }
 }
+
+const centre = (p: Pt): Pt => ({ x: (p.x + 0.5) * TILE, y: (p.y + 0.5) * TILE });
 
 /** Top-left of a runner standing in tile (x, y), on whatever is below it. */
 function standOn(p: Pt): Pt {

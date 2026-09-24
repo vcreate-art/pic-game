@@ -972,3 +972,23 @@ button, input { font: inherit; color: inherit; }
 @media (max-width: 640px) {
   .modes--4 { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ---------------------------------------------------------------- full screen */
+
+.stagebar { display: flex; justify-content: flex-end; }
+.fs-btn { display: inline-flex; align-items: center; gap: 8px; }
+.fs-btn kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+  padding: 0 5px; border-radius: 4px; background: var(--paper); border: 1px solid var(--line);
+}
+
+/* The stage box goes full screen, overlays and all; the canvas keeps its
+   shape and letterboxes on black. */
+.fight__stage:fullscreen {
+  background: #000; display: grid; place-items: center; width: 100vw; height: 100vh;
+}
+.fight__stage:fullscreen .fstage {
+  width: min(100vw, calc(100vh * var(--ar)));
+  height: auto; border-radius: 0; box-shadow: none;
+}
+.fight__stage:fullscreen .overlay { border-radius: 0; }

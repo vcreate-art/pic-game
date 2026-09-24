@@ -39,8 +39,8 @@ await waitForServer();
 
 // Level 1's layout, from packages/shared/src/race/levels.ts.
 const TILE = 32, RH = 26;
-const spawn = { x: 3 * TILE + 6, y: 16 * TILE - RH };
-const finish = { x: 145 * TILE + 6, y: 16 * TILE - RH };
+const spawn = { x: 3 * TILE + 6, y: 38 * TILE - RH };
+const finish = { x: 225 * TILE + 6, y: 30 * TILE - RH };
 
 const A = mk('A'), B = mk('B'), S = mk('Late');
 await Promise.all([ready(A), ready(B), ready(S)]);
@@ -114,9 +114,11 @@ console.log('\n\x1b[1m4. Racing to the flag\x1b[0m');
 // Walk A to the finish in plausible steps: 60px every 150ms is slower than
 // a real runner, and no faster than the server allows.
 let x = spawn.x;
-while (x < finish.x) {
+let y = spawn.y;
+while (x < finish.x || y > finish.y) {
   x = Math.min(finish.x, x + 60);
-  A.pos(x, spawn.y);
+  if (x > finish.x - 20 * TILE) y = Math.max(finish.y, y - 60);
+  A.pos(x, y);
   B.pos(spawn.x, spawn.y);
   await sleep(150);
 }
@@ -125,7 +127,7 @@ const fin = await waitFor(B, 'race:events', (evs) => evs.some(e => e.t === 'fini
 const f = fin?.find(e => e.t === 'finish');
 if (f && f.id === ca.playerId && f.place === 1) ok(`first across the line in ${(f.time / 1000).toFixed(1)}s`);
 else bad('no finish', JSON.stringify(fin));
-A.pos(x + 10, spawn.y);
+A.pos(x + 10, y);
 
 B.emit('race:caught');
 st = await waitFor(B, 'race:state', (g) => g.phase === 'results', 3000).catch(() => null);

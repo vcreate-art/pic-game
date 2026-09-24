@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FIGHTERS, FIGHT_SIDES, type FightEnding, type FightSide } from '@pic-game/shared';
 import { getFightView } from '../../fight/instance.js';
-import type { FightMeta } from '../../fight/renderer.js';
+import { VIEW_H, VIEW_W, type FightMeta } from '../../fight/renderer.js';
 import { msUntil } from '../../net/clock.js';
 import { getSocket } from '../../net/socket.js';
 import { selectFight, selectIsHost, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { Chat } from '../Chat.js';
+import { FullscreenButton } from '../FullscreenButton.js';
 import { FightLobby, SIDE_LABEL } from './FightLobby.js';
 import { FightStage } from './FightStage.js';
 import { Controls, MoveList } from './MoveList.js';
@@ -38,6 +39,7 @@ export function FightGame({ onLeave }: { onLeave: () => void }) {
 
   // A new match starts from a clean picture, not the last one's blood.
   const lastPhase = useRef(phase);
+  const stageRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (phase === 'playing' && lastPhase.current !== 'playing') {
       getFightView().reset();
@@ -79,7 +81,7 @@ export function FightGame({ onLeave }: { onLeave: () => void }) {
     <div className="game game--fight">
       <div className="fight">
         <div className="fight__main">
-          <div className="fight__stage">
+          <div className="fight__stage" ref={stageRef} style={{ ['--ar' as string]: VIEW_W / VIEW_H }}>
             {meta ? <FightStage meta={meta} mySide={mySide} live={game.phase === 'playing'} /> : null}
 
             {paused && game.phase === 'playing' && (
@@ -128,6 +130,9 @@ export function FightGame({ onLeave }: { onLeave: () => void }) {
                 </div>
               </div>
             )}
+          </div>
+          <div className="stagebar">
+            <FullscreenButton target={stageRef} />
           </div>
           <p className="fight__keys">
             <kbd>WASD</kbd> move · <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> punch, punch, kick, kick ·{' '}

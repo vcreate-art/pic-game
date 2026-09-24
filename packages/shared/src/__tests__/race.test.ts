@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  LEVELS, LevelBuilder, PHYS, RB, RH, TILE, atFinish, chaserDoneAt, chaserX, checkpointAt,
+  LEVELS, LevelBuilder, PHYS, RB, RH, TILE, atFinish, caught, chaserDoneAt, chaserProgress,
+  checkpointAt, pathLength, pathPoint, progressAt,
   crumbleState, dashReady, hazardAt, laserPhase, newRunner, newWorld, pointsFor, sawAt, shotsAt,
   solidAt, stepRunner, type Level, type Runner, type World,
 } from '../index.js';
@@ -227,12 +228,12 @@ describe('hazards', () => {
     expect(hazardAt(lv, 5 * TILE, lv.h * TILE + 5, 0)).toBe('pit');
   });
 
-  it('holds the chaser back, then sends it past the finish', () => {
+  it('holds the grinder back, then sends it past the end of the route', () => {
     const lv = room();
-    expect(chaserX(lv, 'off', 1e6)).toBe(-Infinity);
-    expect(chaserX(lv, 'normal', 0)).toBeLessThan(0);
+    expect(chaserProgress(lv, 'off', 1e6)).toBe(-Infinity);
+    expect(chaserProgress(lv, 'normal', 0)).toBeLessThan(0);
     const done = chaserDoneAt(lv, 'normal');
-    expect(chaserX(lv, 'normal', done)).toBeGreaterThanOrEqual(lv.finish.x + lv.finish.w);
+    expect(chaserProgress(lv, 'normal', done)).toBeGreaterThanOrEqual(pathLength(lv));
     expect(chaserDoneAt(lv, 'fast')).toBeLessThan(done);
   });
 });
@@ -284,7 +285,7 @@ describe('the levels', () => {
 
 describe('the climbs', () => {
   // Level, a column inside its shaft, the floor row, and the row of the top.
-  const SHAFTS = [[0, 71, 12, 4], [1, 60, 18, 6]] as const;
+  const SHAFTS = [[0, 71, 34, 26], [0, 146, 38, 6], [1, 60, 18, 6]] as const;
 
   for (const [li, col, floor, top] of SHAFTS) {
     it(`can be climbed in ${LEVELS[li]!.name}`, () => {
@@ -400,5 +401,46 @@ describe('Hollow Knight walls', () => {
       press(r, w, RIGHT | JUMP, JUMP, 8);
     }
     expect(r.y).toBeLessThan(start - 4 * TILE);
+  });
+});
+
+describe('the grinder follows the route', () => {
+  /** Along the floor, up a shaft, and along the top, with the shaft taken slowly. */
+  const lv = new LevelBuilder(40, 30)
+    .floor(0, 40, 25).spawn(2, 24).finish(35, 4)
+    .path([2, 24], [20, 24, 0.5], [20, 4], [36, 4])
+    .build('route', 'Route');
+
+  it('measures progress along the route, not across the map', () => {
+    const along = progressAt(lv, 10 * TILE, 24.5 * TILE);
+    const upShaft = progressAt(lv, 20.5 * TILE, 14 * TILE);
+    const onTop = progressAt(lv, 30 * TILE, 4.5 * TILE);
+    expect(along).toBeLessThan(upShaft);
+    expect(upShaft).toBeLessThan(onTop);
+    // The top of the level is further on than the bottom, though it is above it.
+    expect(progressAt(lv, 22 * TILE, 4.5 * TILE)).toBeGreaterThan(progressAt(lv, 22 * TILE, 24.5 * TILE));
+  });
+
+  it('runs a leg with a slower pace more slowly', () => {
+    const floor = 18 * TILE;
+    const shaft = 20 * TILE;
+    const tFloor = chaserDoneAt(new LevelBuilder(40, 30).floor(0, 40, 25).path([0, 0], [18, 0]).build('a', 'a'), 'normal');
+    const tShaft = chaserDoneAt(new LevelBuilder(40, 30).floor(0, 40, 25).path([0, 0, 0.5], [20, 0]).build('b', 'b'), 'normal');
+    // Twice the time per pixel on the slow leg.
+    expect((tShaft - tFloor) / 1000).toBeGreaterThan(((shaft * 2 - floor) / 150) * 0.9);
+  });
+
+  it('points the way the route runs', () => {
+    const up = pathPoint(lv, pathLength(lv) * 0.5);
+    expect(up.dy).toBeLessThan(0);
+    expect(up.dx).toBeCloseTo(0);
+  });
+
+  it('catches runners it has passed, and only them', () => {
+    const t = chaserDoneAt(lv, 'normal') / 2;
+    const s = chaserProgress(lv, 'normal', t);
+    const at = pathPoint(lv, s);
+    expect(caught(lv, 'normal', t, at.x - 10 - 3 * TILE * at.dx, at.y - 13 - 3 * TILE * at.dy)).toBe(true);
+    expect(caught(lv, 'normal', t, at.x - 10 + 3 * TILE * at.dx, at.y - 13 + 3 * TILE * at.dy)).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import {
-  GF, LEVELS, RH, RW, SHOT_R, T, TILE, atFinish, chaserX, checkpointAt,
+  GF, LEVELS, RH, RW, SHOT_R, T, TILE, atFinish, caught, chaserProgress, checkpointAt, pathLength,
+  pathPoint, progressAt,
   crumbleState, dashReady, hazardAt, laserPhase, laserRect, newRunner, newWorld, sawAt, shotsAt, stepRunner,
   tileAt, type ChaserPace, type DeathCause, type Ghost, type Level, type RaceEvent, type Runner,
   type World,
@@ -212,7 +213,7 @@ export class RaceView {
 
       const cause = hazardAt(this.lv, r.x, r.y, t);
       if (cause) this.die(cause);
-      else if (r.x + RW < chaserX(this.lv, meta.pace, t)) {
+      else if (caught(this.lv, meta.pace, t, r.x, r.y)) {
         this.mode = 'caught';
         this.splat(r.x + RW / 2, r.y + RH / 2, 40);
         this.banner = { text: 'CAUGHT', sub: 'The grinder got you', at: performance.now(), color: '#f87171' };
@@ -367,7 +368,8 @@ export class RaceView {
     const follow = this.mode === 'run' || this.mode === 'dead' || this.mode === 'done' || !this.leader()
       ? { x: r.x, y: r.y } : { x: this.leader()![0], y: this.leader()![1] };
     const tx = follow.x - VIEW_W * 0.4 + r.vx * 12;
-    const ty = follow.y - VIEW_H * 0.55;
+    // Look ahead when falling, so a drop shows what is below it.
+    const ty = follow.y - VIEW_H * 0.55 + (this.mode === 'run' ? Math.max(0, r.vy) * 14 : 0);
     this.cam.x += (tx - this.cam.x) * 0.12;
     this.cam.y += (ty - this.cam.y) * 0.12;
     this.cam.x = Math.max(0, Math.min(lv.w * TILE - VIEW_W, this.cam.x));
@@ -590,28 +592,61 @@ export class RaceView {
     }
   }
 
+  /**
+   * The grinder, drawn as a wall across the route wherever it has got to:
+   * upright while the route runs right, a ceiling coming down a pipe, a floor
+   * rising up a shaft. Everything behind it is filled in.
+   */
   private drawChaser(ctx: CanvasRenderingContext2D, t: number): void {
-    const x = chaserX(this.lv, this.meta!.pace, t);
-    if (!Number.isFinite(x) || x < this.cam.x - 40) return;
-    const top = this.cam.y - 10;
-    const h = VIEW_H + 20;
-    const g = ctx.createLinearGradient(x - 160, 0, x, 0);
+    const s = chaserProgress(this.lv, this.meta!.pace, t);
+    if (!Number.isFinite(s)) return;
+    const p = pathPoint(this.lv, Math.max(0, s));
+    const x0 = this.cam.x - 20;
+    const y0 = this.cam.y - 20;
+    const x1 = x0 + VIEW_W + 40;
+    const y1 = y0 + VIEW_H + 40;
+    // Which way the wall faces, and where its edge is.
+    const horizontal = Math.abs(p.dx) >= Math.abs(p.dy);
+    const sign = horizontal ? Math.sign(p.dx) || 1 : Math.sign(p.dy) || 1;
+    const edge = horizontal ? p.x : p.y;
+    if (horizontal ? (sign > 0 ? edge < x0 : edge > x1) : (sign > 0 ? edge < y0 : edge > y1)) return;
+
+    const g = horizontal
+      ? ctx.createLinearGradient(edge - sign * 160, 0, edge, 0)
+      : ctx.createLinearGradient(0, edge - sign * 160, 0, edge);
     g.addColorStop(0, 'rgba(127,29,29,.95)');
     g.addColorStop(1, 'rgba(239,68,68,.95)');
     ctx.fillStyle = g;
-    ctx.fillRect(this.cam.x - 10, top, x - this.cam.x + 10, h);
-    // A column of spinning teeth along the leading edge.
+    if (horizontal) {
+      if (sign > 0) ctx.fillRect(x0, y0, edge - x0, y1 - y0);
+      else ctx.fillRect(edge, y0, x1 - edge, y1 - y0);
+    } else if (sign > 0) {
+      ctx.fillRect(x0, y0, x1 - x0, edge - y0);
+    } else {
+      ctx.fillRect(x0, edge, x1 - x0, y1 - edge);
+    }
+
+    // A row of spinning teeth along the leading edge.
     ctx.fillStyle = '#e4e4e7';
-    for (let y = top; y < top + h; y += 22) {
-      const wob = Math.sin(t / 90 + y) * 4;
+    const from = horizontal ? y0 : x0;
+    const to = horizontal ? y1 : x1;
+    for (let a = from; a < to; a += 22) {
+      const wob = Math.sin(t / 90 + a) * 4;
       ctx.beginPath();
-      ctx.moveTo(x - 4, y);
-      ctx.lineTo(x + 16 + wob, y + 11);
-      ctx.lineTo(x - 4, y + 22);
+      if (horizontal) {
+        ctx.moveTo(edge - sign * 4, a);
+        ctx.lineTo(edge + sign * (16 + wob), a + 11);
+        ctx.lineTo(edge - sign * 4, a + 22);
+      } else {
+        ctx.moveTo(a, edge - sign * 4);
+        ctx.lineTo(a + 11, edge + sign * (16 + wob));
+        ctx.lineTo(a + 22, edge - sign * 4);
+      }
       ctx.fill();
     }
     ctx.fillStyle = 'rgba(254,202,202,.6)';
-    ctx.fillRect(x - 8, top, 4, h);
+    if (horizontal) ctx.fillRect(edge - sign * 8, y0, 4, y1 - y0);
+    else ctx.fillRect(x0, edge - sign * 8, x1 - x0, 4);
   }
 
   private drawRunner(
@@ -713,25 +748,27 @@ export class RaceView {
     const px0 = 180;
     const pw = VIEW_W - 360;
     const py = 18;
-    const span = lv.finish.x + lv.finish.w;
-    const at = (x: number) => px0 + Math.max(0, Math.min(1, x / span)) * pw;
+    // Measured along the route, so climbing a shaft counts as progress.
+    const span = pathLength(lv);
+    const at = (s: number) => px0 + Math.max(0, Math.min(1, s / span)) * pw;
     ctx.fillStyle = 'rgba(0,0,0,.55)';
     ctx.fillRect(px0 - 6, py - 8, pw + 12, 16);
-    const cx = chaserX(lv, meta.pace, t);
-    if (Number.isFinite(cx) && cx > 0) {
+    const cs = chaserProgress(lv, meta.pace, t);
+    if (Number.isFinite(cs) && cs > 0) {
       ctx.fillStyle = '#dc2626';
-      ctx.fillRect(px0, py - 3, at(cx) - px0, 6);
+      ctx.fillRect(px0, py - 3, at(cs) - px0, 6);
     }
     ctx.fillStyle = '#fde047';
     ctx.fillRect(px0 + pw - 2, py - 8, 4, 16);
     for (const q of meta.racers) {
-      const g = q.id === meta.me ? (meta.racing ? [this.runner.x] : null) : this.ghostAt(q.id);
+      const g = q.id === meta.me ? (meta.racing ? [this.runner.x, this.runner.y] : null) : this.ghostAt(q.id);
       if (!g) continue;
+      const prog = progressAt(lv, g[0]! + RW / 2, g[1]! + RH / 2);
       ctx.fillStyle = q.color;
       ctx.strokeStyle = q.id === meta.me ? '#fff' : '#000';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(at(g[0]!), py, q.id === meta.me ? 6 : 5, 0, Math.PI * 2);
+      ctx.arc(at(prog), py, q.id === meta.me ? 6 : 5, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }

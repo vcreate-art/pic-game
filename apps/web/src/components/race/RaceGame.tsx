@@ -7,6 +7,7 @@ import { VIEW_H, VIEW_W, ordinal, type RaceMeta } from '../../race/view.js';
 import { selectIsHost, selectRace, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { Chat } from '../Chat.js';
+import { FullscreenButton } from '../FullscreenButton.js';
 import { RaceControls, RaceLobby } from './RaceLobby.js';
 
 const colorOf = (p: Player) => AVATAR_COLORS[p.avatar.color] ?? '#ef4444';
@@ -58,6 +59,7 @@ export function RaceGame({ onLeave }: { onLeave: () => void }) {
   const players = room?.players;
 
   useTick(250, game?.phase === 'results' || game?.phase === 'countdown');
+  const stageRef = useRef<HTMLDivElement>(null);
 
   const meta = useMemo<RaceMeta | null>(() => {
     if (!game || !players) return null;
@@ -84,7 +86,7 @@ export function RaceGame({ onLeave }: { onLeave: () => void }) {
     <div className="game game--race">
       <div className="fight">
         <div className="fight__main">
-          <div className="fight__stage">
+          <div className="fight__stage" ref={stageRef} style={{ ['--ar' as string]: VIEW_W / VIEW_H }}>
             <RaceStage meta={meta} />
 
             {game.phase === 'results' && (
@@ -149,6 +151,9 @@ export function RaceGame({ onLeave }: { onLeave: () => void }) {
                 </div>
               </div>
             )}
+          </div>
+          <div className="stagebar">
+            <FullscreenButton target={stageRef} />
           </div>
           <div className="card roster fight__moves">
             <RaceControls />
