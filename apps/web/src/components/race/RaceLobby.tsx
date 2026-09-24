@@ -15,10 +15,11 @@ export function RaceControls() {
   return (
     <ul className="race__keys">
       <li><kbd>A</kbd> <kbd>D</kbd> or <kbd>←</kbd> <kbd>→</kbd> run</li>
-      <li><kbd>Space</kbd> or <kbd>J</kbd> jump · press again in the air to double jump</li>
-      <li>Hold <kbd>Space</kbd> while falling to glide</li>
-      <li>Jump off a wall to wall-jump · hold <kbd>W</kbd>/<kbd>↑</kbd> on a wall to climb</li>
-      <li><kbd>S</kbd>/<kbd>↓</kbd> on a wall slides down faster</li>
+      <li><kbd>Space</kbd> or <kbd>J</kbd> jump (hold for higher) · again in the air to double jump (wings on your back)</li>
+      <li><kbd>Shift</kbd> or <kbd>K</kbd> dash · keep holding it on the ground to sprint</li>
+      <li>After the double jump, hold <kbd>Space</kbd> while falling to glide</li>
+      <li>Push into a wall to cling · jump off it and steer back to climb · <kbd>W</kbd>/<kbd>↑</kbd> climbs too</li>
+      <li>A wall gives back your double jump and dash</li>
     </ul>
   );
 }

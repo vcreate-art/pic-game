@@ -1,6 +1,6 @@
 import {
   GF, LEVELS, RH, RW, SHOT_R, T, TILE, atFinish, chaserX, checkpointAt,
-  crumbleState, hazardAt, laserPhase, laserRect, newRunner, newWorld, sawAt, shotsAt, stepRunner,
+  crumbleState, dashReady, hazardAt, laserPhase, laserRect, newRunner, newWorld, sawAt, shotsAt, stepRunner,
   tileAt, type ChaserPace, type DeathCause, type Ghost, type Level, type RaceEvent, type Runner,
   type World,
 } from '@pic-game/shared';
@@ -83,6 +83,8 @@ export class RaceView {
   private splats: Splat[] = [];
   private bits: Bit[] = [];
   private banner: { text: string; sub?: string; at: number; color: string } | null = null;
+  /** Recent positions while dashing, for the afterimages. */
+  private trail: { x: number; y: number; life: number }[] = [];
 
   attach(canvas: HTMLCanvasElement, out: RaceOut): void {
     this.canvas = canvas;
@@ -137,6 +139,7 @@ export class RaceView {
       this.ghosts.clear();
       this.splats = [];
       this.bits = [];
+      this.trail = [];
       this.feed = [];
       this.banner = null;
       this.mode = meta.racing ? 'run' : 'watch';
@@ -199,9 +202,13 @@ export class RaceView {
 
     if (this.mode === 'run') {
       const wasGround = r.ground;
+      const wasDash = r.dash;
       stepRunner(r, held, pressed, this.world);
       if (!wasGround && r.ground) this.dust(r.x + RW / 2, r.y + RH, 5);
-      if (r.ground && Math.abs(r.vx) > 3 && this.frame % 6 === 0) this.dust(r.x + RW / 2, r.y + RH, 1);
+      if (r.ground && Math.abs(r.vx) > 3 && this.frame % (r.sprint ? 3 : 6) === 0) this.dust(r.x + RW / 2, r.y + RH, r.sprint ? 2 : 1);
+      if (r.flap === 0) this.feathers(r.x + RW / 2, r.y + RH);
+      if (r.dash > 0) this.trail.push({ x: r.x, y: r.y, life: 10 });
+      if (r.dash > 0 && wasDash === 0) this.dust(r.x + RW / 2, r.y + RH / 2, 6);
 
       const cause = hazardAt(this.lv, r.x, r.y, t);
       if (cause) this.die(cause);
@@ -247,14 +254,22 @@ export class RaceView {
   private send(): void {
     if (!this.out) return;
     const r = this.runner;
+    let f = this.runnerFlags();
+    if (this.mode === 'dead') f |= GF.DEAD;
+    if (this.mode === 'done') f |= GF.DONE;
+    this.out.pos(++this.seq, [r.x, r.y, r.vx, r.vy, f]);
+  }
+
+  private runnerFlags(): number {
+    const r = this.runner;
     let f = 0;
     if (r.facing < 0) f |= GF.FACING_LEFT;
     if (r.ground) f |= GF.GROUND;
     if (r.wall) f |= GF.WALL;
     if (r.gliding) f |= GF.GLIDE;
-    if (this.mode === 'dead') f |= GF.DEAD;
-    if (this.mode === 'done') f |= GF.DONE;
-    this.out.pos(++this.seq, [r.x, r.y, r.vx, r.vy, f]);
+    if (r.dash > 0) f |= GF.DASH;
+    if (r.sprint) f |= GF.SPRINT;
+    return f;
   }
 
   // ------------------------------------------------------------ particles
@@ -278,7 +293,19 @@ export class RaceView {
     }
   }
 
+  /** A puff of white feathers: the double jump's wings beating once. */
+  private feathers(x: number, y: number): void {
+    for (let i = 0; i < 8; i++) {
+      this.bits.push({
+        x: x + (Math.random() - 0.5) * 16, y, vx: (Math.random() - 0.5) * 3, vy: 1 + Math.random() * 2,
+        life: 26, color: 'rgba(255,255,255,.85)', size: 2 + Math.random() * 2,
+      });
+    }
+  }
+
   private updateBits(): void {
+    for (const t of this.trail) t.life--;
+    this.trail = this.trail.filter((t) => t.life > 0);
     for (const b of this.bits) {
       b.x += b.vx;
       b.y += b.vy;
@@ -365,12 +392,15 @@ export class RaceView {
         if (g && info && !(g[4] & GF.DEAD)) this.drawRunner(ctx, g[0], g[1], g[2], g[3], g[4], info.color, 0.5, info.name);
       }
       if (meta.racing && this.mode !== 'dead' && this.mode !== 'caught') {
-        let f = 0;
-        if (r.facing < 0) f |= GF.FACING_LEFT;
-        if (r.ground) f |= GF.GROUND;
-        if (r.wall) f |= GF.WALL;
-        if (r.gliding) f |= GF.GLIDE;
-        this.drawRunner(ctx, r.x, r.y, r.vx, r.vy, f, this.myColor(), 1, null);
+        const color = this.myColor();
+        for (const tr of this.trail) {
+          this.drawRunner(ctx, tr.x, tr.y, 0, 0, this.runnerFlags() & GF.FACING_LEFT, color, tr.life / 30, null);
+        }
+        this.drawRunner(ctx, r.x, r.y, r.vx, r.vy, this.runnerFlags(), color, 1, null, {
+          wings: r.airJumps > 0 ? 1 : 0,
+          flap: r.flap,
+          dash: dashReady(r),
+        });
       }
     }
     for (const b of this.bits) {
@@ -587,6 +617,7 @@ export class RaceView {
   private drawRunner(
     ctx: CanvasRenderingContext2D, x: number, y: number, vx: number, vy: number, flags: number,
     color: string, alpha: number, name: string | null,
+    own?: { wings: number; flap: number; dash: boolean },
   ): void {
     const left = (flags & GF.FACING_LEFT) !== 0;
     const ground = (flags & GF.GROUND) !== 0;
@@ -600,6 +631,46 @@ export class RaceView {
     const h = RH * sy;
     ctx.save();
     ctx.globalAlpha = alpha;
+    const backX = left ? cx + w / 2 : cx - w / 2;
+    const back = left ? 1 : -1;
+    if (flags & (GF.DASH | GF.SPRINT)) {
+      // Speed lines streaming off the back.
+      ctx.strokeStyle = flags & GF.DASH ? 'rgba(125,211,252,.8)' : 'rgba(255,255,255,.35)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) {
+        const ly = by - h * (0.25 + i * 0.25);
+        ctx.beginPath();
+        ctx.moveTo(backX + back * 4, ly);
+        ctx.lineTo(backX + back * (flags & GF.DASH ? 30 : 16), ly);
+        ctx.stroke();
+      }
+    }
+    if (own && (own.wings || own.flap < 14)) {
+      // The double jump, shown as a pair of wings on the back: there while it
+      // is available, beating once when it is used, gone until landing.
+      const beat = own.flap < 14 ? Math.sin((own.flap / 14) * Math.PI) : 0;
+      const spread = 0.35 + beat * 0.9;
+      ctx.fillStyle = own.flap < 14 ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.8)';
+      ctx.strokeStyle = 'rgba(0,0,0,.45)';
+      ctx.lineWidth = 1;
+      for (const k of [0, 1]) {
+        const a = -spread - k * 0.35;
+        ctx.save();
+        ctx.translate(backX, by - h + 8);
+        ctx.scale(back, 1);
+        ctx.rotate(a);
+        ctx.beginPath();
+        ctx.ellipse(8, 0, 10 - k * 2, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    if (own?.dash) {
+      // Dash ready: a cool rim of light.
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 10;
+    }
     if (flags & GF.GLIDE) {
       // A little cape, spread for the glide.
       ctx.fillStyle = 'rgba(255,255,255,.75)';
@@ -610,8 +681,9 @@ export class RaceView {
       ctx.lineTo(cx + 4, by - h + 6);
       ctx.fill();
     }
-    ctx.fillStyle = '#1c1917';
+    ctx.fillStyle = own?.dash ? '#0c4a6e' : '#1c1917';
     roundRect(ctx, cx - w / 2 - 2, by - h - 2, w + 4, h + 4, 7);
+    ctx.shadowBlur = 0;
     ctx.fillStyle = color;
     roundRect(ctx, cx - w / 2, by - h, w, h, 6);
     // Eyes, looking where it runs.
@@ -674,6 +746,40 @@ export class RaceView {
       ctx.font = '600 12px Inter, system-ui, sans-serif';
       ctx.fillStyle = 'rgba(255,255,255,.7)';
       ctx.fillText(`☠ ${this.deaths}`, VIEW_W - 14, 42);
+    }
+
+    // What the runner has left: the double jump and the dash.
+    if (meta.racing && (this.mode === 'run' || this.mode === 'dead')) {
+      const r = this.runner;
+      const icons = [
+        { label: 'DOUBLE JUMP', on: r.airJumps > 0, color: '#f5f5f4', glyph: 'wings' },
+        { label: 'DASH', on: dashReady(r), color: '#38bdf8', glyph: 'dash' },
+      ] as const;
+      icons.forEach((ic, i) => {
+        const x = 14 + i * 118;
+        const y = VIEW_H - 36;
+        ctx.globalAlpha = ic.on ? 1 : 0.35;
+        ctx.fillStyle = 'rgba(0,0,0,.55)';
+        roundRect(ctx, x, y, 110, 24, 12);
+        ctx.fillStyle = ic.on ? ic.color : '#78716c';
+        ctx.strokeStyle = ic.on ? ic.color : '#78716c';
+        ctx.lineWidth = 2;
+        if (ic.glyph === 'wings') {
+          ctx.beginPath();
+          ctx.ellipse(x + 15, y + 12, 7, 3, -0.6, 0, Math.PI * 2);
+          ctx.ellipse(x + 25, y + 12, 7, 3, 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(x + 10, y + 7); ctx.lineTo(x + 17, y + 12); ctx.lineTo(x + 10, y + 17);
+          ctx.moveTo(x + 18, y + 7); ctx.lineTo(x + 25, y + 12); ctx.lineTo(x + 18, y + 17);
+          ctx.stroke();
+        }
+        ctx.font = '700 10px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(ic.label, x + 36, y + 16);
+      });
+      ctx.globalAlpha = 1;
     }
 
     // Feed, top left under the name.

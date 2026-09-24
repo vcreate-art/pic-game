@@ -13,13 +13,15 @@ export const T = {
 } as const;
 
 /** One tick of controls. Jump is an edge as well as a hold: pressing it jumps,
- *  holding it through a fall glides. */
+ *  holding it rises higher, and holding it on the way down glides. Dash is the
+ *  same: pressing it dashes, holding it afterwards sprints. */
 export const RB = {
   LEFT: 1 << 0,
   RIGHT: 1 << 1,
   UP: 1 << 2,
   DOWN: 1 << 3,
   JUMP: 1 << 4,
+  DASH: 1 << 5,
 } as const;
 
 export type ChaserPace = 'off' | 'slow' | 'normal' | 'fast';
@@ -88,6 +90,8 @@ export const GF = {
   GLIDE: 1 << 3,
   DEAD: 1 << 4,
   DONE: 1 << 5,
+  DASH: 1 << 6,
+  SPRINT: 1 << 7,
 } as const;
 
 export type RaceEvent =

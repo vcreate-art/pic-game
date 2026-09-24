@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   LEVELS, LevelBuilder, PHYS, RB, RH, TILE, atFinish, chaserDoneAt, chaserX, checkpointAt,
-  crumbleState, hazardAt, laserPhase, newRunner, newWorld, pointsFor, sawAt, shotsAt,
+  crumbleState, dashReady, hazardAt, laserPhase, newRunner, newWorld, pointsFor, sawAt, shotsAt,
   solidAt, stepRunner, type Level, type Runner, type World,
 } from '../index.js';
 
-const { LEFT, RIGHT, UP, JUMP } = RB;
+const { LEFT, RIGHT, UP, JUMP, DASH } = RB;
 
 /** A flat test room: floor at row 10, walls at the edges. */
 function room(extra?: (b: LevelBuilder) => void): Level {
@@ -40,11 +40,11 @@ describe('running', () => {
     expect(r.y).toBe(floorY);
   });
 
-  it('speeds up to a top speed and stops on release', () => {
+  it('is at full speed at once and stops dead, with no slide', () => {
     const { r, w } = setup();
-    run(r, w, 30, RIGHT);
-    expect(r.vx).toBeCloseTo(PHYS.RUN);
-    run(r, w, 20);
+    run(r, w, 1, RIGHT);
+    expect(r.vx).toBe(PHYS.RUN);
+    run(r, w, 1);
     expect(r.vx).toBe(0);
   });
 
@@ -77,15 +77,16 @@ describe('jumping', () => {
 
   it('double jumps once in the air, and not again until landing', () => {
     const { r, w } = setup();
-    press(r, w, JUMP, JUMP, 10);
+    press(r, w, JUMP, JUMP, 20);
     stepRunner(r, JUMP, 0, w);
     const before = r.vy;
     press(r, w, JUMP, JUMP);
     expect(r.vy).toBeLessThan(before);
     expect(r.airJumps).toBe(0);
-    const after = r.vy;
-    press(r, w, JUMP, JUMP);
-    expect(r.vy).toBeGreaterThan(after);
+    run(r, w, 10);
+    press(r, w, 0, JUMP);
+    expect(r.vy).toBeGreaterThan(0);
+    expect(r.airJumps).toBe(0);
   });
 
   it('still jumps just after running off a ledge', () => {
@@ -105,17 +106,25 @@ describe('jumping', () => {
     // Falling now, a few frames above the floor.
     while (r.y < floorY - 20) stepRunner(r, 0, 0, w);
     r.airJumps = 0;
+    // Pressed and let go: with the double jump spent, holding would glide.
     press(r, w, 0, JUMP);
-    run(r, w, 4, JUMP);
+    run(r, w, 6);
     expect(r.y).toBeLessThan(floorY - 10);
   });
 
-  it('glides: holding jump on the way down caps the fall', () => {
+  it('glides: once the double jump is spent, holding jump floats down', () => {
     const { r, w } = setup();
-    press(r, w, JUMP, JUMP, 40);
-    run(r, w, 10, JUMP);
+    press(r, w, JUMP, JUMP, 12);
+    press(r, w, JUMP, JUMP, 30);
     expect(r.gliding).toBe(true);
     expect(r.vy).toBeLessThanOrEqual(PHYS.GLIDE_FALL);
+  });
+
+  it('does not glide off a held first jump: that press is saved for the double', () => {
+    const { r, w } = setup();
+    press(r, w, JUMP, JUMP, 30);
+    expect(r.gliding).toBe(false);
+    expect(r.airJumps).toBe(1);
   });
 });
 
@@ -299,4 +308,97 @@ describe('the climbs', () => {
       expect(r.y).toBeLessThan(top * TILE);
     });
   }
+});
+
+describe('dash and sprint', () => {
+  it('dashes a fixed distance with gravity suspended', () => {
+    const { r, w } = setup();
+    const x = r.x;
+    press(r, w, 0, DASH, PHYS.DASH_FRAMES);
+    expect(r.x - x).toBeCloseTo(PHYS.DASH_SPEED * PHYS.DASH_FRAMES);
+    expect(r.y).toBe(floorY);
+  });
+
+  it('dashes in the air once, flat, and not again until landing', () => {
+    const { r, w } = setup();
+    press(r, w, JUMP, JUMP, 20);
+    const y = r.y;
+    press(r, w, 0, DASH, 5);
+    expect(r.y).toBe(y);
+    expect(r.airDash).toBe(false);
+    run(r, w, 5);
+    // Even with the cooldown skipped, a second air dash does not go off.
+    r.dashCd = 0;
+    const x = r.x;
+    press(r, w, 0, DASH);
+    expect(r.dash).toBe(0);
+    expect(r.x).toBe(x);
+    run(r, w, 60);
+    expect(r.ground).toBe(true);
+    expect(dashReady(r)).toBe(true);
+  });
+
+  it('has a cooldown between dashes', () => {
+    const { r, w } = setup();
+    press(r, w, 0, DASH, PHYS.DASH_FRAMES + 2);
+    const x = r.x;
+    press(r, w, 0, DASH, 3);
+    expect(r.x).toBe(x);
+  });
+
+  it('breaks into a sprint when dash is held through a ground dash', () => {
+    const { r, w } = setup();
+    press(r, w, RIGHT | DASH, DASH, PHYS.DASH_FRAMES + 5);
+    expect(r.sprint).toBe(true);
+    expect(r.vx).toBe(PHYS.SPRINT);
+    run(r, w, 1, RIGHT);
+    expect(r.sprint).toBe(false);
+    expect(r.vx).toBe(PHYS.RUN);
+  });
+
+  it('keeps sprint speed through a jump', () => {
+    const { r, w } = setup();
+    press(r, w, RIGHT | DASH, DASH, PHYS.DASH_FRAMES + 5);
+    press(r, w, RIGHT | DASH | JUMP, JUMP, 10);
+    expect(r.ground).toBe(false);
+    expect(r.vx).toBe(PHYS.SPRINT);
+  });
+});
+
+describe('Hollow Knight walls', () => {
+  it('clings to a wall and slides at a steady speed', () => {
+    const lv = room((b) => b.solid(12, 0, 1, 10));
+    const { r, w } = setup(lv);
+    r.x = 12 * TILE - 20;
+    r.y = 2 * TILE;
+    run(r, w, 40, RIGHT);
+    expect(r.wall).toBe(1);
+    expect(r.vy).toBe(PHYS.WALL_SLIDE);
+  });
+
+  it('refreshes the double jump and dash on a wall', () => {
+    const lv = room((b) => b.solid(12, 0, 1, 10));
+    const { r, w } = setup(lv);
+    r.x = 12 * TILE - 20;
+    r.y = 2 * TILE;
+    r.airJumps = 0;
+    r.airDash = false;
+    run(r, w, 2, RIGHT);
+    expect(r.airJumps).toBe(1);
+    expect(r.airDash).toBe(true);
+  });
+
+  it('climbs a single wall by jumping off it and steering back', () => {
+    // One tall wall, nothing to bounce off on the other side.
+    const lv = room((b) => b.solid(12, 0, 1, 10));
+    const { r, w } = setup(lv);
+    r.x = 12 * TILE - 20;
+    press(r, w, RIGHT | JUMP, JUMP, 6);
+    const start = r.y;
+    for (let i = 0; i < 6; i++) {
+      run(r, w, 10, RIGHT);
+      press(r, w, RIGHT | JUMP, JUMP, 8);
+    }
+    expect(r.y).toBeLessThan(start - 4 * TILE);
+  });
 });

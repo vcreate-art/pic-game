@@ -271,8 +271,8 @@ export class RaceRoom extends BaseRoom<CorePlayer> {
     const [x, y] = s.g;
     const near = x > f.x - 2 * TILE && x < f.x + f.w + 2 * TILE && y > f.y - 2 * TILE && y < f.y + f.h + 2 * TILE;
     const time = Date.now() - this.startAt;
-    // Nobody crosses the level faster than running flat out in a straight line.
-    const fastest = ((f.x - this.lv.spawn.x) / (PHYS.RUN * 60 * 1.3)) * 1000;
+    // Nobody crosses the level faster than dashing flat out in a straight line.
+    const fastest = ((f.x - this.lv.spawn.x) / (PHYS.DASH_SPEED * 60)) * 1000;
     if (!near || time < fastest) return;
 
     r.time = time;

@@ -160,8 +160,10 @@ Fatal Blow. F2 toggles a hitbox overlay.
 
 ## Meat Race
 
-A Super Meat Boy style race for up to eight: run, jump, double jump, glide, wall-jump
-and climb through a cup of levels while saws, lasers, cannons and a chasing wall (the
+A Super Meat Boy style race for up to eight, with Hollow Knight / Silksong movement:
+instant control, a jump that rises while held, wall cling and wall-jump climbing, a
+dash that turns into a sprint when held, a double jump shown as wings on your back, and
+a glide once the double jump is spent. Run it through a cup of levels while saws, lasers, cannons and a chasing wall (the
 grinder) try to stop you. Dying sends you back to your last flag; the grinder ends your
 level. Points go 10, 8, 6, 5, 4, 3, 2, 1 by place.
 

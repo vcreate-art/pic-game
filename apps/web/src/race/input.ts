@@ -1,6 +1,7 @@
 import { RB } from '@pic-game/shared';
 
-/** Up is climb, not jump: holding it on a wall would otherwise wall-jump off. */
+/** Up is climb, not jump: holding it on a wall would otherwise wall-jump off.
+ *  Dash sits under the other hand's fingers, as on a pad's shoulder. */
 export const RACE_KEYS: Record<string, number> = {
   KeyA: RB.LEFT,
   KeyD: RB.RIGHT,
@@ -12,8 +13,12 @@ export const RACE_KEYS: Record<string, number> = {
   ArrowDown: RB.DOWN,
   Space: RB.JUMP,
   KeyJ: RB.JUMP,
-  KeyK: RB.JUMP,
   KeyZ: RB.JUMP,
+  ShiftLeft: RB.DASH,
+  ShiftRight: RB.DASH,
+  KeyK: RB.DASH,
+  KeyX: RB.DASH,
+  KeyL: RB.DASH,
 };
 
 const typing = (t: EventTarget | null) => {
@@ -67,7 +72,8 @@ export class RaceInput {
     let bits = 0;
     for (const p of navigator.getGamepads?.() ?? []) {
       if (!p?.connected) continue;
-      if (p.buttons[0]?.pressed || p.buttons[1]?.pressed) bits |= RB.JUMP;
+      if (p.buttons[0]?.pressed) bits |= RB.JUMP;
+      if (p.buttons[2]?.pressed || p.buttons[5]?.pressed || p.buttons[7]?.pressed) bits |= RB.DASH;
       if (p.buttons[12]?.pressed) bits |= RB.UP;
       if (p.buttons[13]?.pressed) bits |= RB.DOWN;
       if (p.buttons[14]?.pressed) bits |= RB.LEFT;
