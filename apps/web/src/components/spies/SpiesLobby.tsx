@@ -14,7 +14,7 @@ const timeLabel = (s: number) => (s ? `${s}s` : 'Off');
 
 const MODES: { value: ClueMode; name: string; blurb: string }[] = [
   { value: 'typed', name: 'Typed', blurb: 'Spymasters type the clue into the app.' },
-  { value: 'spoken', name: 'Spoken', blurb: 'Said out loud in the room; only the number is entered.' },
+  { value: 'spoken', name: 'In person', blurb: 'Play at a real table: clues out loud, anyone taps the cards.' },
 ];
 
 const SOURCES: { value: WordSource; name: string; blurb: string }[] = [
@@ -39,7 +39,9 @@ export function SpiesLobby({ onLeave }: { onLeave: () => void }) {
   const seated = new Set(SPY_TEAMS.flatMap((t) => [game.teams[t].spymaster, ...game.teams[t].operatives]));
   const unassigned = room.players.filter((p) => !seated.has(p.id));
   const player = (id: string) => room.players.find((p) => p.id === id);
-  const ready = SPY_TEAMS.every((t) => game.teams[t].spymaster && game.teams[t].operatives.length > 0);
+  const spoken = settings.clueMode === 'spoken';
+  // At a real table the app is only the board, so nobody needs a seat in it.
+  const ready = spoken || SPY_TEAMS.every((t) => game.teams[t].spymaster && game.teams[t].operatives.length > 0);
   const fewWords = settings.wordSource === 'custom' && settings.customWords.length < SPIES_BOUNDS.customWords.minForGame;
 
   const Member = ({ id, spy }: { id: string; spy?: boolean }) => {
@@ -60,6 +62,12 @@ export function SpiesLobby({ onLeave }: { onLeave: () => void }) {
         <InviteCard />
 
         <div className="spylobby__teams">
+          {spoken && (
+            <p className="settings__note settings__note--left spylobby__optional">
+              Playing in person: sort out teams in the room. Seats here are optional; a
+              spymaster can also call up the key on their phone once the board is dealt.
+            </p>
+          )}
           {SPY_TEAMS.map((team) => {
             const t = game.teams[team];
             const iAmSpy = t.spymaster === me;
@@ -163,7 +171,10 @@ export function SpiesLobby({ onLeave }: { onLeave: () => void }) {
           </div>
 
           <div className="spytimes">
-            {([['clueSeconds', 'Time to give a clue'], ['guessSeconds', 'Time to guess']] as const).map(([k, label]) => (
+            {(spoken
+              ? ([['guessSeconds', 'Time per turn']] as const)
+              : ([['clueSeconds', 'Time to give a clue'], ['guessSeconds', 'Time to guess']] as const)
+            ).map(([k, label]) => (
               <label key={k} className="settings__row">
                 <span className="settings__label">{label}</span>
                 <select
@@ -188,7 +199,9 @@ export function SpiesLobby({ onLeave }: { onLeave: () => void }) {
               {!ready ? 'Each team needs a spymaster and a guesser' : fewWords ? 'Add more of your words' : 'Deal the board'}
             </button>
           ) : (
-            <p className="settings__note">Pick a team. The host deals when both are ready.</p>
+            <p className="settings__note">
+              {spoken ? 'Waiting for the host to deal…' : 'Pick a team. The host deals when both are ready.'}
+            </p>
           )}
         </section>
       </div>

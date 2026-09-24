@@ -164,10 +164,10 @@ else bad('assassin not handled', JSON.stringify({ phase: st.phase, winner: st.wi
 if (st.key?.length === 25) ok('the key is shown to everyone at the end');
 else bad('no key at the end');
 
-console.log('\n\x1b[1m7. Spoken clues and the clock\x1b[0m');
+console.log('\n\x1b[1m7. The clock\x1b[0m');
 R1.emit('spies:toLobby');
 await sleep(200);
-R1.emit('spies:settings', { clueMode: 'spoken', clueSeconds: 1 });
+R1.emit('spies:settings', { clueSeconds: 1 });
 await sleep(150);
 R1.emit('game:start');
 await sleep(300);
@@ -180,11 +180,47 @@ st = S.last('spies:state');
 if (st.turn !== turn2 && st.phase === 'clue') ok("time's up passes the turn");
 else bad('clock did not pass the turn', JSON.stringify({ turn: st.turn, was: turn2 }));
 R1.emit('spies:settings', { clueSeconds: 0 });
-SM[st.turn].emit('spies:clue', { word: null, count: 2 });
+
+console.log('\n\x1b[1m8. At a real table\x1b[0m');
+// A typed game never hands the key to someone who only asks for it.
+S.emit('spies:peek');
 await sleep(200);
-st = S.last('spies:state');
-if (st.phase === 'guess' && st.clue?.word === null && st.clue.count === 2) ok('a spoken clue is just the number');
-else bad('spoken clue refused', JSON.stringify(st.clue));
+if (!S.saw('spies:key').length) ok('asking for the key in a typed game gets nothing');
+else bad('typed game handed out the key');
+
+const H = mk('Host2'), P = mk('Pal');
+await Promise.all([ready(H), ready(P)]);
+const t2 = await emitAck(H, 'room:create', { name: 'Hana', avatar: {}, game: 'spies' });
+await emitAck(P, 'room:join', { code: t2.state.code, name: 'Pat', avatar: {} });
+H.emit('spies:settings', { clueMode: 'spoken' });
+await sleep(150);
+H.emit('game:start');
+await sleep(300);
+let t = P.last('spies:state');
+if (t?.phase === 'guess' && !H.errors().includes('NOT_READY')) ok('a spoken game starts with nobody seated, straight into guessing');
+else bad('spoken game did not start', JSON.stringify({ phase: t?.phase, errors: H.errors() }));
+if (!P.saw('spies:key').length) ok('nobody is sent the key unasked');
+P.emit('spies:peek');
+await sleep(200);
+const tkey = P.last('spies:key')?.key;
+if (tkey?.length === 25 && !H.saw('spies:key').length) ok('the key goes to the phone that asks, and only that one');
+else bad('peek wrong');
+const turn = t.turn;
+const other = turn === 'red' ? 'blue' : 'red';
+P.emit('spies:reveal', { index: tkey.indexOf(turn) });
+await sleep(200);
+t = P.last('spies:state');
+if (t.board.some(b => b.revealed === turn) && t.turn === turn) ok('anyone can turn a card over; the right one keeps the turn');
+else bad('reveal refused at the table', JSON.stringify({ turn: t.turn }));
+H.emit('spies:reveal', { index: tkey.indexOf('neutral') });
+await sleep(200);
+t = P.last('spies:state');
+if (t.turn === other && t.phase === 'guess') ok('a wrong card passes the turn, straight to guessing again');
+else bad('turn did not pass', JSON.stringify({ turn: t.turn, phase: t.phase }));
+P.emit('spies:pass');
+await sleep(200);
+if (P.last('spies:state').turn === turn) ok('anyone can end the turn');
+H.close(); P.close();
 
 console.log(`\n\x1b[1m${pass.length} passed, ${fail.length} failed\x1b[0m`);
 all.forEach(s => s.close());

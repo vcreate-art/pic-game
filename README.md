@@ -201,8 +201,11 @@ cards and reveal them, and the assassin loses the game on the spot.
   team's spymaster and to nobody else, and `SpiesPublic` carries it only once the game
   is over. A spymaster cannot leave the seat mid-game, since they cannot unsee it.
 - **Clues are checked.** One word, not on the board and not part of a board word
-  (no WATER while WATERFALL is face down). The host can switch to spoken clues for
-  playing in one room, where only the number is entered.
+  (no WATER while WATERFALL is face down).
+- **Or play in person.** Switched to in-person, the app is just the table: deal with
+  nobody seated, say clues out loud, and anyone taps cards or ends a turn. The app
+  still keeps score and passes the turn on a wrong card. A spymaster calls the key up
+  on their own phone, behind a confirm so a guesser does not peek by accident.
 - **Words**: the built-in list, the host's own pasted in, or both. Optional timers on
   giving a clue and on guessing; running out passes the turn.
 

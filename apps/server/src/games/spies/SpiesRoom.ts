@@ -1,5 +1,5 @@
 import {
-  SPIES_BOUNDS, SPIES_DEFAULTS, SPY_TEAMS, SPY_WORDS, clueProblem, deal, giveClue,
+  SPIES_BOUNDS, SPIES_DEFAULTS, SPY_TEAMS, SPY_WORDS, UNLIMITED, clueProblem, deal, giveClue,
   parseCustomWords, passTurn, remaining, reveal, validCount, type RoomState, type SpiesGame,
   type SpiesPhase, type SpiesPublic, type SpiesSettings, type SpiesTeamSeats, type SpyRole,
   type SpyTeam,
@@ -13,6 +13,11 @@ const emptyTeams = (): Record<SpyTeam, SpiesTeamSeats> => ({
 
 /**
  * Word Spies: two teams, a board of words, and a key only the spymasters see.
+ *
+ * Two ways to play. Typed: the app runs the whole game, with seats, roles and
+ * clues entered into it. Spoken: the game happens in the room and the app is
+ * the table. Nobody needs a seat, anyone can turn a card over or end a turn,
+ * clues are said out loud, and a spymaster calls the key up on their own phone.
  *
  * The key is the whole game, so it is handled like the drawer's word in the
  * drawing game: `SpiesPublic` has no field that could carry it while play is
@@ -88,11 +93,17 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     }
   }
 
+  private get spoken(): boolean {
+    return this.settings.clueMode === 'spoken';
+  }
+
   join(id: string, team: SpyTeam | null, role: SpyRole): void {
     if (!this.players.has(id)) return;
     const seat = this.seatOf(id);
     const playing = this.phase === 'clue' || this.phase === 'guess';
-    if (playing && seat) {
+    // At a real table the teams are whoever is sitting where; seats in the
+    // app are only labels, so they stay open.
+    if (playing && seat && !this.spoken) {
       // Mid-game you stay where you are: a spymaster has seen the key, and an
       // operative switching sides would carry their team's plans across.
       this.emitError(id, 'LOCKED', 'Teams are locked until this game is over.');
@@ -175,7 +186,7 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     if (by !== this.hostId) return;
     if (this.phase === 'clue' || this.phase === 'guess') return;
     const missing = SPY_TEAMS.filter((t) => !this.teams[t].spymaster || this.teams[t].operatives.length === 0);
-    if (missing.length) {
+    if (missing.length && !this.spoken) {
       this.emitError(by, 'NOT_READY', 'Each team needs a spymaster and at least one operative.');
       return;
     }
@@ -186,7 +197,8 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     }
     this.game = deal(pool, Math.random);
     this.marks.clear();
-    for (const t of SPY_TEAMS) this.sendKey(this.teams[t].spymaster!);
+    for (const t of SPY_TEAMS) if (this.teams[t].spymaster) this.sendKey(this.teams[t].spymaster!);
+    this.advance();
     this.startTimer();
     this.broadcast();
     this.systemMessage(`New game: ${this.game.starting} goes first.`);
@@ -211,10 +223,28 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     this.broadcast();
   }
 
+  /**
+   * Spoken games have no clue step in the app: the clue is said out loud, so
+   * each turn goes straight to guessing, with no cap the app could know.
+   */
+  private advance(): void {
+    const g = this.game;
+    if (g && this.spoken && g.phase === 'clue') giveClue(g, null, UNLIMITED);
+  }
+
+  /** Who may touch the cards: the team's guessers, or at a real table anyone. */
   private guesser(id: string): SpiesGame | null {
     const g = this.game;
     if (!g || g.phase !== 'guess') return null;
+    if (this.spoken) return this.players.has(id) ? g : null;
     return this.teams[g.turn].operatives.includes(id) ? g : null;
+  }
+
+  /** Spoken games: a spymaster at the table asks for the key on their phone. */
+  peek(id: string): void {
+    const g = this.game;
+    if (!g || !this.spoken || g.phase === 'ended' || !this.players.has(id)) return;
+    this.emitTo(id, 'spies:key', { key: [...g.key] });
   }
 
   mark(id: string, index: number): void {
@@ -235,7 +265,10 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     this.marks.clear();
     this.systemMessage(`${who} picked ${g.words[index]}: ${color === 'neutral' ? 'a bystander' : color === 'assassin' ? 'the assassin!' : `${color} agent`}.`);
     if (g.phase === 'ended') this.finish();
-    else if (turnOver) this.startTimer();
+    else if (turnOver) {
+      this.advance();
+      this.startTimer();
+    }
     this.broadcast();
   }
 
@@ -244,6 +277,7 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     if (!g) return;
     passTurn(g);
     this.marks.clear();
+    this.advance();
     this.startTimer();
     this.broadcast();
   }
@@ -287,6 +321,7 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
       this.systemMessage(`Time's up for ${this.game.turn}.`);
       passTurn(this.game);
       this.marks.clear();
+      this.advance();
       this.startTimer();
       this.broadcast();
     }, secs * 1000);

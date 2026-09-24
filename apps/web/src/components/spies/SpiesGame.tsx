@@ -30,7 +30,14 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
   const socket = getSocket();
   const [word, setWord] = useState('');
   const [count, setCount] = useState(1);
+  /** Spoken games: this device has asked to see the key (a spymaster's phone). */
+  const [peeking, setPeeking] = useState(false);
+  const [confirmPeek, setConfirmPeek] = useState(false);
   useTick(!!room?.game.endsAt);
+  const phase = room?.game.phase;
+  useEffect(() => {
+    if (phase === 'lobby' || phase === 'ended') setPeeking(false);
+  }, [phase]);
 
   const turnKey = `${room?.game.turn}:${room?.game.log.length}`;
   useEffect(() => setWord(''), [turnKey]);
@@ -41,9 +48,13 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
 
   const player = (id: string) => room.players.find((p) => p.id === id);
   const myTeam = SPY_TEAMS.find((t) => game.teams[t].spymaster === me || game.teams[t].operatives.includes(me)) ?? null;
+  const spoken = game.settings.clueMode === 'spoken';
   const amSpymaster = !!myTeam && game.teams[myTeam].spymaster === me;
   const myTurn = myTeam === game.turn;
-  const guessing = game.phase === 'guess' && myTurn && !amSpymaster;
+  // At a real table anyone may turn a card over; in the app, only the guessers
+  // of the team whose turn it is.
+  const guessing = game.phase === 'guess' && (spoken || (myTurn && !amSpymaster));
+  const seesKey = amSpymaster || (spoken && peeking && !!key);
   const giving = game.phase === 'clue' && myTurn && amSpymaster;
   const ended = game.phase === 'ended';
   // What each card is, as far as this screen may know: spymasters see the
@@ -58,6 +69,7 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
   const status = (() => {
     const team = TEAM_NAME[game.turn];
     if (ended) return game.winner ? `${TEAM_NAME[game.winner]} wins${game.reason === 'assassin' ? ': the assassin was found' : ''}!` : 'Game over';
+    if (spoken) return `${team}'s turn: clue out loud, then tap the cards`;
     if (game.phase === 'clue') return giving ? 'Your clue' : `${team} spymaster is thinking…`;
     const left = game.guessesLeft === UNLIMITED ? 'no limit' : `${game.guessesLeft} guess${game.guessesLeft === 1 ? '' : 'es'} left`;
     return `${guessing ? 'Your team is' : `${team} is`} guessing · ${left}`;
@@ -95,7 +107,7 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
               </section>
             );
           })}
-          {!myTeam && !ended && (
+          {!myTeam && !ended && !spoken && (
             <div className="card spyteam__watch">
               <p className="settings__note settings__note--left">You are watching. Join a team as a guesser:</p>
               <div className="spyteam__actions">
@@ -113,7 +125,7 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
         <main className="spies__main">
           <header className={`spybar spybar--${ended ? game.winner ?? 'none' : game.turn}`}>
             <span className="spybar__status">{status}</span>
-            {game.clue && !ended && (
+            {game.clue && !ended && !spoken && (
               <span className="spybar__clue">
                 {game.clue.word ?? 'Spoken clue'} <b>{countLabel(game.clue.count)}</b>
               </span>
@@ -121,9 +133,9 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
             {secs !== null && !ended && <span className={`spybar__time ${secs <= 10 ? 'is-low' : ''}`}>{secs}s</span>}
           </header>
 
-          <div className={`spyboard ${amSpymaster ? 'is-master' : ''} ${guessing ? 'is-guessing' : ''}`}>
+          <div className={`spyboard ${seesKey ? 'is-master' : ''} ${guessing ? 'is-guessing' : ''}`}>
             {game.board.map((card, i) => {
-              const color = card.revealed ?? (amSpymaster || ended ? truth(i) : null);
+              const color = card.revealed ?? (seesKey || ended ? truth(i) : null);
               const marks = game.marks[i] ?? [];
               const mine = marks.includes(me);
               return (
@@ -198,7 +210,34 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
                 <button type="button" className="btn" onClick={() => socket.emit('spies:pass')}>End turn</button>
               </div>
             )}
-            {amSpymaster && !ended && !giving && (
+            {spoken && !ended && !amSpymaster && (
+              <div className="spyguess">
+                {peeking ? (
+                  <button type="button" className="btn" onClick={() => setPeeking(false)}>Hide the key</button>
+                ) : confirmPeek ? (
+                  <>
+                    <span className="settings__note">Only a spymaster should look. Sure?</span>
+                    <button
+                      type="button"
+                      className="btn btn--danger"
+                      onClick={() => {
+                        socket.emit('spies:peek');
+                        setPeeking(true);
+                        setConfirmPeek(false);
+                      }}
+                    >
+                      Show me the key
+                    </button>
+                    <button type="button" className="btn btn--ghost" onClick={() => setConfirmPeek(false)}>Cancel</button>
+                  </>
+                ) : (
+                  <button type="button" className="btn btn--ghost" onClick={() => setConfirmPeek(true)}>
+                    Spymaster? Show the key
+                  </button>
+                )}
+              </div>
+            )}
+            {seesKey && !ended && !giving && (
               <p className="settings__note">You can see the key. Keep a straight face.</p>
             )}
             {ended && isHost && (
@@ -219,7 +258,10 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
               <ol className="spylog__list">
                 {[...game.log].reverse().map((c, i) => (
                   <li key={game.log.length - i} className={`spylog__item spylog__item--${c.team}`}>
-                    <span className="spylog__clue">{c.word ?? '(spoken)'} <b>{countLabel(c.count)}</b></span>
+                    <span className="spylog__clue">
+                      {c.word ?? `${TEAM_NAME[c.team]}'s turn`}
+                      {c.word && <b>{countLabel(c.count)}</b>}
+                    </span>
                     <span className="spylog__guesses">
                       {c.guesses.map((g, j) => (
                         <span key={j} className={`spylog__g is-${g.color}`}>{g.word}</span>

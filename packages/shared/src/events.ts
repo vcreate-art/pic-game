@@ -132,6 +132,9 @@ export interface ClientToServerEvents {
   'spies:reveal': (p: { index: number }) => void;
   /** Stop guessing and hand the turn over. */
   'spies:pass': () => void;
+  /** Spoken games only: send the key to this device, for a spymaster at the
+   *  table. Typed games give it to the seated spymasters and nobody else. */
+  'spies:peek': () => void;
   'spies:rematch': () => void;
   'spies:toLobby': () => void;
 

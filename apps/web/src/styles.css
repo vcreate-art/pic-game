@@ -1121,7 +1121,8 @@ button, input { font: inherit; color: inherit; }
   color: #fff; background: var(--accent); box-shadow: 0 2px 6px rgba(0,0,0,.2);
 }
 
-.spyctl { min-height: 48px; display: flex; align-items: center; justify-content: center; }
+.spyctl { min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.spylobby__optional { grid-column: 1 / -1; margin: 0; }
 .spyclue { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
 .spyclue__word { width: 220px; text-transform: uppercase; font-family: var(--display); font-weight: 700; }
 .spyclue__say { font-weight: 600; }

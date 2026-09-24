@@ -512,6 +512,11 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       if (room && s.playerId) room.pass(s.playerId);
     });
 
+    socket.on('spies:peek', () => {
+      const room = spies();
+      if (room && s.playerId && s.chat.tryTake()) room.peek(s.playerId);
+    });
+
     socket.on('spies:rematch', () => {
       const room = spies();
       if (room && s.playerId) room.rematch(s.playerId);
