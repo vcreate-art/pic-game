@@ -65,12 +65,16 @@ export interface Profile {
   avatar: { color: number; face: number };
 }
 
+/** Fired on every save, so the header and the join form stay in step. */
+export const PROFILE_EVENT = 'pic-game:profile';
+
 export function saveProfile(p: Profile): void {
   try {
     localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
   } catch {
     /* ignore */
   }
+  window.dispatchEvent(new CustomEvent<Profile>(PROFILE_EVENT, { detail: p }));
 }
 
 export function loadProfile(): Profile | null {

@@ -49,6 +49,8 @@ export interface ClientToServerEvents {
     cb: (r: JoinAck) => void,
   ) => void;
   'room:leave': () => void;
+  /** Change your own name or avatar mid-room; everyone sees it at once. */
+  'player:rename': (p: { name: string; avatar: Avatar }) => void;
   /** Host only. Removes a player and blocks that seat from coming back. */
   'player:kick': (p: { playerId: string }) => void;
   'room:settings': (p: Partial<RoomSettings>) => void;

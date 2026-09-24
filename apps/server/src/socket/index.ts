@@ -265,6 +265,13 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.room.handleChat(s.playerId, p.text);
     });
 
+    socket.on('player:rename', (p) => {
+      if (!s.room || !s.playerId || !s.chat.tryTake()) return;
+      const name = cleanName(p?.name);
+      if (!name) return;
+      s.room.rename(s.playerId, name, cleanAvatar(p?.avatar));
+    });
+
     socket.on('player:kick', (p) => {
       if (!s.room || !s.playerId) return;
       if (typeof p?.playerId !== 'string') return;

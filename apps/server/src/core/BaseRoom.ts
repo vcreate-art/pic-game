@@ -166,6 +166,18 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     this.removePlayer(targetId);
   }
 
+  /** A player renames themselves, or changes their avatar. The seat, score and
+   *  everything else stay put: only how they are shown changes. */
+  rename(playerId: string, name: string, avatar: Avatar): void {
+    const p = this.players.get(playerId);
+    if (!p) return;
+    const was = p.name;
+    p.name = name;
+    p.avatar = avatar;
+    this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
+    if (was !== name) this.systemMessage(`${was} is now ${name}.`);
+  }
+
   isBanned(token: string | undefined): boolean {
     return !!token && this.banned.has(token);
   }

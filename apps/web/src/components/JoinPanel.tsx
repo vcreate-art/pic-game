@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AVATAR_COLORS, AVATAR_FACES } from '@pic-game/shared';
 import { MAX_NAME_LEN } from '../constants.js';
-import { loadProfile, saveProfile } from '../net/socket.js';
+import { PROFILE_EVENT, loadProfile, saveProfile, type Profile } from '../net/socket.js';
 import { Avatar } from './Avatar.js';
 
 export interface Identity {
@@ -27,6 +27,18 @@ export function JoinPanel({
   const [name, setName] = useState(saved?.name ?? '');
   const [color, setColor] = useState(saved?.avatar.color ?? Math.floor(Math.random() * AVATAR_COLORS.length));
   const [face, setFace] = useState(saved?.avatar.face ?? Math.floor(Math.random() * AVATAR_FACES.length));
+
+  // Edited from the header while this form is open: take the new values.
+  useEffect(() => {
+    const on = (e: Event) => {
+      const p = (e as CustomEvent<Profile>).detail;
+      setName(p.name);
+      setColor(p.avatar.color);
+      setFace(p.avatar.face);
+    };
+    window.addEventListener(PROFILE_EVENT, on);
+    return () => window.removeEventListener(PROFILE_EVENT, on);
+  }, []);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
