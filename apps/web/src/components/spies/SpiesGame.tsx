@@ -119,6 +119,33 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
               </div>
             </div>
           )}
+          {spoken && !ended && !amSpymaster && (
+            <div className="card spypeek">
+              {peeking ? (
+                <button type="button" className="btn" onClick={() => setPeeking(false)}>Hide the key</button>
+              ) : confirmPeek ? (
+                <>
+                  <span className="settings__note">Only a spymaster should look. Sure?</span>
+                  <button
+                    type="button"
+                    className="btn btn--danger"
+                    onClick={() => {
+                      socket.emit('spies:peek');
+                      setPeeking(true);
+                      setConfirmPeek(false);
+                    }}
+                  >
+                    Show me the key
+                  </button>
+                  <button type="button" className="btn btn--ghost" onClick={() => setConfirmPeek(false)}>Cancel</button>
+                </>
+              ) : (
+                <button type="button" className="btn btn--ghost" onClick={() => setConfirmPeek(true)}>
+                  Spymaster? Show the key
+                </button>
+              )}
+            </div>
+          )}
           <button className="btn btn--danger" type="button" onClick={onLeave}>Leave room</button>
         </aside>
 
@@ -210,33 +237,6 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
                 <button type="button" className="btn" onClick={() => socket.emit('spies:pass')}>End turn</button>
               </div>
             )}
-            {spoken && !ended && !amSpymaster && (
-              <div className="spyguess">
-                {peeking ? (
-                  <button type="button" className="btn" onClick={() => setPeeking(false)}>Hide the key</button>
-                ) : confirmPeek ? (
-                  <>
-                    <span className="settings__note">Only a spymaster should look. Sure?</span>
-                    <button
-                      type="button"
-                      className="btn btn--danger"
-                      onClick={() => {
-                        socket.emit('spies:peek');
-                        setPeeking(true);
-                        setConfirmPeek(false);
-                      }}
-                    >
-                      Show me the key
-                    </button>
-                    <button type="button" className="btn btn--ghost" onClick={() => setConfirmPeek(false)}>Cancel</button>
-                  </>
-                ) : (
-                  <button type="button" className="btn btn--ghost" onClick={() => setConfirmPeek(true)}>
-                    Spymaster? Show the key
-                  </button>
-                )}
-              </div>
-            )}
             {seesKey && !ended && !giving && (
               <p className="settings__note">You can see the key. Keep a straight face.</p>
             )}
@@ -251,7 +251,7 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
 
         <aside className="spies__side">
           <section className="card spylog">
-            <h2 className="card__title">Clues</h2>
+            <h2 className="card__title">{spoken ? 'Turns' : 'Clues'}</h2>
             {game.log.length === 0 ? (
               <p className="settings__note settings__note--left">No clues yet.</p>
             ) : (
@@ -272,7 +272,8 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
               </ol>
             )}
           </section>
-          <Chat />
+          {/* In person, everyone is in the same room: there is nobody to type to. */}
+          {!spoken && <Chat />}
         </aside>
       </div>
     </div>
