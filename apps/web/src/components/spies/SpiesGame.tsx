@@ -75,6 +75,9 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
     return `${guessing ? 'Your team is' : `${team} is`} guessing · ${left}`;
   })();
 
+  // What this player can do right now, shown at the top of the right column.
+  const hasControls = giving || guessing || (ended && isHost);
+
   const give = () => {
     if (typed && (!word.trim() || problem)) return;
     socket.emit('spies:clue', { word: typed ? word.trim() : null, count });
@@ -201,52 +204,54 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
             })}
           </div>
 
-          <footer className="spyctl">
-            {giving && (
-              <form
-                className="spyclue"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  give();
-                }}
-              >
-                {typed ? (
-                  <input
-                    className="field__input spyclue__word"
-                    value={word}
-                    maxLength={20}
-                    placeholder="One-word clue"
-                    autoFocus
-                    onChange={(e) => setWord(e.target.value)}
-                  />
-                ) : (
-                  <span className="spyclue__say">Say your clue out loud, then set the number:</span>
-                )}
-                <select className="spyclue__count" value={count} onChange={(e) => setCount(Number(e.target.value))}>
-                  {COUNTS.map((n) => <option key={n} value={n}>{countLabel(n)}</option>)}
-                </select>
-                <button type="submit" className="btn btn--primary" disabled={typed && (!word.trim() || !!problem)}>
-                  {typed ? 'Give clue' : 'Clue given'}
-                </button>
-                {problem && <span className="spyclue__problem">{problem}</span>}
-              </form>
-            )}
-            {guessing && (
-              <div className="spyguess">
-                <span className="settings__note">Tap a card to point at it; tap Reveal to turn it over.</span>
-                <button type="button" className="btn" onClick={() => socket.emit('spies:pass')}>End turn</button>
-              </div>
-            )}
-            {ended && isHost && (
-              <div className="spyguess">
-                <button type="button" className="btn btn--primary" onClick={() => socket.emit('spies:rematch')}>New board, same teams</button>
-                <button type="button" className="btn" onClick={() => socket.emit('spies:toLobby')}>Change teams</button>
-              </div>
-            )}
-          </footer>
         </main>
 
         <aside className="spies__side">
+          {hasControls && (
+            <section className="card spyctl">
+              {giving && (
+                <form
+                  className="spyclue"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    give();
+                  }}
+                >
+                  {typed ? (
+                    <input
+                      className="field__input spyclue__word"
+                      value={word}
+                      maxLength={20}
+                      placeholder="One-word clue"
+                      autoFocus
+                      onChange={(e) => setWord(e.target.value)}
+                    />
+                  ) : (
+                    <span className="spyclue__say">Say your clue out loud, then set the number:</span>
+                  )}
+                  <select className="spyclue__count" value={count} onChange={(e) => setCount(Number(e.target.value))}>
+                    {COUNTS.map((n) => <option key={n} value={n}>{countLabel(n)}</option>)}
+                  </select>
+                  <button type="submit" className="btn btn--primary" disabled={typed && (!word.trim() || !!problem)}>
+                    {typed ? 'Give clue' : 'Clue given'}
+                  </button>
+                  {problem && <span className="spyclue__problem">{problem}</span>}
+                </form>
+              )}
+              {guessing && (
+                <div className="spyguess">
+                  <span className="settings__note">Tap a card to point at it; tap Reveal to turn it over.</span>
+                  <button type="button" className="btn" onClick={() => socket.emit('spies:pass')}>End turn</button>
+                </div>
+              )}
+              {ended && isHost && (
+                <div className="spyguess">
+                  <button type="button" className="btn btn--primary" onClick={() => socket.emit('spies:rematch')}>New board, same teams</button>
+                  <button type="button" className="btn" onClick={() => socket.emit('spies:toLobby')}>Change teams</button>
+                </div>
+              )}
+            </section>
+          )}
           <section className="card spylog">
             <h2 className="card__title">{spoken ? 'Turns' : 'Clues'}</h2>
             {game.log.length === 0 ? (
