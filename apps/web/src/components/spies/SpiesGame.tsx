@@ -237,9 +237,6 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
                 <button type="button" className="btn" onClick={() => socket.emit('spies:pass')}>End turn</button>
               </div>
             )}
-            {seesKey && !ended && !giving && (
-              <p className="settings__note">You can see the key. Keep a straight face.</p>
-            )}
             {ended && isHost && (
               <div className="spyguess">
                 <button type="button" className="btn btn--primary" onClick={() => socket.emit('spies:rematch')}>New board, same teams</button>
