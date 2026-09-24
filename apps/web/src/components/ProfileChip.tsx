@@ -65,8 +65,7 @@ export function ProfileChip() {
       <button type="button" className="profile__chip" onClick={() => (open ? setOpen(false) : start())} aria-expanded={open}>
         <Avatar data={profile.avatar} size={26} />
         <span className="profile__name">{profile.name}</span>
-        <span className="profile__edit" aria-hidden="true">✎</span>
-        <span className="visually-hidden">Edit your name</span>
+        <span className="visually-hidden">(edit your name)</span>
       </button>
 
       {open && (

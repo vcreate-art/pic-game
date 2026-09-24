@@ -50,13 +50,12 @@ button, input { font: inherit; color: inherit; }
 
 .profile { position: relative; }
 .profile__chip {
-  display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px;
+  display: flex; align-items: center; gap: 8px; padding: 4px 14px 4px 4px;
   border: 1px solid var(--line); border-radius: 999px; background: var(--card);
   font-weight: 600; font-size: 13.5px; cursor: pointer;
 }
 .profile__chip:hover { border-color: var(--accent); }
 .profile__name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.profile__edit { color: var(--ink-soft); font-size: 13px; }
 .profile__pop {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 280px;
   display: flex; flex-direction: column; gap: 12px;
