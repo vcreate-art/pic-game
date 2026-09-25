@@ -1,5 +1,5 @@
 import {
-  SPIES_BOUNDS, SPIES_DEFAULTS, SPY_TEAMS, SPY_WORDS, UNLIMITED, clueProblem, deal, giveClue,
+  SPIES_BOUNDS, SPIES_DEFAULTS, SPY_TEAMS, SPY_WORDS, clueProblem, deal, giveClue,
   parseCustomWords, passTurn, remaining, reveal, validCount, type RoomState, type SpiesGame,
   type SpiesPhase, type SpiesPublic, type SpiesSettings, type SpiesTeamSeats, type SpyRole,
   type SpyTeam,
@@ -198,7 +198,6 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     this.game = deal(pool, Math.random);
     this.marks.clear();
     for (const t of SPY_TEAMS) if (this.teams[t].spymaster) this.sendKey(this.teams[t].spymaster!);
-    this.advance();
     this.startTimer();
     this.broadcast();
     this.systemMessage(`New game: ${this.game.starting} goes first.`);
@@ -206,7 +205,10 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
 
   clue(id: string, word: string | null, count: number): void {
     const g = this.game;
-    if (!g || g.phase !== 'clue' || this.teams[g.turn].spymaster !== id) return;
+    if (!g || g.phase !== 'clue') return;
+    // Spoken aloud, the clue's number is tapped in by whoever is at the table,
+    // like the cards; typed, only this team's spymaster may give it.
+    if (this.spoken ? !this.players.has(id) : this.teams[g.turn].spymaster !== id) return;
     if (!validCount(count)) return;
     let clueWord: string | null = null;
     if (this.settings.clueMode === 'typed') {
@@ -221,15 +223,6 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     this.marks.clear();
     this.startTimer();
     this.broadcast();
-  }
-
-  /**
-   * Spoken games have no clue step in the app: the clue is said out loud, so
-   * each turn goes straight to guessing, with no cap the app could know.
-   */
-  private advance(): void {
-    const g = this.game;
-    if (g && this.spoken && g.phase === 'clue') giveClue(g, null, UNLIMITED);
   }
 
   /** Who may touch the cards: the team's guessers, or at a real table anyone. */
@@ -266,7 +259,6 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     this.systemMessage(`${who} picked ${g.words[index]}: ${color === 'neutral' ? 'a bystander' : color === 'assassin' ? 'the assassin!' : `${color} agent`}.`);
     if (g.phase === 'ended') this.finish();
     else if (turnOver) {
-      this.advance();
       this.startTimer();
     }
     this.broadcast();
@@ -277,7 +269,6 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     if (!g) return;
     passTurn(g);
     this.marks.clear();
-    this.advance();
     this.startTimer();
     this.broadcast();
   }
@@ -312,7 +303,9 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     this.clearTimer();
     const g = this.game;
     if (!g || g.phase === 'ended') return;
-    const secs = g.phase === 'clue' ? this.settings.clueSeconds : this.settings.guessSeconds;
+    // Spoken games show one clock, "time per turn", and it starts once the
+    // number is tapped in; a clue clock set in a typed game must not linger.
+    const secs = g.phase === 'guess' ? this.settings.guessSeconds : this.spoken ? 0 : this.settings.clueSeconds;
     if (!secs) return;
     this.endsAt = Date.now() + secs * 1000;
     this.timer = setTimeout(() => {
@@ -321,7 +314,6 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
       this.systemMessage(`Time's up for ${this.game.turn}.`);
       passTurn(this.game);
       this.marks.clear();
-      this.advance();
       this.startTimer();
       this.broadcast();
     }, secs * 1000);

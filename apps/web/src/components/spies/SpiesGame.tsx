@@ -55,7 +55,8 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
   // of the team whose turn it is.
   const guessing = game.phase === 'guess' && (spoken || (myTurn && !amSpymaster));
   const seesKey = amSpymaster || (spoken && peeking && !!key);
-  const giving = game.phase === 'clue' && myTurn && amSpymaster;
+  // Spoken, anyone at the table taps in the number the spymaster said.
+  const giving = game.phase === 'clue' && (spoken || (myTurn && amSpymaster));
   const ended = game.phase === 'ended';
   // What each card is, as far as this screen may know: spymasters see the
   // whole key; everyone sees it at the end; guessers see only what is turned.
@@ -69,18 +70,18 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
   const status = (() => {
     const team = TEAM_NAME[game.turn];
     if (ended) return game.winner ? `${TEAM_NAME[game.winner]} wins${game.reason === 'assassin' ? ': the assassin was found' : ''}!` : 'Game over';
-    if (spoken) return `${team}'s turn: clue out loud, then tap the cards`;
+    if (spoken && game.phase === 'clue') return `${team}'s turn: say the clue, then tap its number`;
     if (game.phase === 'clue') return giving ? 'Your clue' : `${team} spymaster is thinking…`;
     const left = game.guessesLeft === UNLIMITED ? 'no limit' : `${game.guessesLeft} guess${game.guessesLeft === 1 ? '' : 'es'} left`;
-    return `${guessing ? 'Your team is' : `${team} is`} guessing · ${left}`;
+    return `${guessing && !spoken ? 'Your team is' : `${team} is`} guessing · ${left}`;
   })();
 
   // What this player can do right now, shown at the top of the right column.
   const hasControls = giving || guessing || (ended && isHost);
 
   const give = () => {
-    if (typed && (!word.trim() || problem)) return;
-    socket.emit('spies:clue', { word: typed ? word.trim() : null, count });
+    if (!word.trim() || problem) return;
+    socket.emit('spies:clue', { word: word.trim(), count });
   };
 
   return (
@@ -155,7 +156,7 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
         <main className="spies__main">
           <header className={`spybar spybar--${ended ? game.winner ?? 'none' : game.turn}`}>
             <span className="spybar__status">{status}</span>
-            {game.clue && !ended && !spoken && (
+            {game.clue && !ended && (
               <span className="spybar__clue">
                 {game.clue.word ?? 'Spoken clue'} <b>{countLabel(game.clue.count)}</b>
               </span>
@@ -209,7 +210,20 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
         <aside className="spies__side">
           {hasControls && (
             <section className="card spyctl">
-              {giving && (
+              {giving && spoken && (
+                <div className="spycount">
+                  <span className="spyclue__say">The spymaster said…</span>
+                  <div className="spycount__nums">
+                    {COUNTS.map((n) => (
+                      <button key={n} type="button" className="tool" onClick={() => socket.emit('spies:clue', { word: null, count: n })}>
+                        {countLabel(n)}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="settings__note settings__note--left">That many guesses plus one; 0 or ∞ for no limit.</span>
+                </div>
+              )}
+              {giving && !spoken && (
                 <form
                   className="spyclue"
                   onSubmit={(e) => {
@@ -217,23 +231,19 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
                     give();
                   }}
                 >
-                  {typed ? (
-                    <input
-                      className="field__input spyclue__word"
-                      value={word}
-                      maxLength={20}
-                      placeholder="One-word clue"
-                      autoFocus
-                      onChange={(e) => setWord(e.target.value)}
-                    />
-                  ) : (
-                    <span className="spyclue__say">Say your clue out loud, then set the number:</span>
-                  )}
+                  <input
+                    className="field__input spyclue__word"
+                    value={word}
+                    maxLength={20}
+                    placeholder="One-word clue"
+                    autoFocus
+                    onChange={(e) => setWord(e.target.value)}
+                  />
                   <select className="spyclue__count" value={count} onChange={(e) => setCount(Number(e.target.value))}>
                     {COUNTS.map((n) => <option key={n} value={n}>{countLabel(n)}</option>)}
                   </select>
-                  <button type="submit" className="btn btn--primary" disabled={typed && (!word.trim() || !!problem)}>
-                    {typed ? 'Give clue' : 'Clue given'}
+                  <button type="submit" className="btn btn--primary" disabled={!word.trim() || !!problem}>
+                    Give clue
                   </button>
                   {problem && <span className="spyclue__problem">{problem}</span>}
                 </form>
@@ -262,7 +272,7 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
                   <li key={game.log.length - i} className={`spylog__item spylog__item--${c.team}`}>
                     <span className="spylog__clue">
                       {c.word ?? `${TEAM_NAME[c.team]}'s turn`}
-                      {c.word && <b>{countLabel(c.count)}</b>}
+                      <b>{countLabel(c.count)}</b>
                     </span>
                     <span className="spylog__guesses">
                       {c.guesses.map((g, j) => (

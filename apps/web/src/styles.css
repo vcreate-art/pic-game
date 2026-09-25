@@ -1151,6 +1151,9 @@ button, input { font: inherit; color: inherit; }
 .spyclue .btn { flex: 1; }
 .spyclue__say { font-weight: 600; }
 .spyclue__problem { flex-basis: 100%; color: var(--warn); font-size: 13px; font-weight: 600; }
+.spycount { display: flex; flex-direction: column; gap: 8px; }
+.spycount__nums { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+.spycount__nums .tool { font-family: var(--display); font-weight: 700; font-size: 18px; min-height: 44px; }
 .spyguess { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
 .spyguess .settings__note { text-align: left; }
 
