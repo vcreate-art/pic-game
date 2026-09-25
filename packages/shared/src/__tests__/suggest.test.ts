@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   authorPoints, suggestionKey, tidySuggestion, validateSuggestion,
-  AUTHOR_FLOOR, maskOf, judge,
+  AUTHOR_FLOOR, maskOf, judge, WORDS_EN,
 } from '../index.js';
 
 describe('authorPoints', () => {
@@ -78,5 +78,18 @@ describe('validateSuggestion', () => {
     if (!r.ok) return;
     expect(maskOf(r.text)).toBe('_____-_____');
     expect(judge(r.text, r.text)).toBe('correct');
+  });
+});
+
+describe('the built-in word list', () => {
+  it('has no word twice, ignoring case and spacing', () => {
+    expect(new Set(WORDS_EN.map(suggestionKey)).size).toBe(WORDS_EN.length);
+  });
+
+  it('holds only words a player could have suggested and can guess', () => {
+    for (const word of WORDS_EN) {
+      expect(validateSuggestion(word), word).toMatchObject({ ok: true, text: word });
+      expect(judge(word, word), word).toBe('correct');
+    }
   });
 });

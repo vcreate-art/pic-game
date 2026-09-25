@@ -29,4 +29,16 @@ export const WORDS_EN: readonly string[] = [
   'xylophone',
   'yacht', 'yarn', 'yo-yo',
   'zebra', 'zipper', 'zombie',
+  // Harder: still drawable, but they take a scene, a detail or some acting out
+  // rather than one obvious shape.
+  'accordion', 'aquarium', 'avalanche', 'bagpipes', 'black hole', 'blindfold',
+  'bulldozer', 'catapult', 'chameleon', 'chandelier', 'constellation', 'dentist',
+  'earthquake', 'eclipse', 'escalator', 'ferris wheel', 'fire hydrant', 'gondola',
+  'hammock', 'hiccup', 'hopscotch', 'jack-in-the-box', 'lawn mower', 'lumberjack',
+  'magician', 'microscope', 'mirage', 'mummy', 'narwhal', 'origami', 'periscope',
+  'platypus', 'porcupine', 'quicksand', 'reflection', 'roller coaster', 'sandcastle',
+  'saxophone', 'scarecrow', 'shipwreck', 'skeleton', 'sleepwalking', 'snow globe',
+  'sphinx', 'stethoscope', 'sunburn', 'time machine', 'totem pole', 'traffic jam',
+  'trampoline', 'tug of war', 'tuxedo', 'vacuum cleaner', 'ventriloquist',
+  'wheelbarrow', 'wrecking ball',
 ];
