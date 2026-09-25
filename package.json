@@ -8,7 +8,8 @@
   ],
   "scripts": {
     "dev": "concurrently -n server,web -c cyan,magenta \"npm run dev -w @pic-game/server\" \"npm run dev -w @pic-game/web\"",
-    "build": "npm run build -w @pic-game/web && npm run build -w @pic-game/server",
+    "build": "npm run typecheck && npm run build -w @pic-game/web && npm run build -w @pic-game/server",
+    "start": "npm start -w @pic-game/server",
     "typecheck": "tsc -b --pretty",
     "test": "vitest run"
   },

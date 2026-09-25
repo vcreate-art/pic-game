@@ -6,8 +6,8 @@
   "main": "./dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "build": "node build.mjs",
+    "start": "NODE_ENV=production node --enable-source-maps dist/index.js"
   },
   "dependencies": {
     "@pic-game/shared": "*",
@@ -19,6 +19,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^22.13.1",
+    "esbuild": "^0.28.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }

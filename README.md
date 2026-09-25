@@ -33,12 +33,24 @@ opened, so it already points at the right host.
 In production nothing is inferred — set `CLIENT_ORIGIN` (comma-separated) to the
 origins you want to allow, or only same-origin requests get through.
 
+### Production
+
+```bash
+npm run build   # typecheck, then build the client and bundle the server
+npm start       # one process on $PORT (default 3001): the game, the API and the socket
+```
+
+The server serves `apps/web/dist` itself, so the page and its socket share one
+origin and `CLIENT_ORIGIN` is only needed for clients hosted somewhere else. The
+server bundle (`apps/server/build.mjs`, esbuild) inlines `@pic-game/shared`, which
+ships TypeScript source; everything else loads from `node_modules`.
+
 ## Stack
 
 | Layer | Choice |
 |---|---|
 | Transport | Socket.IO, typed both ends from one shared event map |
-| Server | Node + TypeScript + Express (Express only serves `/health` and two JSON routes) |
+| Server | Node + TypeScript + Express (Express serves `/health`, two JSON routes and, in production, the built client) |
 | Game state | In-memory `Map<code, Room>` — no database |
 | Frontend | React + Vite, TanStack Router, Zustand, TanStack Query for the two real fetches |
 | Monorepo | npm workspaces |

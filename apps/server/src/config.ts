@@ -13,17 +13,28 @@ const PRIVATE_ORIGIN =
   /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/;
 
 /**
- * A same-origin request (curl, health checks) sends no Origin header at all and
- * is always allowed; only cross-origin browser traffic is filtered.
+ * A request with no Origin header (curl, health checks) is always allowed, and so
+ * is one whose Origin names the host it was sent to — the page this server serves
+ * itself in production, whose socket POSTs and WebSocket upgrades do carry one.
+ * Only cross-origin browser traffic is filtered.
  *
  * In production nothing is inferred — set CLIENT_ORIGIN explicitly, or only
  * same-origin requests get through.
  */
-export function isAllowedOrigin(origin: string | undefined): boolean {
+export function isAllowedOrigin(origin: string | undefined, host?: string): boolean {
   if (!origin) return true;
+  if (host && originHost(origin) === host) return true;
   if (CONFIGURED_ORIGINS.includes(origin)) return true;
   if (IS_PROD) return false;
   return PRIVATE_ORIGIN.test(origin);
+}
+
+function originHost(origin: string): string | undefined {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return undefined;
+  }
 }
 
 // Phase timings live in @pic-game/shared so the client's countdown and the
