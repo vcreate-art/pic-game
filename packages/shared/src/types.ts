@@ -192,7 +192,8 @@ export type RoomState =
   | SkribblRoomState | KungFuRoomState | RealmsRoomState | FightRoomState | RaceRoomState
   | SpiesRoomState;
 
-export type ChatKind = 'chat' | 'system' | 'correct' | 'close' | 'secret';
+/** `divider` marks a new turn: the chat draws it as a rule, not a line of text. */
+export type ChatKind = 'chat' | 'system' | 'correct' | 'close' | 'secret' | 'divider';
 
 export interface ChatMessage {
   id: string;

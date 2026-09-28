@@ -378,6 +378,12 @@ button, input { font: inherit; color: inherit; }
 .msg--correct { background: #dcfce7; color: #15803d; font-weight: 600; }
 .msg--close { background: #fef3c7; color: #b45309; font-weight: 600; }
 .msg--secret { background: var(--accent-soft); color: var(--accent); }
+.msg--divider {
+  display: flex; align-items: center; gap: 8px; margin: 6px 0 2px;
+  color: var(--ink-soft); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.msg--divider::before, .msg--divider::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
+.msg--divider span { max-width: 75%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .chat__form { margin-top: 10px; }
 .chat__field { position: relative; display: flex; }

@@ -106,6 +106,9 @@ ok(`drawer received the secret word privately ("${word}")`);
 const turn = await waitFor(guessers[0], 'turn:drawing');
 if (!/[a-z]/i.test(turn.mask)) ok(`guessers see a blank mask ("${turn.mask}")`);
 else bad('mask contains letters', turn.mask);
+const divider = guessers[0].saw('chat:message').map(e => e.args[0]).find(m => m.kind === 'divider');
+if (divider && / is drawing$/.test(divider.text)) ok(`chat gets a turn divider ("${divider.text}")`);
+else bad('no turn divider in chat');
 
 // THE core invariant: scan every byte any guesser has received.
 const leakers = guessers.filter(g => g.blob().toLowerCase().includes(word.toLowerCase()));

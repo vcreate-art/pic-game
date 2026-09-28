@@ -53,7 +53,11 @@ export function Chat() {
     <section className="chat card">
       <h2 className="card__title">Chat</h2>
       <div className="chat__list" ref={listRef}>
-        {messages.map((m) => (
+        {messages.map((m) => m.kind === 'divider' ? (
+          <div key={m.id} className="msg--divider" role="separator">
+            <span>{m.text}</span>
+          </div>
+        ) : (
           <div key={m.id} className={`msg msg--${m.kind}`}>
             {m.kind === 'chat' && <strong className="msg__name">{m.name}</strong>}
             {m.kind === 'secret' && <strong className="msg__name">{m.name} (guessed)</strong>}

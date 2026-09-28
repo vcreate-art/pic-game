@@ -359,6 +359,8 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.hintsShown = 0;
     this.phase = 'drawing';
     this.endsAt = Date.now() + this.settings.drawTime * 1000;
+    // Before the secret goes out, so every guess of this turn lands below it.
+    this.broadcastChat({ kind: 'divider', text: `${this.players.get(playerId)?.name ?? 'Someone'} is drawing` });
 
     // The one place the word leaves this object, addressed to a single socket.
     this.emitTo(playerId, 'word:secret', { word });
