@@ -6,6 +6,7 @@ import { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
 import { RaceRoom } from '../games/race/RaceRoom.js';
 import { RealmsRoom } from '../games/realms/RealmsRoom.js';
 import { SpiesRoom } from '../games/spies/SpiesRoom.js';
+import { BingoRoom } from '../games/bingo/BingoRoom.js';
 import { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
 import type { BaseRoom, CorePlayer } from './BaseRoom.js';
 import { makeRoomCode } from './codes.js';
@@ -13,7 +14,7 @@ import { makeRoomCode } from './codes.js';
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 
 /** Any game's room. Callers narrow on `kind`. */
-export type AnyRoom = SkribblRoom | KungFuRoom | RealmsRoom | FightRoom | RaceRoom | SpiesRoom;
+export type AnyRoom = SkribblRoom | KungFuRoom | RealmsRoom | FightRoom | RaceRoom | SpiesRoom | BingoRoom;
 
 export class RoomManager {
   private readonly rooms = new Map<string, AnyRoom>();
@@ -34,7 +35,9 @@ export class RoomManager {
               ? new RaceRoom(code, this.io)
               : kind === 'spies'
                 ? new SpiesRoom(code, this.io)
-                : new SkribblRoom(code, this.io);
+                : kind === 'bingo'
+                  ? new BingoRoom(code, this.io)
+                  : new SkribblRoom(code, this.io);
     room.onEmpty = (r) => this.collect(r);
     this.rooms.set(code, room);
     return room;

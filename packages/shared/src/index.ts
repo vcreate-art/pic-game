@@ -15,3 +15,4 @@ export * from './realms/format.js';
 export * from './fight/index.js';
 export * from './race/index.js';
 export * from './spies/index.js';
+export * from './bingo/index.js';

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type {
-  CardColor, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
+  BingoCard, BingoPublic, BingoRoomState, CardColor, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
   RaceRoomState, SpiesPublic, SpiesRoomState, KungFuRoomState, Piece, Player,
   RealmsPublic, RealmsRoomState, RealmsSide, RoomSettings, RoomState, Side,
   SkribblRoomState, WordOption,
@@ -52,6 +52,8 @@ interface GameStore {
   realmsOwed: number;
   /** The Word Spies key. Only ever arrives on a spymaster's client. */
   spiesKey: CardColor[] | null;
+  /** Our own Bingo card. Nobody else's arrives until the game is over. */
+  bingoCard: BingoCard | null;
 
   setConnected: (c: boolean) => void;
   setMe: (id: string) => void;
@@ -78,6 +80,8 @@ interface GameStore {
   setRace: (game: RacePublic) => void;
   setSpies: (game: SpiesPublic) => void;
   setSpiesKey: (key: CardColor[] | null) => void;
+  setBingo: (game: BingoPublic) => void;
+  setBingoCard: (card: BingoCard | null) => void;
   setRealmsHand: (hand: CardInstance[], owed: number) => void;
   realmsOver: (winner: RealmsSide | null) => void;
   applyChessMove: (m: {
@@ -107,6 +111,7 @@ export const useGame = create<GameStore>((set) => ({
   realmsHand: [],
   realmsOwed: 0,
   spiesKey: null,
+  bingoCard: null,
 
   setConnected: (connected) => set({ connected }),
   setMe: (me) => set({ me }),
@@ -247,6 +252,10 @@ export const useGame = create<GameStore>((set) => ({
     ),
   setSpiesKey: (spiesKey) => set({ spiesKey }),
 
+  setBingo: (game) =>
+    set((s) => (s.room?.kind === 'bingo' ? { room: { ...s.room, game } } : {})),
+  setBingoCard: (bingoCard) => set({ bingoCard }),
+
   setRealmsHand: (realmsHand, realmsOwed) => set({ realmsHand, realmsOwed }),
 
   realmsOver: (winner) =>
@@ -284,7 +293,7 @@ export const useGame = create<GameStore>((set) => ({
       me: null, room: null, secret: null, choices: null, chooseEndsAt: null,
       suggest: null, mySuggestion: null, suggestError: null,
       messages: [], turnResult: null, final: null, notice: null, kickedBy: null,
-      realmsHand: [], realmsOwed: 0, spiesKey: null,
+      realmsHand: [], realmsOwed: 0, spiesKey: null, bingoCard: null,
     }),
 }));
 
@@ -309,6 +318,9 @@ export const selectRace = (s: GameStore): RaceRoomState | null =>
 
 export const selectSpies = (s: GameStore): SpiesRoomState | null =>
   s.room && s.room.kind === 'spies' ? s.room : null;
+
+export const selectBingo = (s: GameStore): BingoRoomState | null =>
+  s.room && s.room.kind === 'bingo' ? s.room : null;
 
 // kept here so components never reach into `ops` and re-render on strokes
 

@@ -222,6 +222,25 @@ cards and reveal them, and the assassin loses the game on the spot.
 - **Words**: the built-in list, the host's own pasted in, or both. Optional timers on
   giving a clue and on guessing; running out passes the turn.
 
+## Bingo
+
+Two games under one name, picked in the lobby.
+
+- **5×5, take turns** is the one played on paper. Everyone writes 1 to 25 on their own
+  grid, tapping squares in the order they like (or filling the rest at random). Then
+  players take turns calling a number and everyone crosses it off. Each full row, column
+  or diagonal strikes out a letter of B-I-N-G-O, and five lines wins. Finish on the same
+  call and you share it. An optional turn clock calls a random number for a slow player
+  rather than skipping them.
+- **Classic 75-ball** is the hall game: random cards (B 1-15 … O 61-75, free centre),
+  balls drawn every few seconds or by the host, and players daub their own cards and
+  shout BINGO on a line or a full card. Only called numbers can be daubed, and a BINGO
+  that isn't there locks the shouter out for three seconds. The host can hold the draw,
+  or have the app daub everyone's cards.
+- **Cards are private** until the game is over. A grid you filled in yourself is
+  strategy, so each card goes to its owner's socket alone. Line counts are public, as
+  they are at a table.
+
 ## Testing
 
 ```bash
@@ -230,6 +249,7 @@ node scripts/integration.mjs  # 25 checks against a running server
 node scripts/integration-fight.mjs  # the fighter: tick rate, inputs, pause and forfeit
 node scripts/integration-race.mjs   # the race: relay, cheat checks, scoring, the cup
 node scripts/integration-spies.mjs  # the spies: key secrecy, clues, reveals, timers
+node scripts/integration-bingo.mjs  # bingo: private grids, turns, shared wins, the draw, claims
 ```
 
 The integration suite connects three real socket clients and plays a turn, then

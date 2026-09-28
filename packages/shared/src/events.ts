@@ -12,6 +12,7 @@ import type {
 } from './fight/types.js';
 import type { DeathCause, Ghost, RaceEvent, RacePublic, RaceSettings } from './race/types.js';
 import type { CardColor, SpiesPublic, SpiesSettings, SpyRole, SpyTeam } from './spies/types.js';
+import type { BingoCard, BingoPublic, BingoSettings } from './bingo/types.js';
 
 export interface JoinOk {
   ok: true;
@@ -140,6 +141,24 @@ export interface ClientToServerEvents {
   'spies:rematch': () => void;
   'spies:toLobby': () => void;
 
+  // ---- Bingo ----
+  'bingo:settings': (p: Partial<BingoSettings>) => void;
+  /** Turns: your filled-in grid, 1 to 25 in your order. Null to go back to
+   *  editing it. */
+  'bingo:ready': (p: { card: number[] | null }) => void;
+  /** Host only: stop waiting for grids; anyone unfinished gets a random one. */
+  'bingo:begin': () => void;
+  /** Turns: the number you call on your go. */
+  'bingo:call': (p: { n: number }) => void;
+  /** Caller: daub, or un-daub, a square on your own card. */
+  'bingo:daub': (p: { index: number }) => void;
+  'bingo:claim': () => void;
+  /** Caller, host only: draw the next ball by hand, or hold and resume the draw. */
+  'bingo:next': () => void;
+  'bingo:pause': () => void;
+  'bingo:rematch': () => void;
+  'bingo:toLobby': () => void;
+
   /** Round-trip probe used to estimate clock offset against the server. */
   'time:ping': (cb: (serverNow: number) => void) => void;
 }
@@ -251,6 +270,11 @@ export interface ServerToClientEvents {
   'spies:state': (p: SpiesPublic) => void;
   /** The secret key. Sent to the two spymasters' sockets and nobody else. */
   'spies:key': (p: { key: CardColor[] }) => void;
+
+  // ---- Bingo ----
+  'bingo:state': (p: BingoPublic) => void;
+  /** Your own card. Sent to your socket alone; null when you have none. */
+  'bingo:card': (p: BingoCard | null) => void;
 
   'error': (p: { code: string; message: string }) => void;
 }

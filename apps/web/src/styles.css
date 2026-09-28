@@ -1201,3 +1201,195 @@ button, input { font: inherit; color: inherit; }
   .spylog__list { max-height: none; flex: 1; min-height: 0; }
   .spies__side .chat { height: auto; flex: 1; min-height: 0; }
 }
+
+/* ---------------------------------------------------------------- bingo */
+
+:root {
+  --bingo-B: #2563eb;
+  --bingo-I: #dc2626;
+  --bingo-N: #7c3aed;
+  --bingo-G: #16a34a;
+  --bingo-O: #d97706;
+  --bingo-daub: rgba(236, 72, 153, .72);
+  --bingo-cell: #fffdf7;
+}
+
+.bingolobby__row { grid-template-columns: 1fr auto; }
+.bingolobby__check { width: 20px; height: 20px; accent-color: var(--accent); }
+.bingolobby__wins { font-size: 11px; font-weight: 700; color: var(--accent); }
+
+.game--bingo { max-width: 1400px; }
+.bingo { display: grid; grid-template-columns: 240px minmax(0, 1fr) 300px; gap: 14px; align-items: start; }
+.bingo__people, .bingo__side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.bingo__people { align-self: stretch; }
+.bingo__people > .btn--danger { margin-top: auto; }
+.bingo__main { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
+.bingo__watch { margin: 0; text-align: center; color: var(--ink-soft); }
+
+.bplayers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bplayer {
+  display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600;
+  padding: 5px 8px; border-radius: 9px; background: var(--paper); border: 2px solid transparent;
+}
+.bplayer.is-me { background: var(--accent-soft); }
+.bplayer.is-turn { border-color: var(--accent); }
+.bplayer.is-winner { background: #fef3c7; border-color: var(--bingo-O); }
+.bplayer.is-away { opacity: .5; }
+.bplayer__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bplayer__letters { display: flex; gap: 1px; font-family: var(--display); font-size: 12px; }
+.bplayer__letters b { color: var(--line); font-weight: 800; }
+.bplayer__letters b.is-on { color: var(--accent); text-decoration: line-through; }
+.bplayer__lines { font-size: 11px; color: var(--ink-soft); }
+.bplayer__ready { font-size: 11px; color: var(--ink-soft); }
+.bplayer__ready.is-on { color: var(--ok); font-weight: 700; }
+.bplayer__wins {
+  font-size: 11px; font-weight: 800; min-width: 20px; height: 20px; border-radius: 6px;
+  display: grid; place-items: center; color: #fff; background: var(--bingo-O);
+}
+
+.bbar {
+  align-self: stretch; display: flex; align-items: center; gap: 12px; min-height: 58px;
+  padding: 10px 16px; border-radius: var(--radius); color: #fff; background: var(--ink); box-shadow: var(--shadow);
+}
+.bbar.is-mine { background: var(--accent); }
+.bbar.is-ended { background: linear-gradient(90deg, var(--bingo-B), var(--bingo-N), var(--bingo-I)); }
+.bbar__status { font-family: var(--display); font-weight: 700; font-size: 17px; flex: 1; }
+.bbar__last { font-size: 13px; opacity: .85; }
+.bbar__last b { font-family: var(--display); font-size: 22px; margin-left: 4px; }
+.bbar__time { font-family: var(--display); font-weight: 800; font-variant-numeric: tabular-nums; }
+.bbar__time.is-low { color: #fde68a; }
+
+/* A 75-ball number, as it comes out of the cage. */
+.bball {
+  --ball: var(--ink);
+  display: inline-grid; place-items: center; align-content: center; border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, #fff 0 52%, var(--ball) 53%);
+  color: var(--ink); box-shadow: 0 2px 6px rgba(0,0,0,.25); line-height: 1;
+  font-family: var(--display); font-weight: 800;
+}
+.bball--md { width: 52px; height: 52px; animation: bdrop .35s ease; }
+.bball--md .bball__letter { font-size: 11px; color: var(--ball); }
+.bball--md .bball__num { font-size: 20px; }
+.bball--B { --ball: var(--bingo-B); }
+.bball--I { --ball: var(--bingo-I); }
+.bball--N { --ball: var(--bingo-N); }
+.bball--G { --ball: var(--bingo-G); }
+.bball--O { --ball: var(--bingo-O); }
+@keyframes bdrop { from { transform: translateY(-14px) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.bplay { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; }
+.bcardwrap {
+  /* Sized to the window's height too, so the BINGO button stays in view. */
+  width: min(100%, 480px, max(300px, calc(100dvh - 340px))); padding: 14px; border-radius: 20px;
+  background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow);
+}
+.bletters { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 8px; }
+.bletters__l {
+  position: relative; text-align: center; font-family: var(--display); font-weight: 800; font-size: 30px;
+  line-height: 1.2; color: #fff; border-radius: 10px;
+}
+.bletters__l:nth-child(1) { background: var(--bingo-B); }
+.bletters__l:nth-child(2) { background: var(--bingo-I); }
+.bletters__l:nth-child(3) { background: var(--bingo-N); }
+.bletters__l:nth-child(4) { background: var(--bingo-G); }
+.bletters__l:nth-child(5) { background: var(--bingo-O); }
+/* A finished line strikes a letter through, like on paper. */
+.bletters__l.is-crossed::after {
+  content: ''; position: absolute; left: 10%; right: 10%; top: 50%; height: 4px; border-radius: 2px;
+  background: var(--ink); transform: rotate(-18deg); animation: bstrike .3s ease;
+}
+@keyframes bstrike { from { right: 90%; } to { right: 10%; } }
+
+.bgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.bcell {
+  position: relative; aspect-ratio: 1; padding: 0; border-radius: 12px; cursor: default;
+  display: grid; place-items: center; background: var(--bingo-cell);
+  border: 2px solid var(--line); box-shadow: 0 2px 0 var(--line);
+  transition: transform .1s ease, border-color .12s ease, background .2s ease;
+}
+.bcell__n { position: relative; z-index: 1; font-family: var(--display); font-weight: 800; font-size: clamp(16px, 3.4vw, 28px); color: var(--ink); }
+.bcell.is-empty { background: var(--paper); border-style: dashed; }
+.bcell.is-live { cursor: pointer; }
+.bcell.is-live:hover { transform: translateY(-2px); border-color: var(--accent); }
+.bcell.is-free .bcell__n { color: var(--bingo-O); }
+
+/* Turns: a called number is crossed off. */
+.bgrid--turns .bcell.is-marked { background: var(--paper); }
+.bgrid--turns .bcell.is-marked .bcell__n { color: var(--ink-soft); z-index: 2; }
+.bgrid--turns .bcell.is-marked::after {
+  content: ''; position: absolute; inset: 16%; border-radius: 3px; opacity: .45;
+  background: linear-gradient(45deg, transparent calc(50% - 2px), var(--warn) calc(50% - 2px) calc(50% + 2px), transparent calc(50% + 2px)),
+              linear-gradient(-45deg, transparent calc(50% - 2px), var(--warn) calc(50% - 2px) calc(50% + 2px), transparent calc(50% + 2px));
+}
+/* Caller: a daub is a splash of ink over the number. */
+.bgrid--caller .bcell.is-marked::after {
+  content: ''; position: absolute; inset: 12%; border-radius: 50%; background: var(--bingo-daub);
+  animation: bdaub .18s ease;
+}
+.bgrid--caller .bcell.is-marked .bcell__n { color: #fff; }
+@keyframes bdaub { from { transform: scale(.3); } to { transform: none; } }
+.bcell.is-lit { border-color: var(--bingo-O); background: #fef3c7; box-shadow: 0 2px 0 var(--bingo-O); }
+
+.bgrid--small { gap: 3px; }
+.bgrid--small .bcell { border-radius: 5px; border-width: 1px; box-shadow: none; }
+.bgrid--small .bcell__n { font-size: 11px; }
+/* Too small for a cross to leave the number readable: a tint instead. */
+.bgrid--small.bgrid--turns .bcell.is-marked::after { display: none; }
+.bgrid--small.bgrid--turns .bcell.is-marked { background: #fee2e2; }
+.bgrid--small.bgrid--turns .bcell.is-marked .bcell__n { color: var(--warn); }
+.bgrid--small .bcell.is-lit { background: #fde68a; }
+.bgrid--small .bcell.is-lit .bcell__n { color: var(--ink); }
+.bgrid--small .bcell.is-marked::after { inset: 18%; }
+
+.bshout {
+  width: min(100%, 480px, max(300px, calc(100dvh - 340px))); padding: 12px; border: none; border-radius: 18px; cursor: pointer;
+  font-family: var(--display); font-weight: 800; font-size: 32px; letter-spacing: .08em; color: #fff;
+  background: linear-gradient(90deg, var(--bingo-B), var(--bingo-I), var(--bingo-N), var(--bingo-G), var(--bingo-O));
+  box-shadow: 0 4px 0 rgba(0,0,0,.2), var(--shadow); transition: transform .08s ease;
+}
+.bshout:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.2); }
+
+.barrange { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 14px; width: 100%; }
+.barrange__ctl { display: flex; flex-direction: column; gap: 10px; width: 260px; }
+.barrange__next { margin: 0; font-weight: 600; }
+.barrange__next b { font-family: var(--display); font-size: 24px; color: var(--accent); }
+.barrange__row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.bcards { align-self: stretch; }
+.bcards__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.bcards__one { margin: 0; padding: 8px; border-radius: 12px; border: 2px solid transparent; }
+.bcards__one.is-winner { border-color: var(--bingo-O); background: #fffbeb; }
+.bcards__one figcaption { margin-top: 6px; text-align: center; font-size: 13px; font-weight: 700; }
+
+.bctl { display: flex; flex-direction: column; gap: 8px; }
+
+.bcalled__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.bcalled__list li {
+  min-width: 34px; height: 34px; padding: 0 6px; border-radius: 10px; display: grid; place-items: center;
+  font-family: var(--display); font-weight: 800; background: var(--paper);
+}
+.bcalled__list li.is-last { background: var(--accent); color: #fff; }
+
+.bboard { display: flex; flex-direction: column; gap: 3px; }
+.bboard__row { display: grid; grid-template-columns: 22px repeat(15, 1fr); gap: 2px; align-items: center; }
+.bboard__l {
+  font-family: var(--display); font-weight: 800; font-size: 13px; text-align: center;
+  color: #fff; background: var(--ball); border-radius: 5px;
+}
+.bboard__n {
+  font-size: 9px; font-weight: 700; text-align: center; line-height: 16px; border-radius: 3px;
+  color: #c4bfb2; font-variant-numeric: tabular-nums;
+}
+.bboard__n.is-on { color: var(--ink); background: var(--accent-soft); }
+.bboard__n.is-last { color: #fff; background: var(--accent); }
+
+@media (max-width: 1080px) {
+  .bingo { grid-template-columns: 1fr; }
+  .bingo__main { order: -1; }
+}
+@media (max-width: 560px) {
+  .bcardwrap { padding: 8px; }
+  .bgrid, .bletters { gap: 5px; }
+  .bletters__l { font-size: 22px; }
+}
+

@@ -12,6 +12,7 @@ import type { FightRoom } from '../games/fight/FightRoom.js';
 import type { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
 import type { RaceRoom } from '../games/race/RaceRoom.js';
 import type { SpiesRoom } from '../games/spies/SpiesRoom.js';
+import type { BingoRoom } from '../games/bingo/BingoRoom.js';
 import type { RealmsRoom } from '../games/realms/RealmsRoom.js';
 import type { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
 import { TokenBucket } from '../rateLimit.js';
@@ -91,6 +92,8 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.room?.kind === 'race' && s.playerId ? s.room : null;
     const spies = (): SpiesRoom | null =>
       s.room?.kind === 'spies' && s.playerId ? s.room : null;
+    const bingo = (): BingoRoom | null =>
+      s.room?.kind === 'bingo' && s.playerId ? s.room : null;
 
     socket.on('time:ping', (cb) => {
       if (typeof cb === 'function') cb(Date.now());
@@ -531,6 +534,66 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
 
     socket.on('spies:toLobby', () => {
       const room = spies();
+      if (room && s.playerId) room.toLobby(s.playerId);
+    });
+
+    socket.on('bingo:settings', (p) => {
+      const room = bingo();
+      if (room && s.playerId) room.updateSettings(s.playerId, p ?? {});
+    });
+
+    socket.on('bingo:ready', (p) => {
+      const room = bingo();
+      if (!room || !s.playerId || !s.chat.tryTake()) return;
+      // The room checks it is a proper grid; here only that it is small.
+      const card = p?.card;
+      if (card !== null && (!Array.isArray(card) || card.length > 25)) return;
+      room.ready(s.playerId, card);
+    });
+
+    socket.on('bingo:begin', () => {
+      const room = bingo();
+      if (room && s.playerId) room.begin(s.playerId);
+    });
+
+    socket.on('bingo:call', (p) => {
+      const room = bingo();
+      const n = Number(p?.n);
+      if (!room || !s.playerId || !Number.isInteger(n)) return;
+      room.call(s.playerId, n);
+    });
+
+    socket.on('bingo:daub', (p) => {
+      const room = bingo();
+      const i = Number(p?.index);
+      // Daubing is quick work when the balls come fast: the drawing bucket.
+      if (!room || !s.playerId || !Number.isInteger(i) || !s.draw.tryTake()) return;
+      room.daubCard(s.playerId, i);
+    });
+
+    socket.on('bingo:claim', () => {
+      const room = bingo();
+      if (room && s.playerId && s.chat.tryTake()) room.shout(s.playerId);
+    });
+
+    // Host only, and there are only 75 balls: no bucket needed.
+    socket.on('bingo:next', () => {
+      const room = bingo();
+      if (room && s.playerId) room.next(s.playerId);
+    });
+
+    socket.on('bingo:pause', () => {
+      const room = bingo();
+      if (room && s.playerId) room.pause(s.playerId);
+    });
+
+    socket.on('bingo:rematch', () => {
+      const room = bingo();
+      if (room && s.playerId) room.rematch(s.playerId);
+    });
+
+    socket.on('bingo:toLobby', () => {
+      const room = bingo();
       if (room && s.playerId) room.toLobby(s.playerId);
     });
 

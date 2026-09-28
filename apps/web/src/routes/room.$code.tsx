@@ -6,6 +6,7 @@ import { FightGame } from '../components/fight/FightGame.js';
 import { KungFuGame } from '../components/kungfu/KungFuGame.js';
 import { RaceGame } from '../components/race/RaceGame.js';
 import { SpiesGame } from '../components/spies/SpiesGame.js';
+import { BingoGame } from '../components/bingo/BingoGame.js';
 import { Lobby } from '../components/Lobby.js';
 import { RealmsGame } from '../components/realms/RealmsGame.js';
 import { SkribblGame } from '../components/skribbl/SkribblGame.js';
@@ -137,6 +138,8 @@ function RoomPage() {
   if (room.kind === 'race') return <RaceGame onLeave={leave} />;
 
   if (room.kind === 'spies') return <SpiesGame onLeave={leave} />;
+
+  if (room.kind === 'bingo') return <BingoGame onLeave={leave} />;
 
   if (phase === 'lobby') {
     return (

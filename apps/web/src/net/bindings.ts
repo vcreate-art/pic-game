@@ -94,6 +94,10 @@ export function bindSocket(engine: CanvasEngine): () => void {
   socket.on('spies:state', (game) => g().setSpies(game));
   socket.on('spies:key', ({ key }) => g().setSpiesKey(key));
 
+  // --- bingo ---
+  socket.on('bingo:state', (game) => g().setBingo(game));
+  socket.on('bingo:card', (card) => g().setBingoCard(card));
+
   socket.on('chat:message', (m) => g().pushMessage(m));
   socket.on('guess:correct', ({ playerId }) => g().markGuessed(playerId));
 
@@ -120,6 +124,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
       'fight:state', 'fight:frame', 'fight:events',
       'race:state', 'race:ghosts', 'race:events',
       'spies:state', 'spies:key',
+      'bingo:state', 'bingo:card',
     ] as const) {
       socket.off(ev);
     }
