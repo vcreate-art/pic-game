@@ -268,6 +268,14 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.room.handleChat(s.playerId, p.text);
     });
 
+    socket.on('draw:react', (p) => {
+      const room = skribbl();
+      if (!room || !s.playerId || !s.chat.tryTake()) return;
+      const vote = p?.vote;
+      if (vote !== null && vote !== 'like' && vote !== 'dislike') return;
+      room.react(s.playerId, vote);
+    });
+
     socket.on('player:rename', (p) => {
       if (!s.room || !s.playerId || !s.chat.tryTake()) return;
       const name = cleanName(p?.name);

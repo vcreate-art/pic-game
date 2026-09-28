@@ -116,6 +116,11 @@ export class CanvasEngine {
     return this.ops;
   }
 
+  /** The picture as a PNG, at the full logical size whatever the screen. */
+  toDataURL(): string {
+    return this.off.toDataURL('image/png');
+  }
+
   // ---------------------------------------------------------------- strokes
 
   startStroke(op: StrokeOp): void {

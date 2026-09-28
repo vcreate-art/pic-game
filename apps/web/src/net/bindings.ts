@@ -48,7 +48,8 @@ export function bindSocket(engine: CanvasEngine): () => void {
   socket.on('turn:drawing', (turn) => g().beginDrawing(turn));
   socket.on('hint:reveal', ({ index, char }) => g().reveal(index, char));
   socket.on('turn:end', (r) => g().endTurn(r));
-  socket.on('game:end', ({ players }) => g().endGame(players));
+  socket.on('game:end', ({ players, gallery }) => g().endGame(players, gallery));
+  socket.on('draw:reactions', (r) => g().setReactions(r));
 
   // --- canvas: engine only, deliberately bypassing React ---
   socket.on('draw:start', (op) => engine.startStroke({ kind: 'stroke', ...op }));
@@ -116,7 +117,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
     for (const ev of [
       'state:sync', 'player:joined', 'player:updated', 'player:left',
       'room:settings', 'host:changed', 'kicked', 'turn:choosing', 'word:secret', 'suggest:state',
-      'turn:drawing', 'hint:reveal', 'turn:end', 'game:end',
+      'turn:drawing', 'hint:reveal', 'turn:end', 'game:end', 'draw:reactions',
       'draw:start', 'draw:append', 'draw:end', 'draw:fill',
       'canvas:undone', 'canvas:cleared', 'chat:message', 'guess:correct', 'error',
       'chess:state', 'chess:moved', 'chess:over', 'chess:rejected',

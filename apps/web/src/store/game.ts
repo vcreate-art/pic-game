@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type {
-  BingoCard, BingoPublic, BingoRoomState, CardColor, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
+  BingoCard, BingoPublic, BingoRoomState, CardColor, Drawing, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
   RaceRoomState, SpiesPublic, SpiesRoomState, KungFuRoomState, Piece, Player,
   RealmsPublic, RealmsRoomState, RealmsSide, RoomSettings, RoomState, Side,
   SkribblRoomState, WordOption,
@@ -54,6 +54,10 @@ interface GameStore {
   spiesKey: CardColor[] | null;
   /** Our own Bingo card. Nobody else's arrives until the game is over. */
   bingoCard: BingoCard | null;
+  /** Draw & Guess: the last game's drawings. Outlives the podium, so the
+   *  gallery stays open when the room drops back to the lobby. */
+  gallery: Drawing[] | null;
+  galleryOpen: boolean;
 
   setConnected: (c: boolean) => void;
   setMe: (id: string) => void;
@@ -71,7 +75,9 @@ interface GameStore {
   reveal: (index: number, char: string) => void;
   markGuessed: (playerId: string) => void;
   endTurn: (r: TurnResult) => void;
-  endGame: (players: Player[]) => void;
+  endGame: (players: Player[], gallery: Drawing[]) => void;
+  setReactions: (r: { likes: string[]; dislikes: string[] }) => void;
+  setGalleryOpen: (open: boolean) => void;
   pushMessage: (m: ChatMessage) => void;
   setNotice: (n: string | null) => void;
   setChess: (game: KungFuPublic) => void;
@@ -112,11 +118,19 @@ export const useGame = create<GameStore>((set) => ({
   realmsOwed: 0,
   spiesKey: null,
   bingoCard: null,
+  gallery: null,
+  galleryOpen: false,
 
   setConnected: (connected) => set({ connected }),
   setMe: (me) => set({ me }),
 
-  sync: (room) => set({ room, turnResult: null }),
+  sync: (room) =>
+    set({
+      room,
+      turnResult: null,
+      // A podium snapshot carries the gallery; any other state keeps the one we have.
+      ...(room.kind === 'skribbl' && room.gallery.length ? { gallery: room.gallery } : {}),
+    }),
 
   patchPlayer: (p) =>
     set((s) =>
@@ -164,6 +178,8 @@ export const useGame = create<GameStore>((set) => ({
               revealed: {},
               endsAt: p.endsAt,
               guessed: [],
+              likes: [],
+              dislikes: [],
             },
             ops: [],
           }
@@ -218,12 +234,22 @@ export const useGame = create<GameStore>((set) => ({
         : s.room,
     })),
 
-  endGame: (final) =>
+  endGame: (final, gallery) =>
     set((s) => ({
       final,
+      gallery,
       turnResult: null,
       room: s.room?.kind === 'skribbl' ? { ...s.room, phase: 'gameEnd', players: final } : s.room,
     })),
+
+  setReactions: ({ likes, dislikes }) =>
+    set((s) =>
+      s.room?.kind === 'skribbl' && s.room.turn
+        ? { room: { ...s.room, turn: { ...s.room.turn, likes, dislikes } } }
+        : {},
+    ),
+
+  setGalleryOpen: (galleryOpen) => set({ galleryOpen }),
 
   pushMessage: (m) =>
     set((s) => ({ messages: [...s.messages, m].slice(-MAX_MESSAGES) })),
@@ -293,7 +319,7 @@ export const useGame = create<GameStore>((set) => ({
       me: null, room: null, secret: null, choices: null, chooseEndsAt: null,
       suggest: null, mySuggestion: null, suggestError: null,
       messages: [], turnResult: null, final: null, notice: null, kickedBy: null,
-      realmsHand: [], realmsOwed: 0, spiesKey: null, bingoCard: null,
+      realmsHand: [], realmsOwed: 0, spiesKey: null, bingoCard: null, gallery: null, galleryOpen: false,
     }),
 }));
 

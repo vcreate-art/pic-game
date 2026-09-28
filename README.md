@@ -222,6 +222,19 @@ cards and reveal them, and the assassin loses the game on the spot.
 - **Words**: the built-in list, the host's own pasted in, or both. Optional timers on
   giving a clue and on guessing; running out passes the turn.
 
+## Draw & Guess: reactions and the gallery
+
+- **Thumbs up or down** on the drawing in progress, from the game header. One vote
+  each, and tapping your thumb again takes it back. You can't vote on your own
+  drawing, and votes stay open while the word is shown after the turn.
+- **The gallery.** At the end of the game, "See all drawings" shows every picture
+  with its word, artist and votes, with the most liked marked as the crowd
+  favourite. Each one downloads as an 800×600 PNG. The server keeps the strokes of
+  each finished turn and sends them with `game:end`, and the browser replays them
+  into images, so late arrivals at the podium get every drawing too. The gallery
+  stays reachable from the lobby after the podium times out, until the next game
+  starts. Turns where nothing was drawn are left out.
+
 ## Bingo
 
 Two games under one name, picked in the lobby.
@@ -250,6 +263,7 @@ node scripts/integration-fight.mjs  # the fighter: tick rate, inputs, pause and 
 node scripts/integration-race.mjs   # the race: relay, cheat checks, scoring, the cup
 node scripts/integration-spies.mjs  # the spies: key secrecy, clues, reveals, timers
 node scripts/integration-bingo.mjs  # bingo: private grids, turns, shared wins, the draw, claims
+node scripts/integration-gallery.mjs  # drawing reactions and the end-of-game gallery
 ```
 
 The integration suite connects three real socket clients and plays a turn, then

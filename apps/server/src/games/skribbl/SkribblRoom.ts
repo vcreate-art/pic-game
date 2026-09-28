@@ -3,9 +3,9 @@ import {
   DEFAULT_SETTINGS, SETTINGS_BOUNDS, WORD_MODES,
   authorPoints, drawerPoints, guessPoints, judge, maskOf, pickHintPositions,
   suggestionKey, validateSuggestion,
-  type CanvasOp, type ChatMessage, type Phase, type Player,
+  type CanvasOp, type ChatMessage, type Drawing, type Phase, type Player,
   type RoomSettings, type RoomState, type SuggestAck, type TurnPublic,
-  type WordOption,
+  type Vote, type WordOption,
 } from '@pic-game/shared';
 import {
   CHOOSE_SECONDS, GAME_END_SECONDS, MAX_CHAT_LEN, MAX_OPS_PER_TURN,
@@ -57,6 +57,16 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   private usedWords = new Set<string>();
   private deltas: Record<string, number> = {};
   private openStrokes = new Set<string>();
+  /** Thumbs on the current drawing. A fresh object each turn rather than
+   *  cleared, because the finished drawing in the gallery keeps holding it:
+   *  people can still react while the word is shown after the turn. */
+  private reactions = { likes: new Set<string>(), dislikes: new Set<string>() };
+  /** This game's drawings, in the order they were made. Kept after the game so
+   *  the podium can show them; cleared when the next game starts. */
+  private gallery: {
+    id: string; round: number; drawerId: string; drawerName: string; word: string;
+    ops: CanvasOp[]; reactions: { likes: Set<string>; dislikes: Set<string> };
+  }[] = [];
 
   private phaseTimer: ReturnType<typeof setTimeout> | null = null;
   private hintTimer: ReturnType<typeof setInterval> | null = null;
@@ -153,6 +163,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     }
     for (const p of this.players.values()) p.score = 0;
     this.usedWords.clear();
+    this.gallery = [];
     this.round = 1;
     this.turnIndex = 0;
     this.order = [...this.players.keys()];
@@ -418,6 +429,19 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
       }
     }
 
+    // A turn that ended before anything was drawn leaves nothing to keep.
+    if (word && this.drawerId && this.ops.length > 0) {
+      this.gallery.push({
+        id: randomUUID(),
+        round: this.round,
+        drawerId: this.drawerId,
+        drawerName: this.players.get(this.drawerId)?.name ?? 'Someone',
+        word,
+        ops: this.ops,
+        reactions: this.reactions,
+      });
+    }
+
     this.phase = 'turnEnd';
     this.io.to(this.code).emit('turn:end', {
       word,
@@ -451,7 +475,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   private endGame(): void {
     this.clearTimers();
     this.phase = 'gameEnd';
-    this.io.to(this.code).emit('game:end', { players: this.publicPlayers() });
+    this.io.to(this.code).emit('game:end', { players: this.publicPlayers(), gallery: this.galleryPublic() });
     this.phaseTimer = setTimeout(() => this.abortToLobby(), GAME_END_SECONDS * 1000);
   }
 
@@ -479,6 +503,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.deltas = {};
     this.picking = false;
     this.openStrokes.clear();
+    this.reactions = { likes: new Set(), dislikes: new Set() };
     for (const p of this.players.values()) {
       p.guessedAt = null;
       p.placement = null;
@@ -551,6 +576,32 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.ops = [];
     this.openStrokes.clear();
     this.io.to(this.code).emit('canvas:cleared');
+  }
+
+  // ------------------------------------------------------------------ reactions
+
+  /**
+   * A thumbs up or down on the drawing everyone is looking at: while it is
+   * being drawn, and while the word is shown after. One vote each, which a
+   * second tap on the same thumb takes back. Not the drawer's own.
+   */
+  react(playerId: string, vote: Vote | null): void {
+    if (this.phase !== 'drawing' && this.phase !== 'turnEnd') return;
+    if (!this.drawerId || playerId === this.drawerId || !this.players.has(playerId)) return;
+    const { likes, dislikes } = this.reactions;
+    likes.delete(playerId);
+    dislikes.delete(playerId);
+    if (vote === 'like') likes.add(playerId);
+    if (vote === 'dislike') dislikes.add(playerId);
+    this.io.to(this.code).emit('draw:reactions', { likes: [...likes], dislikes: [...dislikes] });
+  }
+
+  private galleryPublic(): Drawing[] {
+    return this.gallery.map(({ reactions, ...d }) => ({
+      ...d,
+      likes: [...reactions.likes],
+      dislikes: [...reactions.dislikes],
+    }));
   }
 
   // ------------------------------------------------------------------ chat & guessing
@@ -669,6 +720,8 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
       revealed: { ...this.revealed },
       endsAt: this.endsAt,
       guessed: [...this.players.values()].filter((p) => p.guessedAt !== null).map((p) => p.id),
+      likes: [...this.reactions.likes],
+      dislikes: [...this.reactions.dislikes],
     };
   }
 
@@ -685,6 +738,9 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
       round: this.round,
       turn: this.turnPublic(),
       ops: this.ops,
+      // Only at the podium: sent to everyone in `game:end` already, and heavy
+      // enough that every join in the lobby should not carry it.
+      gallery: this.phase === 'gameEnd' ? this.galleryPublic() : [],
       serverTime: Date.now(),
     };
   }

@@ -1,7 +1,9 @@
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
 import { selectIsDrawer, selectSkribbl, useGame } from '../../store/game.js';
 import { Chat } from '../Chat.js';
+import { Gallery } from '../Gallery.js';
 import { Podium } from '../Podium.js';
+import { Reactions } from '../Reactions.js';
 import { Scoreboard } from '../Scoreboard.js';
 import { Timer } from '../Timer.js';
 import { Toolbar } from '../Toolbar.js';
@@ -26,6 +28,7 @@ export function SkribblGame({ onLeave }: { onLeave: () => void }) {
           <span className="game__round">
             Round {room.round}/{room.settings.rounds}
           </span>
+          <Reactions />
         </div>
         <WordMask />
         <div className="game__head-side game__head-side--end">
@@ -53,6 +56,7 @@ export function SkribblGame({ onLeave }: { onLeave: () => void }) {
 
         <Chat />
       </div>
+      <Gallery />
     </div>
   );
 }

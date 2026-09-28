@@ -119,6 +119,24 @@ export interface TurnPublic {
   endsAt: number;
   /** player ids who have already guessed correctly */
   guessed: string[];
+  /** Who has given this drawing a thumbs up, or down. */
+  likes: string[];
+  dislikes: string[];
+}
+
+export type Vote = 'like' | 'dislike';
+
+/** One finished turn's picture, kept for the gallery at the end of the game. */
+export interface Drawing {
+  id: string;
+  round: number;
+  drawerId: string;
+  /** Kept with the drawing, so it still has a name if the drawer has left. */
+  drawerName: string;
+  word: string;
+  ops: CanvasOp[];
+  likes: string[];
+  dislikes: string[];
 }
 
 /** Which game a room is playing. Fixed when the room is created. */
@@ -158,6 +176,8 @@ export interface SkribblRoomState extends RoomStateBase {
   turn: TurnPublic | null;
   /** full canvas history, so a late joiner replays the drawing exactly */
   ops: CanvasOp[];
+  /** Every drawing of the game just played. Only filled in at `gameEnd`. */
+  gallery: Drawing[];
 }
 
 export interface KungFuRoomState extends RoomStateBase {

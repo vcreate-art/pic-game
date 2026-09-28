@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { getSocket } from '../net/socket.js';
 import { selectIsHost, selectSkribbl, useGame } from '../store/game.js';
 import { Avatar } from './Avatar.js';
+import { GalleryButton } from './Gallery.js';
 import { InviteCard } from './InviteCard.js';
 import { KickButton } from './KickButton.js';
 import { Settings } from './Settings.js';
@@ -34,6 +35,8 @@ export function Lobby() {
             </li>
           ))}
         </ul>
+        {/* The last game's drawings stay to hand after the podium times out. */}
+        <GalleryButton className="btn btn--ghost lobby__gallery" />
       </div>
 
       <div className="lobby__settings card">

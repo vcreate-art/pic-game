@@ -8,6 +8,7 @@ import { RaceGame } from '../components/race/RaceGame.js';
 import { SpiesGame } from '../components/spies/SpiesGame.js';
 import { BingoGame } from '../components/bingo/BingoGame.js';
 import { Lobby } from '../components/Lobby.js';
+import { Gallery } from '../components/Gallery.js';
 import { RealmsGame } from '../components/realms/RealmsGame.js';
 import { SkribblGame } from '../components/skribbl/SkribblGame.js';
 import { bindSocket } from '../net/bindings.js';
@@ -145,6 +146,7 @@ function RoomPage() {
     return (
       <div className="lobbyscreen">
         <Lobby />
+        <Gallery />
         <div className="leavebar">
           <button className="btn btn--danger" type="button" onClick={leave}>
             Leave room

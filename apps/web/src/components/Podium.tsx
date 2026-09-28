@@ -1,6 +1,7 @@
 import { getSocket } from '../net/socket.js';
 import { selectIsHost, useGame } from '../store/game.js';
 import { Avatar } from './Avatar.js';
+import { GalleryButton } from './Gallery.js';
 
 export function Podium() {
   const final = useGame((s) => s.final);
@@ -39,6 +40,8 @@ export function Podium() {
             </li>
           ))}
         </ol>
+
+        <GalleryButton />
 
         {isHost ? (
           <button className="btn btn--primary" type="button" onClick={() => socket.emit('game:start')}>

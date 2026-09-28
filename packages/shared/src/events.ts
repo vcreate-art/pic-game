@@ -1,6 +1,6 @@
 import type {
-  Avatar, CanvasOp, ChatMessage, GameKind, PenTool, Player,
-  RoomSettings, RoomState, TurnPublic, WordOption,
+  Avatar, CanvasOp, ChatMessage, Drawing, GameKind, PenTool, Player,
+  RoomSettings, RoomState, TurnPublic, Vote, WordOption,
 } from './types.js';
 import type { KungFuPublic, KungFuSettings, Piece, Side, Square } from './kungfu/types.js';
 import type {
@@ -72,6 +72,8 @@ export interface ClientToServerEvents {
   'canvas:clear': () => void;
 
   'chat:guess': (p: { text: string }) => void;
+  /** Thumbs up or down on the drawing in front of everyone; null takes it back. */
+  'draw:react': (p: { vote: Vote | null }) => void;
 
   // ---- Kung Fu Chess ----
   /** Claim or release a side. The host starts the game once both are taken. */
@@ -206,7 +208,9 @@ export interface ServerToClientEvents {
     /** Who suggested the word, revealed only now that the turn is over. */
     authorId?: string;
   }) => void;
-  'game:end': (p: { players: Player[] }) => void;
+  'game:end': (p: { players: Player[]; gallery: Drawing[] }) => void;
+  /** The current drawing's reactions, whenever they change. */
+  'draw:reactions': (p: { likes: string[]; dislikes: string[] }) => void;
 
   'draw:start': (p: DrawStart & { by: string }) => void;
   'draw:append': (p: { id: string; pts: number[] }) => void;
