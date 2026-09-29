@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   CLUE_GROUPS, HEXES, SEAT_COLORS, allClues, clueMask, clueText, hasHex, hexLabel,
   type CryptidAction, type CryptidBoard, type CryptidPublic,
@@ -81,7 +81,13 @@ export function CryptidGame({ onLeave }: { onLeave: () => void }) {
   const myTurn = game.turn === me;
   const ended = game.phase === 'ended';
   const last = game.log.at(-1) ?? null;
-  const focus = hover ?? (last && last.kind !== 'skip' ? last.hex : null);
+  // A penalty cube is the end of the move that earned it: show them together.
+  const prev = game.log.at(-2) ?? null;
+  const cause = last?.kind === 'cube' && last.why !== 'setup' && prev && prev.by === last.by
+    && (prev.kind === 'question' || prev.kind === 'search') ? prev : null;
+  const lastRing = last && last.kind !== 'skip'
+    ? { hexes: cause ? [cause.hex, last.hex] : [last.hex], color: colorOf(last.by), key: game.log.length }
+    : null;
 
   const status = (() => {
     if (ended) return game.winner === me ? 'You found it!' : `${name(game.winner)} found the creature!`;
@@ -158,7 +164,7 @@ export function CryptidGame({ onLeave }: { onLeave: () => void }) {
               <p className="cclue__text">{clueText(myClue)}</p>
               <label className="cclue__shade">
                 <input type="checkbox" checked={shadeOn} onChange={(e) => setShadeOn(e.target.checked)} />
-                Shade where it rules the creature out
+                Fade out the spaces it rules out
               </label>
               {!ended && <p className="settings__note settings__note--left">Keep it to yourself.</p>}
             </section>
@@ -172,10 +178,25 @@ export function CryptidGame({ onLeave }: { onLeave: () => void }) {
         </aside>
 
         <main className="cryptid__main">
-          <header className={`cbar ${ended ? 'is-ended' : myTurn ? 'is-mine' : ''} ${game.phase === 'penalty' && myTurn ? 'is-penalty' : ''}`}>
+          {/* Keyed on whose go it is, so the bar flashes each time the turn moves. */}
+          <header
+            key={`${game.turn}-${game.phase}`}
+            className={`cbar ${ended ? 'is-ended' : myTurn ? 'is-mine' : ''} ${game.phase === 'penalty' && myTurn ? 'is-penalty' : ''}`}
+          >
+            {!ended && game.turn && <span className="cbar__seat" style={{ background: colorOf(game.turn) }} />}
             <span className="cbar__status">{status}</span>
+            {!ended && (
+              <ol className="ctrack" aria-label="Turn order">
+                {game.players.filter((id) => !(id in game.departed)).map((id) => (
+                  <li key={id} className={game.turn === id ? 'is-on' : ''} style={{ '--seat': colorOf(id) } as CSSProperties}>
+                    <span className="ctrack__dot" />
+                    <span className="ctrack__name">{id === me ? 'You' : name(id)}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
           </header>
-          {last && <LastMove action={last} name={name} colorOf={colorOf} />}
+          {last && <LastMove key={game.log.length} action={last} cause={cause} name={name} me={me} colorOf={colorOf} />}
 
           <div className="cmapwrap">
             <HexMap
@@ -185,14 +206,15 @@ export function CryptidGame({ onLeave }: { onLeave: () => void }) {
               disks={game.disks}
               cubes={game.cubes}
               selected={selected}
-              focus={focus}
+              focus={hover}
+              last={lastRing}
               shade={shade}
               answer={game.answer}
               onPick={ended ? undefined : (h) => setSelected((s) => (s === h ? null : h))}
               onHover={setHover}
             />
           </div>
-          <Legend />
+          <Legend advanced={game.settings.advanced} />
         </main>
 
         <aside className="cryptid__side">
@@ -401,37 +423,103 @@ function actionText(a: CryptidAction, name: (id: string) => string): string {
   }
 }
 
-/** The banner under the status: the move just made, with each answer. */
-function LastMove({ action, name, colorOf }: {
+/** A player, as the banner names them: their seat colour, then their name. */
+function Who({ id, name, me, colorOf }: { id: string; name: (id: string) => string; me: string; colorOf: (id: string) => string }) {
+  return (
+    <span className="cwho">
+      <span className="cplayer__seat" style={{ background: colorOf(id) }} />
+      <b>{id === me ? 'You' : name(id)}</b>
+    </span>
+  );
+}
+
+/**
+ * The banner under the status: the move just made, as a sentence with the
+ * answer set apart in green or red. Keyed on the move, so it animates in
+ * fresh each time, and edged in the colour of whoever made it.
+ */
+function LastMove({ action, cause, name, me, colorOf }: {
   action: CryptidAction;
+  /** The question or search that earned this penalty cube, if it is one. */
+  cause?: Extract<CryptidAction, { kind: 'question' | 'search' }> | null;
   name: (id: string) => string;
+  me: string;
   colorOf: (id: string) => string;
 }) {
-  if (action.kind === 'search') {
-    return (
-      <div className={`clast ${action.found ? 'is-found' : ''}`} key={action.hex + ':' + action.answers.length}>
-        <span><Disk color={colorOf(action.by)} /> {name(action.by)} searched <b>{hexLabel(action.hex)}</b></span>
-        {action.answers.map((a, i) => (
-          <span key={a.id} className="clast__answer" style={{ animationDelay: `${(i + 1) * 450}ms` }}>
-            {a.yes ? <Disk color={colorOf(a.id)} /> : <Cube color={colorOf(a.id)} />}
-            {name(a.id)} {a.yes ? 'yes' : 'no'}
-          </span>
-        ))}
-      </div>
+  const who = (id: string) => <Who id={id} name={name} me={me} colorOf={colorOf} />;
+  const space = (h: number) => <span className="clast__hex">{hexLabel(h)}</span>;
+  if (cause && action.kind === 'cube') {
+    // Whoever said no: the one asked, or the last to answer the search.
+    const naysayer = cause.kind === 'question' ? cause.target : cause.answers.at(-1)!.id;
+    const verdict = (
+      <span className="clast__verdict is-no"><Cube color={colorOf(naysayer)} />{naysayer === me ? 'You' : name(naysayer)}: no</span>
     );
-  }
-  if (action.kind === 'question') {
     return (
-      <div className="clast">
-        <span>{name(action.by)} asked {name(action.target)} about <b>{hexLabel(action.hex)}</b></span>
-        <span className="clast__answer">
-          {action.yes ? <Disk color={colorOf(action.target)} /> : <Cube color={colorOf(action.target)} />}
-          {action.yes ? 'could be' : 'no'}
+      <div className="clast is-no" style={{ '--actor': colorOf(action.by) } as CSSProperties}>
+        <span className="clast__tag">Just now</span>
+        <span className="clast__what">
+          {who(action.by)} {cause.kind === 'question' ? <>asked {who(cause.target)} about</> : 'searched'} {space(cause.hex)}
+          {verdict}
+          <span className="clast__then">so paid a cube on</span> {space(action.hex)}
         </span>
       </div>
     );
   }
-  return <div className="clast"><span>{actionText(action, name)}</span></div>;
+  let body: ReactNode;
+  let tone = '';
+  switch (action.kind) {
+    case 'question':
+      tone = action.yes ? 'is-yes' : 'is-no';
+      body = (
+        <>
+          {who(action.by)} asked {who(action.target)} about {space(action.hex)}
+          <span className={`clast__verdict ${tone}`}>
+            {action.yes ? <Disk color={colorOf(action.target)} /> : <Cube color={colorOf(action.target)} />}
+            {action.yes ? 'Could be' : 'No'}
+          </span>
+          {!action.yes && <span className="clast__then">{action.by === me ? 'You owe' : `${name(action.by)} owes`} a cube</span>}
+        </>
+      );
+      break;
+    case 'search': {
+      const no = action.answers.find((a) => !a.yes);
+      tone = action.found ? 'is-found' : 'is-no';
+      body = (
+        <>
+          {who(action.by)} searched {space(action.hex)}
+          {action.answers.map((a, i) => (
+            <span
+              key={a.id}
+              className={`clast__verdict ${a.yes ? 'is-yes' : 'is-no'} is-step`}
+              style={{ animationDelay: `${(i + 1) * 450}ms` }}
+            >
+              {a.yes ? <Disk color={colorOf(a.id)} /> : <Cube color={colorOf(a.id)} />}
+              {a.id === me ? 'You' : name(a.id)}: {a.yes ? 'yes' : 'no'}
+            </span>
+          ))}
+          {action.found && <span className="clast__verdict is-found is-step" style={{ animationDelay: `${(action.answers.length + 1) * 450}ms` }}>Found it 🐾</span>}
+          {no && <span className="clast__then is-step" style={{ animationDelay: `${(action.answers.length + 1) * 450}ms` }}>{action.by === me ? 'You owe' : `${name(action.by)} owes`} a cube</span>}
+        </>
+      );
+      break;
+    }
+    case 'cube':
+      body = (
+        <>
+          {who(action.by)} {action.why === 'setup' ? 'set a cube on' : action.why === 'auto' ? 'was away; a cube went on' : 'paid a cube on'} {space(action.hex)}
+        </>
+      );
+      break;
+    case 'skip':
+      body = <>{who(action.by)} was away, so their turn passed</>;
+      break;
+  }
+  return (
+    <div className={`clast ${tone}`} style={{ '--actor': colorOf(action.by) } as CSSProperties}>
+      <span className="clast__tag">Just now</span>
+      <span className="clast__what">{body}</span>
+    </div>
+  );
 }
 
 function History({ log, name, colorOf, onHover }: {
@@ -481,24 +569,39 @@ function ClueBook({ advanced }: { advanced: boolean }) {
   );
 }
 
-function Legend() {
+const STRUCT_COLORS_SHOWN = ['white', 'green', 'blue', 'black'] as const;
+
+function Legend({ advanced }: { advanced: boolean }) {
+  const colors = STRUCT_COLORS_SHOWN.filter((c) => advanced || c !== 'black');
   return (
     <div className="clegend">
-      {(['forest', 'desert', 'water', 'swamp', 'mountain'] as const).map((t) => (
-        <span key={t} className="clegend__item"><i className={`clegend__sw cterr--${t}`} />{TERRAIN_NAMES[t]}</span>
-      ))}
-      <span className="clegend__item"><i className="clegend__fence clegend__fence--bear" />Bear</span>
-      <span className="clegend__item"><i className="clegend__fence clegend__fence--cougar" />Cougar</span>
-      <span className="clegend__item">
-        <svg viewBox="-7 -7 14 14" className="clegend__glyph"><StructureGlyph s={{ shape: 'stone', color: 'white' }} x={0} y={0} size={12} /></svg>
-        Stone
-      </span>
-      <span className="clegend__item">
-        <svg viewBox="-7 -7 14 14" className="clegend__glyph"><StructureGlyph s={{ shape: 'shack', color: 'white' }} x={0} y={0} size={12} /></svg>
-        Shack
-      </span>
-      <span className="clegend__item"><Disk color="#fff" />could be</span>
-      <span className="clegend__item"><Cube color="#fff" />cannot be</span>
+      <div className="clegend__group">
+        {(['forest', 'desert', 'water', 'swamp', 'mountain'] as const).map((t) => (
+          <span key={t} className="clegend__item"><i className={`clegend__sw clegend__sw--${t}`} />{TERRAIN_NAMES[t]}</span>
+        ))}
+      </div>
+      <div className="clegend__group">
+        <span className="clegend__item"><i className="clegend__fence clegend__fence--bear" />Bear land</span>
+        <span className="clegend__item"><i className="clegend__fence clegend__fence--cougar" />Cougar land</span>
+      </div>
+      <div className="clegend__group">
+        <span className="clegend__item">
+          <svg viewBox="-9 -11 18 20" className="clegend__glyph"><StructureGlyph s={{ shape: 'stone', color: 'white' }} x={0} y={0} u={28} /></svg>
+          Standing stone
+        </span>
+        <span className="clegend__item">
+          <svg viewBox="-9 -11 18 20" className="clegend__glyph"><StructureGlyph s={{ shape: 'shack', color: 'white' }} x={0} y={0} u={28} /></svg>
+          Shack
+        </span>
+        <span className="clegend__item clegend__colors" title="Structure colours">
+          {colors.map((c) => <i key={c} className={`clegend__dot cstruct--${c}`} title={c} />)}
+          {colors.join(', ')}
+        </span>
+      </div>
+      <div className="clegend__group">
+        <span className="clegend__item"><Disk color="#fff" />could be</span>
+        <span className="clegend__item"><Cube color="#fff" />cannot be</span>
+      </div>
     </div>
   );
 }

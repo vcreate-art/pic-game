@@ -1,6 +1,6 @@
 import { memo, useId, useMemo, type ReactNode } from 'react';
 import {
-  COLS, HEXES, ROWS, colOf, hexLabel, neighbour, rowOf,
+  COLS, HEXES, ROWS, TERRAINS, colOf, hexLabel, neighbour, rowOf,
   type CryptidBoard, type Structure, type Terrain,
 } from '@pic-game/shared';
 
@@ -29,35 +29,166 @@ function corners(hex: number, scale = 1): [number, number][] {
 }
 
 const points = (pts: [number, number][]) => pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+const f = (n: number) => n.toFixed(1);
 
 export const TERRAIN_NAMES: Record<Terrain, string> = {
   forest: 'Forest', desert: 'Desert', water: 'Water', swamp: 'Swamp', mountain: 'Mountain',
 };
 
-/** One structure glyph: a standing stone is a tall slab, a shack a little house. */
-export function StructureGlyph({ s, x, y, size }: { s: Pick<Structure, 'shape' | 'color'>; x: number; y: number; size: number }) {
-  const k = size / 10;
+// -------------------------------------------------------------- structures
+
+/**
+ * A structure, centred on (x, y), in units of `u` (a hex radius on the map).
+ * The two shapes are told apart by silhouette before colour: a standing stone
+ * is a tall narrow monolith, a shack a wide low house with a roof and a door.
+ */
+export function StructureGlyph({ s, x, y, u }: { s: Pick<Structure, 'shape' | 'color'>; x: number; y: number; u: number }) {
   const cls = `cstruct cstruct--${s.color}`;
   if (s.shape === 'stone') {
+    const w = 0.24 * u;
+    const h = 0.58 * u;
+    const top = y - h / 2;
+    const bot = y + h / 2;
     return (
-      <path
-        className={cls}
-        d={`M${x - 3.2 * k},${y + 5 * k} L${x - 3.8 * k},${y - 2.5 * k} L${x - 1.5 * k},${y - 5.5 * k} L${x + 2 * k},${y - 5 * k} L${x + 3.8 * k},${y - 1.5 * k} L${x + 3.2 * k},${y + 5 * k} Z`}
-      />
+      <g>
+        <ellipse className="cstruct__shadow" cx={x} cy={bot} rx={w * 0.85} ry={u * 0.05} />
+        <path
+          className={cls}
+          d={`M${f(x - w / 2)},${f(bot)} L${f(x - w / 2 + 0.02 * u)},${f(top + w / 2)} Q${f(x - w / 2 + 0.02 * u)},${f(top)} ${f(x)},${f(top)} Q${f(x + w / 2 - 0.02 * u)},${f(top)} ${f(x + w / 2 - 0.02 * u)},${f(top + w / 2)} L${f(x + w / 2)},${f(bot)} Z`}
+        />
+        <path className="cstruct__mark" d={`M${f(x - 0.03 * u)},${f(top + 0.16 * u)} l${f(0.05 * u)},${f(0.1 * u)} l${f(-0.04 * u)},${f(0.1 * u)}`} />
+      </g>
     );
   }
+  const w = 0.56 * u;
+  const eave = y - 0.02 * u;
+  const bot = y + 0.2 * u;
+  const peak = y - 0.24 * u;
   return (
-    <path
-      className={cls}
-      d={`M${x - 5 * k},${y + 4.5 * k} L${x - 5 * k},${y - 0.5 * k} L${x},${y - 5.5 * k} L${x + 5 * k},${y - 0.5 * k} L${x + 5 * k},${y + 4.5 * k} Z`}
-    />
+    <g>
+      <ellipse className="cstruct__shadow" cx={x} cy={bot} rx={w * 0.55} ry={u * 0.05} />
+      <path
+        className={cls}
+        d={`M${f(x - w / 2 + 0.04 * u)},${f(bot)} L${f(x - w / 2 + 0.04 * u)},${f(eave)} L${f(x - w / 2)},${f(eave)} L${f(x)},${f(peak)} L${f(x + w / 2)},${f(eave)} L${f(x + w / 2 - 0.04 * u)},${f(eave)} L${f(x + w / 2 - 0.04 * u)},${f(bot)} Z`}
+      />
+      <rect className="cstruct__door" x={x - 0.06 * u} y={bot - 0.14 * u} width={0.12 * u} height={0.14 * u} />
+    </g>
   );
 }
 
-/** The ground: terrain, territory fences, structures and the grid labels.
- *  None of it changes once a map is dealt, so it renders once per board. */
+// ------------------------------------------------------------ terrain art
+
+/** A small repeatable random stream per space, so the art varies from space
+ *  to space but is the same on every render and every screen. */
+function seeded(n: number): () => number {
+  let s = (n * 2654435761) >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Where scenery may go inside a space, in hex radii from its centre. The top
+ *  middle is left clear for a structure. */
+const SPOTS: readonly [number, number][] = [
+  [-0.46, -0.3], [0.46, -0.3], [-0.6, 0.12], [0.6, 0.12], [-0.28, 0.5],
+  [0.3, 0.5], [0, 0.08], [-0.2, -0.62], [0.22, -0.62], [0.02, 0.62],
+];
+const COUNT: Record<Terrain, number> = { forest: 4, desert: 2, water: 3, swamp: 3, mountain: 2 };
+
+function scenery(t: Terrain, x: number, y: number, r: () => number, key: string): ReactNode {
+  const u = S;
+  switch (t) {
+    case 'forest': {
+      const k = 0.85 + r() * 0.35;
+      return (
+        <g key={key} transform={`translate(${f(x)},${f(y)}) scale(${k.toFixed(2)})`}>
+          <rect className="cart-trunk" x={-0.03 * u} y={0.06 * u} width={0.06 * u} height={0.08 * u} />
+          <path className="cart-tree" d={`M0,${f(-0.26 * u)} L${f(0.13 * u)},${f(-0.04 * u)} L${f(-0.13 * u)},${f(-0.04 * u)} Z`} />
+          <path className="cart-tree" d={`M0,${f(-0.14 * u)} L${f(0.17 * u)},${f(0.08 * u)} L${f(-0.17 * u)},${f(0.08 * u)} Z`} />
+          <path className="cart-tree-lit" d={`M0,${f(-0.26 * u)} L${f(-0.13 * u)},${f(-0.04 * u)} L0,${f(-0.04 * u)} Z`} />
+        </g>
+      );
+    }
+    case 'desert':
+      return r() < 0.25 ? (
+        <g key={key} transform={`translate(${f(x)},${f(y)})`}>
+          <path className="cart-cactus" d={`M0,${f(0.12 * u)} V${f(-0.14 * u)} M0,${f(-0.02 * u)} h${f(-0.08 * u)} v${f(-0.07 * u)} M0,${f(0.03 * u)} h${f(0.08 * u)} v${f(-0.08 * u)}`} />
+        </g>
+      ) : (
+        <path key={key} className="cart-dune" d={`M${f(x - 0.22 * u)},${f(y)} Q${f(x)},${f(y - 0.16 * u)} ${f(x + 0.22 * u)},${f(y)}`} />
+      );
+    case 'water':
+      return (
+        <path
+          key={key}
+          className="cart-wave"
+          d={`M${f(x - 0.2 * u)},${f(y)} q${f(0.1 * u)},${f(-0.1 * u)} ${f(0.2 * u)},0 t${f(0.2 * u)},0`}
+        />
+      );
+    case 'swamp':
+      return (
+        <g key={key} transform={`translate(${f(x)},${f(y)})`}>
+          <ellipse className="cart-pool" cx={0} cy={0.07 * u} rx={0.17 * u} ry={0.05 * u} />
+          <path className="cart-reed" d={`M${f(-0.06 * u)},${f(0.07 * u)} q${f(-0.02 * u)},${f(-0.12 * u)} ${f(-0.07 * u)},${f(-0.2 * u)} M0,${f(0.07 * u)} V${f(-0.18 * u)} M${f(0.06 * u)},${f(0.07 * u)} q${f(0.02 * u)},${f(-0.1 * u)} ${f(0.07 * u)},${f(-0.16 * u)}`} />
+          <ellipse className="cart-cattail" cx={0} cy={-0.19 * u} rx={0.025 * u} ry={0.05 * u} />
+        </g>
+      );
+    case 'mountain': {
+      const k = 0.9 + r() * 0.3;
+      return (
+        <g key={key} transform={`translate(${f(x)},${f(y)}) scale(${k.toFixed(2)})`}>
+          <path className="cart-peak" d={`M${f(-0.26 * u)},${f(0.12 * u)} L0,${f(-0.24 * u)} L${f(0.26 * u)},${f(0.12 * u)} Z`} />
+          <path className="cart-peak-shade" d={`M0,${f(-0.24 * u)} L${f(0.26 * u)},${f(0.12 * u)} L${f(0.04 * u)},${f(0.12 * u)} Z`} />
+          <path className="cart-snow" d={`M${f(-0.08 * u)},${f(-0.13 * u)} L0,${f(-0.24 * u)} L${f(0.08 * u)},${f(-0.13 * u)} L${f(0.03 * u)},${f(-0.1 * u)} L${f(-0.02 * u)},${f(-0.14 * u)} Z`} />
+        </g>
+      );
+    }
+  }
+}
+
+function spaceArt(board: CryptidBoard, h: number, hasStructure: boolean): ReactNode[] {
+  const t = board.terrain[h]!;
+  const r = seeded(h * 31 + TERRAINS.indexOf(t));
+  const spots = SPOTS.filter(([sx, sy]) => !(hasStructure && sy < -0.1 && Math.abs(sx) < 0.35));
+  const [cx, cy] = centre(h);
+  const out: ReactNode[] = [];
+  const pool = [...spots];
+  for (let i = 0; i < COUNT[t] && pool.length; i++) {
+    const [sx, sy] = pool.splice(Math.floor(r() * pool.length), 1)[0]!;
+    const jx = (r() - 0.5) * 0.12;
+    const jy = (r() - 0.5) * 0.12;
+    out.push(scenery(t, cx + (sx + jx) * S, cy + (sy + jy) * S, r, `${h}-${i}`));
+  }
+  return out;
+}
+
+/** Structures drawn a little over a hex radius tall, so they read at a glance. */
+const STRUCT_U = S * 1.15;
+
+/** The ground: terrain and scenery. None of it changes once a map is dealt,
+ *  so it renders once per board. */
 const Ground = memo(function Ground({ board, pid }: { board: CryptidBoard; pid: string }) {
-  const structAt = new Map(board.structures.map((s) => [s.hex, s]));
+  const structAt = new Set(board.structures.map((s) => s.hex));
+  return (
+    <g className="cmap__ground">
+      {Array.from({ length: HEXES }, (_, h) => (
+        <g key={h} className={`cspace cspace--${board.terrain[h]}`}>
+          <polygon points={points(corners(h))} fill={`url(#${pid}-${board.terrain[h]})`} className="cterr" />
+          <polygon points={points(corners(h, 0.9))} className="cterr__bevel" />
+          {spaceArt(board, h, structAt.has(h))}
+        </g>
+      ))}
+    </g>
+  );
+});
+
+/** What clues are about: territory fences and structures, with the grid
+ *  labels. Drawn above the wash on ruled-out spaces, so it never hides them. */
+const Landmarks = memo(function Landmarks({ board }: { board: CryptidBoard }) {
   const fences: { d: string; animal: string }[] = [];
   for (let h = 0; h < HEXES; h++) {
     const a = board.animal[h];
@@ -71,28 +202,19 @@ const Ground = memo(function Ground({ board, pid }: { board: CryptidBoard; pid: 
       if (n !== null && board.animal[n] === a) continue;
       const [x1, y1] = edge[side]!;
       const [x2, y2] = edge[(side + 1) % 6]!;
-      d += `M${x1.toFixed(1)},${y1.toFixed(1)}L${x2.toFixed(1)},${y2.toFixed(1)}`;
+      d += `M${f(x1)},${f(y1)}L${f(x2)},${f(y2)}`;
     }
     if (d) fences.push({ d, animal: a });
   }
 
   return (
-    <g className="cmap__ground">
-      {Array.from({ length: HEXES }, (_, h) => {
-        const pts = points(corners(h));
-        return (
-          <g key={h}>
-            <polygon points={pts} className={`cterr cterr--${board.terrain[h]}`} />
-            <polygon points={pts} fill={`url(#${pid}-${board.terrain[h]})`} className="cterr__tex" />
-          </g>
-        );
-      })}
-      {fences.map((f, i) => (
-        <path key={i} d={f.d} className={`cfence cfence--${f.animal}`} />
+    <g className="cmap__landmarks">
+      {fences.map((fe, i) => (
+        <path key={i} d={fe.d} className={`cfence cfence--${fe.animal}`} />
       ))}
-      {[...structAt.values()].map((s) => {
+      {board.structures.map((s) => {
         const [x, y] = centre(s.hex);
-        return <StructureGlyph key={s.hex} s={s} x={x} y={y - S * 0.42} size={S * 0.36} />;
+        return <StructureGlyph key={s.hex} s={s} x={x} y={y - S * 0.44} u={STRUCT_U} />;
       })}
       {Array.from({ length: COLS }, (_, c) => {
         const [x] = centre(c);
@@ -106,18 +228,20 @@ const Ground = memo(function Ground({ board, pid }: { board: CryptidBoard; pid: 
   );
 });
 
-/** Small repeating marks per terrain, so the map reads without colour too. */
-function Patterns({ pid }: { pid: string }) {
-  const p = (t: Terrain, w: number, h: number, body: ReactNode) => (
-    <pattern key={t} id={`${pid}-${t}`} width={w} height={h} patternUnits="userSpaceOnUse">{body}</pattern>
-  );
+/** A light-to-dark wash per terrain, and the hatch that marks ruled-out spaces. */
+function Defs({ pid }: { pid: string }) {
   return (
     <defs>
-      {p('forest', 14, 14, <path d="M4,9 L7,3 L10,9 Z" className="ctex ctex--fill" />)}
-      {p('desert', 10, 10, <><circle cx="2.5" cy="2.5" r=".9" className="ctex ctex--fill" /><circle cx="7.5" cy="7.5" r=".9" className="ctex ctex--fill" /></>)}
-      {p('water', 16, 8, <path d="M0,5 Q4,2 8,5 T16,5" className="ctex" />)}
-      {p('swamp', 12, 12, <path d="M3,10 L3,5 M6,10 L6,3 M9,10 L9,6" className="ctex" />)}
-      {p('mountain', 16, 12, <path d="M2,9 L6,4 L10,9 M8,9 L11,6 L14,9" className="ctex" />)}
+      {TERRAINS.map((t) => (
+        <linearGradient key={t} id={`${pid}-${t}`} x1="0" y1="0" x2="0.35" y2="1">
+          <stop offset="0" style={{ stopColor: `var(--cry-${t}-hi)` }} />
+          <stop offset="1" style={{ stopColor: `var(--cry-${t})` }} />
+        </linearGradient>
+      ))}
+      <pattern id={`${pid}-out`} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="7" height="7" className="cshade__wash" />
+        <line x1="0" y1="0" x2="0" y2="7" className="cshade__line" />
+      </pattern>
     </defs>
   );
 }
@@ -137,9 +261,11 @@ export interface HexMapProps {
   disks: string[][];
   cubes: (string | null)[];
   selected: number | null;
-  /** Spaces to point at: the last move, or a history line being hovered. */
+  /** A space to point at: a history line being hovered. */
   focus: number | null;
-  /** Spaces to shade, e.g. where your own clue rules the creature out. */
+  /** The spaces the last move touched, ringed in the colour of who made it. */
+  last: { hexes: number[]; color: string; key: number } | null;
+  /** Spaces to wash out, e.g. where your own clue rules the creature out. */
   shade: Set<number> | null;
   answer: number | null;
   onPick?: (hex: number) => void;
@@ -147,7 +273,7 @@ export interface HexMapProps {
 }
 
 export function HexMap(props: HexMapProps) {
-  const { board, colorOf, seatOf, disks, cubes, selected, focus, shade, answer, onPick, onHover } = props;
+  const { board, colorOf, seatOf, disks, cubes, selected, focus, last, shade, answer, onPick, onHover } = props;
   const pid = useId().replace(/:/g, '');
   const outlines = useMemo(() => Array.from({ length: HEXES }, (_, h) => points(corners(h))), []);
 
@@ -159,14 +285,24 @@ export function HexMap(props: HexMapProps) {
       aria-label="The map"
       onPointerLeave={() => onHover?.(null)}
     >
-      <Patterns pid={pid} />
+      <Defs pid={pid} />
       <Ground board={board} pid={pid} />
 
       {shade && (
         <g className="cmap__shade">
-          {[...shade].map((h) => <polygon key={h} points={outlines[h]} />)}
+          {[...shade].map((h) => <polygon key={h} points={outlines[h]} fill={`url(#${pid}-out)`} />)}
         </g>
       )}
+      <Landmarks board={board} />
+
+      {last?.hexes.filter((h) => h !== answer).map((h) => (
+        <polygon
+          key={`${last.key}-${h}`}
+          className="cmap__last"
+          points={points(corners(h, 0.94))}
+          style={{ stroke: last.color }}
+        />
+      ))}
 
       <g className="cmap__pieces">
         {Array.from({ length: HEXES }, (_, h) => {
