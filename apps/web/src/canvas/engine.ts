@@ -7,6 +7,9 @@ const BG = '#ffffff';
 /** Flood-fill match tolerance. Anti-aliased stroke edges differ slightly between
  *  browsers; a loose threshold keeps fills from leaking through those seams. */
 const FILL_TOLERANCE = 32;
+/** How far from an edge pixel to look for the line colour it is blended from.
+ *  Two covers a soft edge two pixels wide, which heavy strokes can leave. */
+const LINE_REACH = 2;
 
 /**
  * All painting happens on a fixed 800x600 backing canvas, which is then blitted
@@ -215,20 +218,34 @@ function hexToRgb(hex: string): [number, number, number] {
  * which is why only the seed travels over the wire, not a region of pixels.
  */
 function floodFill(ctx: CanvasRenderingContext2D, sx: number, sy: number, color: string): void {
-  const w = LOGICAL_W;
-  const h = LOGICAL_H;
-  if (sx < 0 || sy < 0 || sx >= w || sy >= h) return;
+  if (sx < 0 || sy < 0 || sx >= LOGICAL_W || sy >= LOGICAL_H) return;
+  const img = ctx.getImageData(0, 0, LOGICAL_W, LOGICAL_H);
+  if (fillPixels(img.data, LOGICAL_W, LOGICAL_H, sx, sy, hexToRgb(color))) ctx.putImageData(img, 0, 0);
+}
 
-  const img = ctx.getImageData(0, 0, w, h);
-  const d = img.data;
+/**
+ * The fill itself, on raw RGBA pixels. Returns false when there was nothing to do.
+ *
+ * Two passes. The first floods every pixel within FILL_TOLERANCE of the seed's
+ * colour. That stops short of a stroke's anti-aliased edge, whose pixels are
+ * blends of the line and the old background, and left alone they show as a pale
+ * halo between line and fill. So the second pass takes the one ring of pixels
+ * bordering the flooded area and re-blends each: it estimates how much of the
+ * pixel is line, from the most line-like pixel around it, and swaps the old
+ * background for the new colour in the same proportion. The line keeps its
+ * smooth edge and the fill runs right up to it. One ring only, so it cannot
+ * creep through a gap.
+ */
+export function fillPixels(
+  d: Uint8ClampedArray, w: number, h: number, sx: number, sy: number, rgb: [number, number, number],
+): boolean {
   const at = (x: number, y: number) => (y * w + x) * 4;
-
   const start = at(sx, sy);
   const tr = d[start]!, tg = d[start + 1]!, tb = d[start + 2]!;
-  const [nr, ng, nb] = hexToRgb(color);
+  const [nr, ng, nb] = rgb;
 
   // Filling with the colour already there would spin over the whole region for nothing.
-  if (Math.abs(tr - nr) < 2 && Math.abs(tg - ng) < 2 && Math.abs(tb - nb) < 2) return;
+  if (Math.abs(tr - nr) < 2 && Math.abs(tg - ng) < 2 && Math.abs(tb - nb) < 2) return false;
 
   const matches = (i: number): boolean =>
     Math.abs(d[i]! - tr) <= FILL_TOLERANCE &&
@@ -260,5 +277,65 @@ function floodFill(ctx: CanvasRenderingContext2D, sx: number, sy: number, color:
     }
   }
 
-  ctx.putImageData(img, 0, 0);
+  // Worked out against the pixels as they are before any of the edge changes,
+  // then applied together, so no edge pixel reads a neighbour already re-blended.
+  const edits: number[] = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (seen[y * w + x] || !bordersFlood(seen, w, h, x, y)) continue;
+      // The pixel itself is a candidate for the line colour, then the unflooded
+      // pixels around it: whichever is furthest from the old background.
+      let lr = 0, lg = 0, lb = 0, far = -1;
+      for (let dy = -LINE_REACH; dy <= LINE_REACH; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (let dx = -LINE_REACH; dx <= LINE_REACH; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= w || seen[yy * w + xx]) continue;
+          const q = at(xx, yy);
+          const dist = (d[q]! - tr) ** 2 + (d[q + 1]! - tg) ** 2 + (d[q + 2]! - tb) ** 2;
+          if (dist > far) {
+            far = dist;
+            lr = d[q]!;
+            lg = d[q + 1]!;
+            lb = d[q + 2]!;
+          }
+        }
+      }
+      if (far <= 0) continue;
+      // How much of this pixel is line: its offset from the old background,
+      // projected onto the line's.
+      const p = at(x, y);
+      const cover = ((d[p]! - tr) * (lr - tr) + (d[p + 1]! - tg) * (lg - tg) + (d[p + 2]! - tb) * (lb - tb)) / far;
+      const a = Math.min(1, Math.max(0, cover));
+      if (a >= 1) continue;
+      edits.push(
+        p,
+        Math.round(a * lr + (1 - a) * nr),
+        Math.round(a * lg + (1 - a) * ng),
+        Math.round(a * lb + (1 - a) * nb),
+      );
+    }
+  }
+  for (let i = 0; i < edits.length; i += 4) {
+    const p = edits[i]!;
+    d[p] = edits[i + 1]!;
+    d[p + 1] = edits[i + 2]!;
+    d[p + 2] = edits[i + 3]!;
+    d[p + 3] = 255;
+  }
+  return true;
+}
+
+/** Whether any of the eight pixels around (x, y) was flooded. */
+function bordersFlood(seen: Uint8Array, w: number, h: number, x: number, y: number): boolean {
+  for (let dy = -1; dy <= 1; dy++) {
+    const yy = y + dy;
+    if (yy < 0 || yy >= h) continue;
+    for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx;
+      if (xx >= 0 && xx < w && seen[yy * w + xx]) return true;
+    }
+  }
+  return false;
 }
