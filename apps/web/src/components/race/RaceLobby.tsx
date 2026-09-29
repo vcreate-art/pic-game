@@ -2,6 +2,7 @@ import { CHASER_PACES, LEVELS, type ChaserPace } from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectIsHost, selectRace, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
+import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 
 const PACE: Record<ChaserPace, { name: string; blurb: string }> = {
@@ -43,6 +44,7 @@ export function RaceLobby({ onLeave }: { onLeave: () => void }) {
               <li key={p.id} className="lobby__player">
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
+                {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
               </li>
             ))}
           </ul>

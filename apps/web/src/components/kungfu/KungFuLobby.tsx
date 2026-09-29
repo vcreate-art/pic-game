@@ -5,6 +5,7 @@ import {
 import { getSocket } from '../../net/socket.js';
 import { selectIsHost, selectKungFu, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
+import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 
 /** Every piece, shortest rest first, so the slider means something concrete. */
@@ -40,6 +41,7 @@ export function KungFuLobby({ onLeave }: { onLeave: () => void }) {
                 <li key={p.id} className="lobby__player">
                   <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                   <span>{p.name}</span>
+                  {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
                   {side && (
                     <span className={`seat__chip seat__chip--${side}`}>{sideLabel(spec, side)}</span>
                   )}

@@ -2,6 +2,7 @@ import type { BingoMode, BingoPattern } from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectBingo, selectIsHost, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
+import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 
 const MODES: { value: BingoMode; name: string; blurb: string }[] = [
@@ -39,6 +40,7 @@ export function BingoLobby({ onLeave }: { onLeave: () => void }) {
               <li key={p.id} className="lobby__player">
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
+                {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
                 {p.score > 0 && <span className="bingolobby__wins">{p.score} win{p.score === 1 ? '' : 's'}</span>}
               </li>
             ))}

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AVATAR_COLORS, AVATAR_FACES } from '@pic-game/shared';
 import { MAX_NAME_LEN } from '../constants.js';
 import { PROFILE_EVENT, getSocket, loadProfile, saveProfile, type Profile } from '../net/socket.js';
 import { useGame } from '../store/game.js';
+import { useDismiss } from '../lib/useDismiss.js';
 import { Avatar } from './Avatar.js';
 
 /**
@@ -18,6 +19,7 @@ export function ProfileChip() {
   const [face, setFace] = useState(0);
   const inRoom = useGame((s) => !!s.room && !!s.me);
   const box = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
     const on = (e: Event) => setProfile((e as CustomEvent<Profile>).detail);
@@ -25,20 +27,7 @@ export function ProfileChip() {
     return () => window.removeEventListener(PROFILE_EVENT, on);
   }, []);
 
-  // Close on a click outside or on Escape.
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('mousedown', away);
-    window.addEventListener('keydown', esc);
-    return () => {
-      document.removeEventListener('mousedown', away);
-      window.removeEventListener('keydown', esc);
-    };
-  }, [open]);
+  useDismiss(box, open, close);
 
   // Nothing to show until a name has been picked on the landing page.
   if (!profile) return null;

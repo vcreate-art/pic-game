@@ -5,6 +5,7 @@ import {
 import { getSocket } from '../../net/socket.js';
 import { selectFight, selectIsHost, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
+import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { FighterCard } from './FighterCard.js';
 import { Controls, MoveList } from './MoveList.js';
@@ -154,6 +155,7 @@ export function FightLobby({ onLeave }: { onLeave: () => void }) {
                 <li key={p.id} className="lobby__player">
                   <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                   <span>{p.name}</span>
+                  {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
                   {side && (
                     <span className={`seat__chip seat__chip--${side === 'a' ? 'p1' : 'p2'}`}>{SIDE_LABEL[side]}</span>
                   )}

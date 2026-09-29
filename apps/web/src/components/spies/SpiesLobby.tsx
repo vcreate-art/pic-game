@@ -5,6 +5,7 @@ import {
 import { getSocket } from '../../net/socket.js';
 import { selectIsHost, selectSpies, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
+import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 
 export const TEAM_NAME: Record<SpyTeam, string> = { red: 'Red', blue: 'Blue' };
@@ -52,6 +53,7 @@ export function SpiesLobby({ onLeave }: { onLeave: () => void }) {
         <Avatar data={p.avatar} size={26} host={p.id === room.hostId} />
         <span>{p.name}</span>
         {spy && <span className="spyteam__tag">Spymaster</span>}
+        {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
       </li>
     );
   };
