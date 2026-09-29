@@ -14,6 +14,7 @@ import type { FightFrame, FightPublic } from './fight/types.js';
 import type { RacePublic } from './race/types.js';
 import type { SpiesPublic } from './spies/types.js';
 import type { BingoPublic } from './bingo/types.js';
+import type { TourneyPublic } from './tourney/types.js';
 
 export interface Avatar {
   /** index into AVATAR_COLORS */
@@ -140,13 +141,13 @@ export interface Drawing {
 }
 
 /** Which game a room is playing. Fixed when the room is created. */
-export type GameKind = 'skribbl' | 'kungfu' | 'realms' | 'fight' | 'race' | 'spies' | 'bingo';
+export type GameKind = 'skribbl' | 'kungfu' | 'realms' | 'fight' | 'race' | 'spies' | 'bingo' | 'tourney';
 
-export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies', 'bingo'];
+export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies', 'bingo', 'tourney'];
 
 /** The ones with a playable interface. A kind can exist on the server before
  *  it has a screen, and the picker should only offer what can be played. */
-export const PLAYABLE_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies', 'bingo'];
+export const PLAYABLE_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies', 'bingo', 'tourney'];
 
 export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
   skribbl: { name: 'Draw & Guess', blurb: 'One draws a secret word, everyone else races to guess.' },
@@ -155,6 +156,7 @@ export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
   fight: { name: 'Stick Kombat', blurb: 'Best of three. Then finish them.' },
   race: { name: 'Meat Race', blurb: 'Run, jump, glide and climb. Beat the saws and each other.' },
   spies: { name: 'Word Spies', blurb: 'One-word clues, two teams, and an assassin to avoid.' },
+  tourney: { name: 'MK11 Tournament', blurb: 'Points, rising entry fees and best-of-3 MK11 matches. Last one standing wins.' },
   bingo: { name: 'Bingo', blurb: 'Fill your grid, call numbers in turn, or play the 75-ball hall game.' },
 };
 
@@ -213,11 +215,16 @@ export interface BingoRoomState extends RoomStateBase {
   game: BingoPublic;
 }
 
+export interface TourneyRoomState extends RoomStateBase {
+  kind: 'tourney';
+  game: TourneyPublic;
+}
+
 /** Discriminated on `kind`, so reading a field the other game does not have is
  *  a compile error rather than an undefined at runtime. */
 export type RoomState =
   | SkribblRoomState | KungFuRoomState | RealmsRoomState | FightRoomState | RaceRoomState
-  | SpiesRoomState | BingoRoomState;
+  | SpiesRoomState | BingoRoomState | TourneyRoomState;
 
 /** `divider` marks a new turn: the chat draws it as a rule, not a line of text. */
 export type ChatKind = 'chat' | 'system' | 'correct' | 'close' | 'secret' | 'divider';

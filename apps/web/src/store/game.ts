@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type {
-  BingoCard, BingoPublic, BingoRoomState, CardColor, Drawing, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
+  BingoCard, BingoPublic, BingoRoomState, CardColor, Drawing, TourneyPublic, TourneyRoomState, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
   RaceRoomState, SpiesPublic, SpiesRoomState, KungFuRoomState, Piece, Player,
   RealmsPublic, RealmsRoomState, RealmsSide, RoomSettings, RoomState, Side,
   SkribblRoomState, WordOption,
@@ -88,6 +88,7 @@ interface GameStore {
   setSpiesKey: (key: CardColor[] | null) => void;
   setBingo: (game: BingoPublic) => void;
   setBingoCard: (card: BingoCard | null) => void;
+  setTourney: (game: TourneyPublic) => void;
   setRealmsHand: (hand: CardInstance[], owed: number) => void;
   realmsOver: (winner: RealmsSide | null) => void;
   applyChessMove: (m: {
@@ -282,6 +283,9 @@ export const useGame = create<GameStore>((set) => ({
     set((s) => (s.room?.kind === 'bingo' ? { room: { ...s.room, game } } : {})),
   setBingoCard: (bingoCard) => set({ bingoCard }),
 
+  setTourney: (game) =>
+    set((s) => (s.room?.kind === 'tourney' ? { room: { ...s.room, game } } : {})),
+
   setRealmsHand: (realmsHand, realmsOwed) => set({ realmsHand, realmsOwed }),
 
   realmsOver: (winner) =>
@@ -347,6 +351,9 @@ export const selectSpies = (s: GameStore): SpiesRoomState | null =>
 
 export const selectBingo = (s: GameStore): BingoRoomState | null =>
   s.room && s.room.kind === 'bingo' ? s.room : null;
+
+export const selectTourney = (s: GameStore): TourneyRoomState | null =>
+  s.room && s.room.kind === 'tourney' ? s.room : null;
 
 // kept here so components never reach into `ops` and re-render on strokes
 

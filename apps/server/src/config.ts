@@ -45,10 +45,19 @@ export const TURN_END_SECONDS = 6;
 /** Podium display before the room falls back to the lobby. */
 export const GAME_END_SECONDS = 15;
 
-/** A reconnecting socket may reclaim its seat and score within this window. */
-export const RECONNECT_GRACE_MS = 60_000;
+const envMs = (name: string, fallback: number) => {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
+/** A reconnecting socket may reclaim its seat and score within this window.
+ *  The env overrides exist so the integration tests can shorten them. */
+export const RECONNECT_GRACE_MS = envMs('RECONNECT_GRACE_MS', 60_000);
 /** An empty room is collected after this long. */
-export const EMPTY_ROOM_TTL_MS = 120_000;
+export const EMPTY_ROOM_TTL_MS = envMs('EMPTY_ROOM_TTL_MS', 120_000);
+/** A tournament runs for an evening, from a host phone that sleeps between
+ *  matches: its room, and its seats, are kept this long instead. */
+export const TOURNEY_KEEP_MS = envMs('TOURNEY_KEEP_MS', 8 * 60 * 60_000);
 
 export const MAX_NAME_LEN = 20;
 export const MAX_CHAT_LEN = 100;

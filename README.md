@@ -254,6 +254,29 @@ Two games under one name, picked in the lobby.
   strategy, so each card goes to its owner's socket alone. Line counts are public, as
   they are at a table.
 
+## MK11 Tournament
+
+Not a game in the app: a points tournament for **real Mortal Kombat 11**, played on a
+console, with the app keeping the stacks, the running order and the results. The host
+runs it; everyone else in the room watches the standings update on their phone.
+
+- **Setup.** Starting points, an entry fee that rises every few turns (like poker blinds),
+  and the bonus amounts. Players sign themselves up or the host adds them by name, each
+  with an optional MK11 main.
+- **The circle.** Each lap, the players still in are seated in a random circle and fight
+  both neighbours, so everyone plays twice a lap even with an odd count. Even edges go
+  first, so nobody fights back to back where that can be avoided (from five players up).
+- **A match** is best of 3 on the console. Both players pay the entry; someone short goes
+  all-in, and the other only matches it. The winner takes the pot plus bonuses: a clean
+  2-0 and a growing win streak are automatic; Flawless, Fatality and Brutality are ticked
+  by the host. Hitting zero knocks you out.
+- **The end** comes when one player has points left, or when the host calls it and the
+  leader wins. The results can be copied as text for a group chat. Every result can be
+  undone, and a match can be called off with the entries refunded.
+- **It survives an evening.** A tournament room and its seats are kept for 8 hours rather
+  than 2 minutes, and the host's browser keeps a copy it can restore into a new room if
+  the server restarts.
+
 ## Testing
 
 ```bash
@@ -264,6 +287,8 @@ node scripts/integration-race.mjs   # the race: relay, cheat checks, scoring, th
 node scripts/integration-spies.mjs  # the spies: key secrecy, clues, reveals, timers
 node scripts/integration-bingo.mjs  # bingo: private grids, turns, shared wins, the draw, claims
 node scripts/integration-gallery.mjs  # drawing reactions and the end-of-game gallery
+SHORT_TTLS=1 node scripts/integration-tourney.mjs  # the tournament; needs a server started with
+#   EMPTY_ROOM_TTL_MS=1500 RECONNECT_GRACE_MS=1000 for its keep-alive checks
 ```
 
 The integration suite connects three real socket clients and plays a turn, then

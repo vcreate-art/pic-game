@@ -13,6 +13,9 @@ import type {
 import type { DeathCause, Ghost, RaceEvent, RacePublic, RaceSettings } from './race/types.js';
 import type { CardColor, SpiesPublic, SpiesSettings, SpyRole, SpyTeam } from './spies/types.js';
 import type { BingoCard, BingoPublic, BingoSettings } from './bingo/types.js';
+import type {
+  ManualBonus, MatchScore, TourneyBonuses, TourneyPublic, TourneySettings,
+} from './tourney/types.js';
 
 export interface JoinOk {
   ok: true;
@@ -161,6 +164,33 @@ export interface ClientToServerEvents {
   'bingo:rematch': () => void;
   'bingo:toLobby': () => void;
 
+  // ---- MK11 Tournament: the host runs it, everyone else watches ----
+  'tourney:settings': (p: Partial<Omit<TourneySettings, 'bonuses'>> & { bonuses?: Partial<TourneyBonuses> }) => void;
+  /** Host: someone without the app, by name. */
+  'tourney:add': (p: { name: string; main: string | null }) => void;
+  /** Host: everyone in the room who is not entered yet. */
+  'tourney:addRoom': () => void;
+  'tourney:remove': (p: { id: string }) => void;
+  /** Host for anyone; a player for their own entry. */
+  'tourney:main': (p: { id: string; main: string | null }) => void;
+  'tourney:signUp': () => void;
+  'tourney:withdraw': () => void;
+  /** Host: put someone else into the match up next. */
+  'tourney:swap': (p: { side: 0 | 1; id: string }) => void;
+  'tourney:startMatch': () => void;
+  'tourney:cancel': () => void;
+  'tourney:report': (p: {
+    winner: string;
+    score: MatchScore;
+    bonuses: ManualBonus[];
+    chars: { a: string | null; b: string | null } | null;
+  }) => void;
+  'tourney:undo': () => void;
+  'tourney:end': () => void;
+  'tourney:toSetup': () => void;
+  /** Host: a tournament saved in their browser, after a server restart. */
+  'tourney:restore': (p: { state: unknown }) => void;
+
   /** Round-trip probe used to estimate clock offset against the server. */
   'time:ping': (cb: (serverNow: number) => void) => void;
 }
@@ -279,6 +309,9 @@ export interface ServerToClientEvents {
   'bingo:state': (p: BingoPublic) => void;
   /** Your own card. Sent to your socket alone; null when you have none. */
   'bingo:card': (p: BingoCard | null) => void;
+
+  // ---- MK11 Tournament ----
+  'tourney:state': (p: TourneyPublic) => void;
 
   'error': (p: { code: string; message: string }) => void;
 }

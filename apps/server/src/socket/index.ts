@@ -1,7 +1,7 @@
 import type { Server, Socket } from 'socket.io';
 import {
   AVATAR_COLORS, AVATAR_FACES, GAME_KINDS, sanitizePoints, PALETTE, BRUSH_SIZES,
-  type GameKind, type Side,
+  MANUAL_BONUSES, type GameKind, type ManualBonus, type Side,
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
 import {
@@ -13,6 +13,7 @@ import type { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
 import type { RaceRoom } from '../games/race/RaceRoom.js';
 import type { SpiesRoom } from '../games/spies/SpiesRoom.js';
 import type { BingoRoom } from '../games/bingo/BingoRoom.js';
+import type { TourneyRoom } from '../games/tourney/TourneyRoom.js';
 import type { RealmsRoom } from '../games/realms/RealmsRoom.js';
 import type { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
 import { TokenBucket } from '../rateLimit.js';
@@ -94,6 +95,8 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.room?.kind === 'spies' && s.playerId ? s.room : null;
     const bingo = (): BingoRoom | null =>
       s.room?.kind === 'bingo' && s.playerId ? s.room : null;
+    const tourney = (): TourneyRoom | null =>
+      s.room?.kind === 'tourney' && s.playerId ? s.room : null;
 
     socket.on('time:ping', (cb) => {
       if (typeof cb === 'function') cb(Date.now());
@@ -604,6 +607,57 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       const room = bingo();
       if (room && s.playerId) room.toLobby(s.playerId);
     });
+
+    // ---- MK11 Tournament. The room checks who is host; here only shapes, and
+    // the chat bucket, since every one of these rebroadcasts the tournament.
+    const idOf = (v: unknown) => (typeof v === 'string' && v.length > 0 && v.length <= 64 ? v : null);
+    const mainOf = (v: unknown) => (v === null || (typeof v === 'string' && v.length <= 32) ? v : undefined);
+    const tourneyAct = <P>(fn: (room: TourneyRoom, playerId: string, p: P) => void) => (p?: P) => {
+      const room = tourney();
+      if (!room || !s.playerId || !s.chat.tryTake()) return;
+      fn(room, s.playerId, p as P);
+    };
+
+    socket.on('tourney:settings', tourneyAct((r, id, p) => r.updateSettings(id, p ?? {})));
+    socket.on('tourney:add', tourneyAct((r, id, p) => {
+      const name = cleanName(p?.name);
+      if (name) r.add(id, name, p?.main);
+    }));
+    socket.on('tourney:addRoom', tourneyAct((r, id) => r.addRoom(id)));
+    socket.on('tourney:remove', tourneyAct((r, id, p) => {
+      const e = idOf(p?.id);
+      if (e) r.remove(id, e);
+    }));
+    socket.on('tourney:main', tourneyAct((r, id, p) => {
+      const e = idOf(p?.id);
+      const main = mainOf(p?.main);
+      if (e && main !== undefined) r.setMain(id, e, main);
+    }));
+    socket.on('tourney:signUp', tourneyAct((r, id) => r.signUp(id)));
+    socket.on('tourney:withdraw', tourneyAct((r, id) => r.withdraw(id)));
+    socket.on('tourney:swap', tourneyAct((r, id, p) => {
+      const e = idOf(p?.id);
+      if (e && (p?.side === 0 || p?.side === 1)) r.swap(id, p.side, e);
+    }));
+    socket.on('tourney:startMatch', tourneyAct((r, id) => r.startMatch(id)));
+    socket.on('tourney:cancel', tourneyAct((r, id) => r.cancel(id)));
+    socket.on('tourney:report', tourneyAct((r, id, p) => {
+      const winner = idOf(p?.winner);
+      const score = p?.score;
+      const bonuses = Array.isArray(p?.bonuses) ? p.bonuses : [];
+      if (!winner || (score !== '2-0' && score !== '2-1') || bonuses.length > 3) return;
+      if (!bonuses.every((b: unknown) => MANUAL_BONUSES.includes(b as ManualBonus))) return;
+      const chars = p?.chars;
+      const a = chars ? mainOf(chars.a) : null;
+      const b = chars ? mainOf(chars.b) : null;
+      if (a === undefined || b === undefined) return;
+      r.report(id, winner, score, bonuses, chars ? { a, b } : null);
+    }));
+    socket.on('tourney:undo', tourneyAct((r, id) => r.undo(id)));
+    socket.on('tourney:end', tourneyAct((r, id) => r.end(id)));
+    socket.on('tourney:toSetup', tourneyAct((r, id) => r.toSetup(id)));
+    // Validated in full by the room; the socket's own size cap bounds it.
+    socket.on('tourney:restore', tourneyAct((r, id, p) => r.restore(id, p?.state)));
 
     socket.on('room:leave', () => {
       if (!s.room || !s.playerId) return;

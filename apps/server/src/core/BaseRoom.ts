@@ -78,6 +78,16 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     return false;
   }
   protected onTooFewPlayers(): void {}
+
+  /** How long a room with nobody connected is kept. Games that run for hours
+   *  between visits, like a tournament, keep theirs longer. */
+  protected get emptyTtlMs(): number {
+    return EMPTY_ROOM_TTL_MS;
+  }
+  /** How long a dropped player may come back and reclaim their seat. */
+  protected get reconnectGraceMs(): number {
+    return RECONNECT_GRACE_MS;
+  }
   protected onDestroy(): void {}
 
   // ------------------------------------------------------------------ players
@@ -107,7 +117,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     for (const p of this.players.values()) {
       if (p.token !== token) continue;
       if (p.connected) return null; // token in use by a live socket
-      if (p.disconnectedAt && Date.now() - p.disconnectedAt > RECONNECT_GRACE_MS) return null;
+      if (p.disconnectedAt && Date.now() - p.disconnectedAt > this.reconnectGraceMs) return null;
       p.socketId = socketId;
       p.connected = true;
       p.disconnectedAt = null;
@@ -194,7 +204,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
 
   private scheduleEmptyCollection(): void {
     if (this.emptyTimer) clearTimeout(this.emptyTimer);
-    this.emptyTimer = setTimeout(() => this.onEmpty?.(this), EMPTY_ROOM_TTL_MS);
+    this.emptyTimer = setTimeout(() => this.onEmpty?.(this), this.emptyTtlMs);
   }
 
   private cancelEmptyCollection(): void {
