@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type {
-  BingoCard, BingoPublic, BingoRoomState, CardColor, Drawing, TourneyPublic, TourneyRoomState, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
+  BingoCard, BingoPublic, BingoRoomState, CardColor, CryptidClue, CryptidPublic, CryptidRoomState, Drawing, TourneyPublic, TourneyRoomState, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
   RaceRoomState, SpiesPublic, SpiesRoomState, KungFuRoomState, Piece, Player,
   RealmsPublic, RealmsRoomState, RealmsSide, RoomSettings, RoomState, Side,
   SkribblRoomState, WordOption,
@@ -54,6 +54,8 @@ interface GameStore {
   spiesKey: CardColor[] | null;
   /** Our own Bingo card. Nobody else's arrives until the game is over. */
   bingoCard: BingoCard | null;
+  /** Our own Cryptid clue. Nobody else's arrives until they leave or the game ends. */
+  cryptidClue: CryptidClue | null;
   /** Draw & Guess: the last game's drawings. Outlives the podium, so the
    *  gallery stays open when the room drops back to the lobby. */
   gallery: Drawing[] | null;
@@ -88,6 +90,8 @@ interface GameStore {
   setSpiesKey: (key: CardColor[] | null) => void;
   setBingo: (game: BingoPublic) => void;
   setBingoCard: (card: BingoCard | null) => void;
+  setCryptid: (game: CryptidPublic) => void;
+  setCryptidClue: (clue: CryptidClue | null) => void;
   setTourney: (game: TourneyPublic) => void;
   setRealmsHand: (hand: CardInstance[], owed: number) => void;
   realmsOver: (winner: RealmsSide | null) => void;
@@ -119,6 +123,7 @@ export const useGame = create<GameStore>((set) => ({
   realmsOwed: 0,
   spiesKey: null,
   bingoCard: null,
+  cryptidClue: null,
   gallery: null,
   galleryOpen: false,
 
@@ -283,6 +288,10 @@ export const useGame = create<GameStore>((set) => ({
     set((s) => (s.room?.kind === 'bingo' ? { room: { ...s.room, game } } : {})),
   setBingoCard: (bingoCard) => set({ bingoCard }),
 
+  setCryptid: (game) =>
+    set((s) => (s.room?.kind === 'cryptid' ? { room: { ...s.room, game } } : {})),
+  setCryptidClue: (cryptidClue) => set({ cryptidClue }),
+
   setTourney: (game) =>
     set((s) => (s.room?.kind === 'tourney' ? { room: { ...s.room, game } } : {})),
 
@@ -323,7 +332,8 @@ export const useGame = create<GameStore>((set) => ({
       me: null, room: null, secret: null, choices: null, chooseEndsAt: null,
       suggest: null, mySuggestion: null, suggestError: null,
       messages: [], turnResult: null, final: null, notice: null, kickedBy: null,
-      realmsHand: [], realmsOwed: 0, spiesKey: null, bingoCard: null, gallery: null, galleryOpen: false,
+      realmsHand: [], realmsOwed: 0, spiesKey: null, bingoCard: null, cryptidClue: null,
+      gallery: null, galleryOpen: false,
     }),
 }));
 
@@ -351,6 +361,9 @@ export const selectSpies = (s: GameStore): SpiesRoomState | null =>
 
 export const selectBingo = (s: GameStore): BingoRoomState | null =>
   s.room && s.room.kind === 'bingo' ? s.room : null;
+
+export const selectCryptid = (s: GameStore): CryptidRoomState | null =>
+  s.room && s.room.kind === 'cryptid' ? s.room : null;
 
 export const selectTourney = (s: GameStore): TourneyRoomState | null =>
   s.room && s.room.kind === 'tourney' ? s.room : null;

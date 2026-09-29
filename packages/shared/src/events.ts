@@ -13,6 +13,7 @@ import type {
 import type { DeathCause, Ghost, RaceEvent, RacePublic, RaceSettings } from './race/types.js';
 import type { CardColor, SpiesPublic, SpiesSettings, SpyRole, SpyTeam } from './spies/types.js';
 import type { BingoCard, BingoPublic, BingoSettings } from './bingo/types.js';
+import type { CryptidClue, CryptidPublic, CryptidSettings } from './cryptid/types.js';
 import type {
   ManualBonus, MatchScore, TourneyBonuses, TourneyPublic, TourneySettings,
 } from './tourney/types.js';
@@ -167,6 +168,16 @@ export interface ClientToServerEvents {
   'bingo:rematch': () => void;
   'bingo:toLobby': () => void;
 
+  // ---- Cryptid ----
+  'cryptid:settings': (p: Partial<CryptidSettings>) => void;
+  /** A cube from your own supply: in setup, or the one you owe after a no. */
+  'cryptid:cube': (p: { hex: number }) => void;
+  /** Ask another player whether the creature could be on a space. */
+  'cryptid:question': (p: { target: string; hex: number }) => void;
+  'cryptid:search': (p: { hex: number }) => void;
+  'cryptid:rematch': () => void;
+  'cryptid:toLobby': () => void;
+
   // ---- MK11 Tournament: the host runs it, everyone else watches ----
   'tourney:settings': (p: Partial<Omit<TourneySettings, 'bonuses'>> & { bonuses?: Partial<TourneyBonuses> }) => void;
   /** Host: someone without the app, by name. */
@@ -312,6 +323,11 @@ export interface ServerToClientEvents {
   'bingo:state': (p: BingoPublic) => void;
   /** Your own card. Sent to your socket alone; null when you have none. */
   'bingo:card': (p: BingoCard | null) => void;
+
+  // ---- Cryptid ----
+  'cryptid:state': (p: CryptidPublic) => void;
+  /** Your own clue. Sent to your socket alone; null when you have none. */
+  'cryptid:clue': (p: { clue: CryptidClue | null }) => void;
 
   // ---- MK11 Tournament ----
   'tourney:state': (p: TourneyPublic) => void;

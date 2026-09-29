@@ -1,7 +1,7 @@
 import type { Server, Socket } from 'socket.io';
 import {
   AVATAR_COLORS, AVATAR_FACES, GAME_KINDS, sanitizePoints, PALETTE, BRUSH_SIZES,
-  MANUAL_BONUSES, type GameKind, type ManualBonus, type Side,
+  MANUAL_BONUSES, HEXES, type GameKind, type ManualBonus, type Side,
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
 import {
@@ -13,6 +13,7 @@ import type { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
 import type { RaceRoom } from '../games/race/RaceRoom.js';
 import type { SpiesRoom } from '../games/spies/SpiesRoom.js';
 import type { BingoRoom } from '../games/bingo/BingoRoom.js';
+import type { CryptidRoom } from '../games/cryptid/CryptidRoom.js';
 import type { TourneyRoom } from '../games/tourney/TourneyRoom.js';
 import type { RealmsRoom } from '../games/realms/RealmsRoom.js';
 import type { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
@@ -95,6 +96,8 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.room?.kind === 'spies' && s.playerId ? s.room : null;
     const bingo = (): BingoRoom | null =>
       s.room?.kind === 'bingo' && s.playerId ? s.room : null;
+    const cryptid = (): CryptidRoom | null =>
+      s.room?.kind === 'cryptid' && s.playerId ? s.room : null;
     const tourney = (): TourneyRoom | null =>
       s.room?.kind === 'tourney' && s.playerId ? s.room : null;
 
@@ -614,6 +617,35 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       const room = bingo();
       if (room && s.playerId) room.toLobby(s.playerId);
     });
+
+    // ---- Cryptid. Every move rebroadcasts the map, so each takes from the chat
+    // bucket; the room checks turns and legality.
+    const hexOf = (v: unknown) => {
+      const n = Number(v);
+      return Number.isInteger(n) && n >= 0 && n < HEXES ? n : null;
+    };
+    const cryptidAct = <P>(fn: (room: CryptidRoom, playerId: string, p: P) => void) => (p?: P) => {
+      const room = cryptid();
+      if (!room || !s.playerId || !s.chat.tryTake()) return;
+      fn(room, s.playerId, p as P);
+    };
+
+    socket.on('cryptid:settings', cryptidAct((r, id, p) => r.updateSettings(id, p ?? {})));
+    socket.on('cryptid:cube', cryptidAct((r, id, p) => {
+      const hex = hexOf(p?.hex);
+      if (hex !== null) r.cube(id, hex);
+    }));
+    socket.on('cryptid:question', cryptidAct((r, id, p) => {
+      const hex = hexOf(p?.hex);
+      const target = typeof p?.target === 'string' && p.target.length <= 64 ? p.target : null;
+      if (hex !== null && target) r.ask(id, target, hex);
+    }));
+    socket.on('cryptid:search', cryptidAct((r, id, p) => {
+      const hex = hexOf(p?.hex);
+      if (hex !== null) r.searchAt(id, hex);
+    }));
+    socket.on('cryptid:rematch', cryptidAct((r, id) => r.rematch(id)));
+    socket.on('cryptid:toLobby', cryptidAct((r, id) => r.toLobby(id)));
 
     // ---- MK11 Tournament. The room checks who is host; here only shapes, and
     // the chat bucket, since every one of these rebroadcasts the tournament.
