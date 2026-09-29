@@ -1719,6 +1719,10 @@ button, input { font: inherit; color: inherit; }
 .cclue__shade input { width: 16px; height: 16px; accent-color: #86efac; }
 .cclue .settings__note { color: #9fb2a4; margin-top: 8px; }
 .cwatch { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.cwatchers__title { margin: 14px 0 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+.cwatchers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.cwatchers li { display: flex; align-items: center; gap: 7px; padding: 3px 8px; font-size: 13px; font-weight: 600; }
+.cwatchers li.is-away { opacity: .55; }
 
 /* status */
 .cbar {

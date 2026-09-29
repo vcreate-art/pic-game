@@ -3,6 +3,7 @@ import { getSocket } from '../../net/socket.js';
 import { selectCryptid, selectIsHost, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { InviteCard } from '../InviteCard.js';
+import { KickButton } from '../KickButton.js';
 
 const MODES = [
   { advanced: false, name: 'Standard', blurb: 'Every clue says where the creature could be. Six structures in three colours.' },
@@ -31,6 +32,7 @@ export function CryptidLobby({ onLeave }: { onLeave: () => void }) {
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
                 {p.score > 0 && <span className="bingolobby__wins">{p.score} found</span>}
+                {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
               </li>
             ))}
           </ul>

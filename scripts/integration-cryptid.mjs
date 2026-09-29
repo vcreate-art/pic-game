@@ -164,7 +164,11 @@ await sleep(150);
 console.log('\n\x1b[1m7. Watchers\x1b[0m');
 const E = mk('E');
 await ready(E);
-ids.E = (await emitAck(E, 'room:join', { code, name: 'Eve', avatar: {} })).playerId;
+{
+  const r = await emitAck(E, 'room:join', { code, name: 'Eve', avatar: {} });
+  ids.E = r.playerId;
+  tokens.E = r.token;
+}
 await sleep(150);
 check(E.last('cryptid:clue') === undefined || E.last('cryptid:clue').clue === null, 'a late arrival gets no clue');
 E.emit('cryptid:search', { hex: ANSWER });
@@ -194,7 +198,9 @@ sock[leaver].emit('room:leave');
 await sleep(200);
 st = state();
 check(st.openClues[leaver] && clueKey(st.openClues[leaver]) === clueKey(clues[leaver]), 'their clue goes public, since it still counts');
-check(st.phase !== 'lobby' && st.departed[leaver], 'and the game goes on');
+const nameOf = (id) => ({ [ids.A]: 'Ann', [ids.B]: 'Bo', [ids.C]: 'Cy', [ids.D]: 'Di', [ids.E]: 'Eve' })[id];
+check(st.phase !== 'lobby' && st.departed[leaver] === nameOf(leaver),
+  'and the game goes on, still knowing them by name', JSON.stringify(st.departed));
 
 console.log('\n\x1b[1m10. Found\x1b[0m');
 // Pass turns until someone still here is up, then search the answer.
@@ -225,11 +231,31 @@ st = state();
 check(st.phase === 'setup' && JSON.stringify(st.board) !== oldBoard, 'a rematch deals a new map');
 check(st.players.length === 4 && st.players.includes(ids.E), 'the watcher is in this one');
 
-console.log('\n\x1b[1m12. Too few left\x1b[0m');
-const leavers = st.players.filter((id) => id !== ids.A).slice(0, 3);
+console.log('\n\x1b[1m12. Removing a player\x1b[0m');
+const sockOf = (id) => (id === ids.E ? E : sock[id]);
+const victim = st.players.find((id) => id !== ids.A);
+const bystander = st.players.find((id) => id !== ids.A && id !== victim);
+sockOf(bystander).emit('player:kick', { playerId: victim });
+await sleep(150);
+check(!state().departed[victim], 'only the host can remove someone');
+sock[ids.A].emit('player:kick', { playerId: ids.A });
+await sleep(120);
+check(state().players.includes(ids.A) && !state().departed[ids.A], 'the host cannot remove themselves');
+const victimSock = sockOf(victim);
+const victimLabel = victimSock.label;
+sock[ids.A].emit('player:kick', { playerId: victim });
+await sleep(200);
+st = state();
+check(victimSock.saw('kicked').length === 1, 'the removed player is told');
+check(st.departed[victim] === nameOf(victim) && st.openClues[victim], 'mid-game, their clue goes public like a leaver', JSON.stringify(st.departed));
+check(st.phase === 'setup' && st.turn !== victim, 'and play carries on without them');
+const again = await emitAck(mk('again'), 'room:join', { code, name: 'Sneaky', avatar: {}, token: tokens[victimLabel] });
+check(!again.ok && again.code === 'KICKED', 'and cannot come back on the same seat', JSON.stringify(again));
+
+console.log('\n\x1b[1m13. Too few left\x1b[0m');
+const leavers = st.players.filter((id) => id !== ids.A && id !== victim);
 for (const id of leavers) {
-  const s = id === ids.E ? E : sock[id];
-  s.emit('room:leave');
+  sockOf(id).emit('room:leave');
   await sleep(120);
 }
 check(state().phase === 'lobby', 'with one player left, back to the lobby');

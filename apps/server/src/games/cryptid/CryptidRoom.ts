@@ -27,6 +27,8 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
   /** Names of players who left mid-game, for the history. */
   private departed: Record<string, string> = {};
   private awayTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The name of whoever is being removed, while their removal runs. */
+  private leavingName: string | null = null;
 
   constructor(code: string, io: IO) {
     super(code, io);
@@ -62,17 +64,28 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
     return false;
   }
 
+  /** BaseRoom drops the seat before `onPlayerRemoved` runs, so the name is
+   *  caught on the way out for the history and the open clue. */
+  override removePlayer(playerId: string): void {
+    this.leavingName = this.players.get(playerId)?.name ?? null;
+    try {
+      super.removePlayer(playerId);
+    } finally {
+      this.leavingName = null;
+    }
+  }
+
   protected override onPlayerRemoved(playerId: string): boolean {
     const g = this.game;
     if (g && g.stage !== 'ended' && g.order.includes(playerId)) {
-      this.departed[playerId] = this.nameOf(playerId);
+      this.departed[playerId] = this.leavingName ?? 'Someone';
       depart(g, playerId);
       // Watchers keep the room above its minimum, so count the table itself.
       if (g.order.length - g.gone.length < 2) {
         this.onTooFewPlayers();
         return true;
       }
-      this.systemMessage(`${this.departed[playerId]} left. Their clue still counts, so it is now open: "${clueText(g.clues[playerId]!)}".`);
+      this.systemMessage(`${this.departed[playerId]} is out. Their clue still counts, so it is now open: "${clueText(g.clues[playerId]!)}".`);
       this.afterMove();
       return true;
     }

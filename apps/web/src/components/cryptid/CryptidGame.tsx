@@ -7,6 +7,7 @@ import { getSocket } from '../../net/socket.js';
 import { selectCryptid, selectIsHost, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { Chat } from '../Chat.js';
+import { KickButton } from '../KickButton.js';
 import { CryptidLobby } from './CryptidLobby.js';
 import { HexMap, StructureGlyph, TERRAIN_NAMES } from './HexMap.js';
 
@@ -76,6 +77,7 @@ export function CryptidGame({ onLeave }: { onLeave: () => void }) {
     (id && (room.players.find((p) => p.id === id)?.name ?? game.departed[id])) || 'Someone';
 
   const playing = game.players.includes(me);
+  const watchers = room.players.filter((p) => !game.players.includes(p.id));
   const myTurn = game.turn === me;
   const ended = game.phase === 'ended';
   const last = game.log.at(-1) ?? null;
@@ -122,17 +124,32 @@ export function CryptidGame({ onLeave }: { onLeave: () => void }) {
                     <div className="cplayer__row">
                       <span className="cplayer__seat" style={{ background: colorOf(id) }} />
                       {p && <Avatar data={p.avatar} size={24} host={id === room.hostId} />}
-                      <span className="cplayer__name">{name(id)}{gone ? ' (left)' : ''}</span>
+                      <span className="cplayer__name">{name(id)}{gone ? ' (out)' : ''}</span>
                       <span className="cplayer__count" title={`${nDisks} disks, ${nCubes} cubes`}>
                         <Disk color={colorOf(id)} />{nDisks}
                         <Cube color={colorOf(id)} />{nCubes}
                       </span>
+                      {isHost && p && id !== room.hostId && <KickButton playerId={id} name={p.name} />}
                     </div>
                     {open && <p className="cplayer__clue">{clueText(open)}</p>}
                   </li>
                 );
               })}
             </ul>
+            {watchers.length > 0 && (
+              <>
+                <h3 className="cwatchers__title">Watching</h3>
+                <ul className="cwatchers">
+                  {watchers.map((p) => (
+                    <li key={p.id} className={p.connected ? '' : 'is-away'}>
+                      <Avatar data={p.avatar} size={20} host={p.id === room.hostId} />
+                      <span className="cplayer__name">{p.name}</span>
+                      {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </section>
 
           {playing && myClue && (
