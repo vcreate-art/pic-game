@@ -189,6 +189,13 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       room.updateSettings(patch ?? {});
     });
 
+    socket.on('room:words', (p) => {
+      const room = skribbl();
+      if (!room || s.playerId !== room.hostId) return;
+      if (typeof p?.text !== 'string') return;
+      room.setWords(p.text);
+    });
+
     socket.on('game:start', () => {
       if (!s.room || !s.playerId) return;
       s.room.startGame(s.playerId);

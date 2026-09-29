@@ -147,17 +147,17 @@ export function SpiesLobby({ onLeave }: { onLeave: () => void }) {
               ))}
             </div>
             {settings.wordSource !== 'builtin' && (
-              <div className="spywords">
+              <div className="wordbox">
                 <textarea
-                  className="spywords__box"
+                  className="wordbox__box"
                   value={draft}
                   readOnly={!isHost}
                   placeholder="Your words, separated by commas or new lines: inside jokes, a theme, anything."
                   onChange={(e) => setDraft(e.target.value)}
                   rows={4}
                 />
-                <div className="spywords__foot">
-                  <span className={fewWords ? 'spywords__count is-low' : 'spywords__count'}>
+                <div className="wordbox__foot">
+                  <span className={fewWords ? 'wordbox__count is-low' : 'wordbox__count'}>
                     {settings.customWords.length} saved
                   </span>
                   {isHost && (

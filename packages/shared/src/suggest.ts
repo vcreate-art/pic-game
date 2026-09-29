@@ -1,3 +1,5 @@
+import { CUSTOM_WORDS } from './types.js';
+
 export const SUGGEST_MIN_LEN = 3;
 export const SUGGEST_MAX_LEN = 20;
 
@@ -45,6 +47,25 @@ export function validateSuggestion(raw: unknown, taken: ReadonlySet<string> = ne
   if (taken.has(suggestionKey(text))) return fail('duplicate');
 
   return { ok: true, text };
+}
+
+/**
+ * The host's own words, from whatever they pasted: split on commas, semicolons
+ * and new lines, and held to the same rules as a suggestion, since they end up
+ * on the same pick list. Anything that fails is dropped quietly; repeats keep
+ * their first spelling.
+ */
+export function parseDrawWords(input: string): string[] {
+  const taken = new Set<string>();
+  const words: string[] = [];
+  for (const part of input.split(/[\n,;]+/)) {
+    const r = validateSuggestion(part, taken);
+    if (!r.ok) continue;
+    taken.add(suggestionKey(r.text));
+    words.push(r.text);
+    if (words.length >= CUSTOM_WORDS.max) break;
+  }
+  return words;
 }
 
 /** Case- and spacing-insensitive identity, for duplicate detection. */

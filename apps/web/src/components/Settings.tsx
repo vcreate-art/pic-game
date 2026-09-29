@@ -1,4 +1,7 @@
-import { SETTINGS_BOUNDS, type RoomSettings, type WordMode } from '@pic-game/shared';
+import { useEffect, useState } from 'react';
+import {
+  CUSTOM_WORDS, SETTINGS_BOUNDS, WORDS_EN, type WordMode, type WordSource,
+} from '@pic-game/shared';
 import { getSocket } from '../net/socket.js';
 import { selectIsHost, selectSkribbl, useGame } from '../store/game.js';
 
@@ -10,10 +13,20 @@ const FIELDS: Array<{ key: keyof typeof SETTINGS_BOUNDS; label: string; step: nu
   { key: 'maxPlayers', label: 'Max players', step: 1 },
 ];
 
+const SOURCES: Array<[WordSource, string, string]> = [
+  ['builtin', 'Built-in', `${WORDS_EN.length} words.`],
+  ['mixed', 'Mixed', 'Built-in plus yours.'],
+  ['custom', 'Only mine', `Needs ${CUSTOM_WORDS.minForGame} or more.`],
+];
+
 export function Settings() {
   const settings = useGame((s) => selectSkribbl(s)?.settings);
   const isHost = useGame(selectIsHost);
   const socket = getSocket();
+  const saved = settings?.customWords ?? [];
+  const [draft, setDraft] = useState(saved.join(', '));
+  // Pick up the saved list when it changes elsewhere (another host, a reload).
+  useEffect(() => setDraft(saved.join(', ')), [saved.join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!settings) return null;
 
   return (
@@ -65,7 +78,54 @@ export function Settings() {
           guess it. Works best with 4 or more players.
         </p>
       )}
+      <div className="settings__modes">
+        <span className="settings__label">
+          {settings.wordMode === 'players' ? 'Words to fill the gaps' : 'Word pool'}
+        </span>
+        <div className="modes modes--3">
+          {SOURCES.map(([source, label, blurb]) => (
+            <button
+              key={source}
+              type="button"
+              className={`mode ${settings.wordSource === source ? 'is-active' : ''}`}
+              disabled={!isHost}
+              aria-pressed={settings.wordSource === source}
+              onClick={() => socket.emit('room:settings', { wordSource: source })}
+            >
+              <strong>{label}</strong>
+              <span>{blurb}</span>
+            </button>
+          ))}
+        </div>
+        {settings.wordSource !== 'builtin' && (
+          <div className="wordbox">
+            <textarea
+              className="wordbox__box"
+              value={draft}
+              readOnly={!isHost}
+              placeholder="Your words, separated by commas or new lines: inside jokes, a theme, anything drawable."
+              onChange={(e) => setDraft(e.target.value)}
+              rows={4}
+            />
+            <div className="wordbox__foot">
+              <span className={fewWords(settings) ? 'wordbox__count is-low' : 'wordbox__count'}>
+                {settings.customWords.length} saved
+              </span>
+              {isHost && (
+                <button type="button" className="tool" onClick={() => socket.emit('room:words', { text: draft })}>
+                  Save words
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
       {!isHost && <p className="settings__note">Only the host can change these.</p>}
     </div>
   );
+}
+
+/** "Only mine" with too few words to play. The server refuses to start too. */
+export function fewWords(s: { wordSource: WordSource; customWords: string[] }): boolean {
+  return s.wordSource === 'custom' && s.customWords.length < CUSTOM_WORDS.minForGame;
 }

@@ -1,3 +1,5 @@
+import type { WordSource } from './spies/types.js';
+
 /** Fixed logical drawing surface. Every client renders to this and scales on display,
  *  so a stroke drawn on a phone lands in the same place on a desktop. */
 export const LOGICAL_W = 800;
@@ -39,6 +41,19 @@ export type WordMode = 'builtin' | 'players';
 
 export const WORD_MODES: readonly WordMode[] = ['builtin', 'players'];
 
+/** Where the game's own words come from: the shipped list, the host's words
+ *  alone, or both together. In players mode these fill the gaps suggestions
+ *  leave. */
+export const WORD_SOURCES: readonly WordSource[] = ['builtin', 'mixed', 'custom'];
+
+export const CUSTOM_WORDS = {
+  /** Past this, the rest of what was pasted is dropped. */
+  max: 500,
+  /** Fewest words an "only mine" game may start with. Fewer than this and the
+   *  same handful would come round every other turn. */
+  minForGame: 10,
+} as const;
+
 /** Seconds the drawer gets to pick, once the options are on the table. */
 export const CHOOSE_SECONDS = 15;
 /** Backstop for the suggestion window. It normally closes early, the moment
@@ -53,6 +68,9 @@ export interface RoomSettings {
   hints: number;
   maxPlayers: number;
   wordMode: WordMode;
+  wordSource: WordSource;
+  /** The host's words. Replaced wholesale via `room:words`, never patched. */
+  customWords: string[];
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
@@ -62,6 +80,8 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   hints: 2,
   maxPlayers: 12,
   wordMode: 'builtin',
+  wordSource: 'builtin',
+  customWords: [],
 };
 
 /** One option on the drawer's pick list. Carries an id because the list grows

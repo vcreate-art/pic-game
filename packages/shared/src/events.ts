@@ -57,7 +57,10 @@ export interface ClientToServerEvents {
   'player:rename': (p: { name: string; avatar: Avatar }) => void;
   /** Host only. Removes a player and blocks that seat from coming back. */
   'player:kick': (p: { playerId: string }) => void;
-  'room:settings': (p: Partial<RoomSettings>) => void;
+  'room:settings': (p: Partial<Omit<RoomSettings, 'customWords'>>) => void;
+  /** Host only, in the lobby. Replaces the room's own words with whatever
+   *  parses out of `text`. */
+  'room:words': (p: { text: string }) => void;
   'game:start': () => void;
 
   /** Identified by id, not position: in the player-suggested mode the option

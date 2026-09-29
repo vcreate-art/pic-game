@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
-  DEFAULT_SETTINGS, SETTINGS_BOUNDS, WORD_MODES,
-  authorPoints, drawerPoints, guessPoints, judge, maskOf, pickHintPositions,
+  CUSTOM_WORDS, DEFAULT_SETTINGS, SETTINGS_BOUNDS, WORDS_EN, WORD_MODES, WORD_SOURCES,
+  authorPoints, drawerPoints, guessPoints, judge, maskOf, parseDrawWords, pickHintPositions,
   suggestionKey, validateSuggestion,
   type CanvasOp, type ChatMessage, type Drawing, type Phase, type Player,
   type RoomSettings, type RoomState, type SuggestAck, type TurnPublic,
@@ -24,7 +24,7 @@ export interface ServerPlayer extends CorePlayer {
  *  class is the game itself — turns, words, scoring and the canvas. */
 export class SkribblRoom extends BaseRoom<ServerPlayer> {
   readonly kind = 'skribbl' as const;
-  settings: RoomSettings = { ...DEFAULT_SETTINGS };
+  settings: RoomSettings = { ...DEFAULT_SETTINGS, customWords: [] };
   phase: Phase = 'lobby';
   round = 0;
   turnIndex = 0;
@@ -145,7 +145,30 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     if (patch.wordMode && WORD_MODES.includes(patch.wordMode)) {
       this.settings.wordMode = patch.wordMode;
     }
+    if (patch.wordSource && WORD_SOURCES.includes(patch.wordSource)) {
+      this.settings.wordSource = patch.wordSource;
+    }
     this.io.to(this.code).emit('room:settings', this.settings);
+  }
+
+  setWords(text: string): void {
+    if (this.phase !== 'lobby') return;
+    this.settings.customWords = parseDrawWords(String(text).slice(0, 20_000));
+    this.io.to(this.code).emit('room:settings', this.settings);
+  }
+
+  /** The words this game draws from, or null when "only mine" has too few. */
+  private wordPool(): readonly string[] | null {
+    const custom = this.settings.customWords;
+    switch (this.settings.wordSource) {
+      case 'builtin': return WORDS_EN;
+      case 'custom': return custom.length >= CUSTOM_WORDS.minForGame ? custom : null;
+      case 'mixed': {
+        // A host word that is already built in would otherwise come up twice as often.
+        const builtin = new Set(WORDS_EN.map(suggestionKey));
+        return [...WORDS_EN, ...custom.filter((w) => !builtin.has(suggestionKey(w)))];
+      }
+    }
   }
 
   private get playerWords(): boolean {
@@ -159,6 +182,10 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     if (this.phase !== 'lobby' && this.phase !== 'gameEnd') return;
     if (this.activeCount() < 2) {
       this.emitError(byPlayerId, 'TOO_FEW', 'Need at least 2 players to start.');
+      return;
+    }
+    if (!this.wordPool()) {
+      this.emitError(byPlayerId, 'FEW_WORDS', `Add at least ${CUSTOM_WORDS.minForGame} words of your own.`);
       return;
     }
     for (const p of this.players.values()) p.score = 0;
@@ -185,7 +212,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
     // Always stock a full list of built-ins. In players mode these are padding
     // that suggestions push out; in builtin mode they are the whole list.
-    this.padding = pickWords(this.settings.wordChoices, this.usedWords).map((text) => {
+    this.padding = pickWords(this.settings.wordChoices, this.usedWords, this.wordPool() ?? WORDS_EN).map((text) => {
       const id = randomUUID();
       this.offered.set(id, { text, authorId: null });
       return { id, text };

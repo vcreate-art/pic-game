@@ -5,16 +5,18 @@ import { Avatar } from './Avatar.js';
 import { GalleryButton } from './Gallery.js';
 import { InviteCard } from './InviteCard.js';
 import { KickButton } from './KickButton.js';
-import { Settings } from './Settings.js';
+import { Settings, fewWords } from './Settings.js';
 
 export function Lobby() {
   const room = useGame((s) => s.room);
   const isHost = useGame(selectIsHost);
-  const maxPlayers = useGame((s) => selectSkribbl(s)?.settings.maxPlayers);
+  const settings = useGame((s) => selectSkribbl(s)?.settings);
+  const maxPlayers = settings?.maxPlayers;
   const socket = getSocket();
   if (!room) return null;
 
   const enough = room.players.filter((p) => p.connected).length >= 2;
+  const short = !!settings && fewWords(settings);
 
 
   return (
@@ -46,10 +48,10 @@ export function Lobby() {
           <button
             type="button"
             className="btn btn--primary btn--lg"
-            disabled={!enough}
+            disabled={!enough || short}
             onClick={() => socket.emit('game:start')}
           >
-            {enough ? 'Start game' : 'Need 2+ players'}
+            {!enough ? 'Need 2+ players' : short ? 'Add more of your words' : 'Start game'}
           </button>
         ) : (
           <p className="settings__note">Waiting for the host to start…</p>

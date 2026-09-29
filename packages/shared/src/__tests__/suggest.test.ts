@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   authorPoints, suggestionKey, tidySuggestion, validateSuggestion,
-  AUTHOR_FLOOR, maskOf, judge, WORDS_EN,
+  AUTHOR_FLOOR, CUSTOM_WORDS, maskOf, judge, parseDrawWords, WORDS_EN,
 } from '../index.js';
 
 describe('authorPoints', () => {
@@ -91,5 +91,29 @@ describe('the built-in word list', () => {
       expect(validateSuggestion(word), word).toMatchObject({ ok: true, text: word });
       expect(judge(word, word), word).toBe('correct');
     }
+  });
+});
+
+describe('parseDrawWords', () => {
+  it('splits on commas, semicolons and new lines, and tidies each word', () => {
+    expect(parseDrawWords('  pizza ,taco\nhot   dog;\n\nice-cream ')).toEqual(['pizza', 'taco', 'hot dog', 'ice-cream']);
+  });
+
+  it('keeps the first spelling of a repeat', () => {
+    expect(parseDrawWords('Hot Dog, hot dog, hotdog, HOT-DOG')).toEqual(['Hot Dog']);
+  });
+
+  it('drops what a suggestion would refuse, since both land on the same pick list', () => {
+    expect(parseDrawWords('ok, no, r2d2, <b>, a word far too long to ever draw, café')).toEqual(['café']);
+  });
+
+  it('stops at the cap', () => {
+    const many = Array.from({ length: CUSTOM_WORDS.max + 50 }, (_, i) => `word ${'x'.repeat(i % 10 + 1)}${String.fromCharCode(97 + (i % 26))}${String.fromCharCode(97 + Math.floor(i / 26) % 26)}`);
+    expect(parseDrawWords(many.join('\n'))).toHaveLength(CUSTOM_WORDS.max);
+  });
+
+  it('gives nothing for nothing', () => {
+    expect(parseDrawWords('')).toEqual([]);
+    expect(parseDrawWords(' , ;\n')).toEqual([]);
   });
 });
