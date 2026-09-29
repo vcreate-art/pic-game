@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type {
-  BingoCard, BingoPublic, BingoRoomState, CardColor, CryptidClue, CryptidPublic, CryptidRoomState, Drawing, TourneyPublic, TourneyRoomState, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
+  BingoCard, BingoPublic, BingoRoomState, CardColor, CryptidClue, CryptidPublic, CryptidRoomState, Flip7Public, Flip7RoomState, Drawing, TourneyPublic, TourneyRoomState, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
   RaceRoomState, SpiesPublic, SpiesRoomState, KungFuRoomState, Piece, Player,
   RealmsPublic, RealmsRoomState, RealmsSide, RoomSettings, RoomState, Side,
   SkribblRoomState, WordOption,
@@ -92,6 +92,7 @@ interface GameStore {
   setBingoCard: (card: BingoCard | null) => void;
   setCryptid: (game: CryptidPublic) => void;
   setCryptidClue: (clue: CryptidClue | null) => void;
+  setFlip7: (game: Flip7Public) => void;
   setTourney: (game: TourneyPublic) => void;
   setRealmsHand: (hand: CardInstance[], owed: number) => void;
   realmsOver: (winner: RealmsSide | null) => void;
@@ -292,6 +293,9 @@ export const useGame = create<GameStore>((set) => ({
     set((s) => (s.room?.kind === 'cryptid' ? { room: { ...s.room, game } } : {})),
   setCryptidClue: (cryptidClue) => set({ cryptidClue }),
 
+  setFlip7: (game) =>
+    set((s) => (s.room?.kind === 'flip7' ? { room: { ...s.room, game } } : {})),
+
   setTourney: (game) =>
     set((s) => (s.room?.kind === 'tourney' ? { room: { ...s.room, game } } : {})),
 
@@ -364,6 +368,9 @@ export const selectBingo = (s: GameStore): BingoRoomState | null =>
 
 export const selectCryptid = (s: GameStore): CryptidRoomState | null =>
   s.room && s.room.kind === 'cryptid' ? s.room : null;
+
+export const selectFlip7 = (s: GameStore): Flip7RoomState | null =>
+  s.room && s.room.kind === 'flip7' ? s.room : null;
 
 export const selectTourney = (s: GameStore): TourneyRoomState | null =>
   s.room && s.room.kind === 'tourney' ? s.room : null;

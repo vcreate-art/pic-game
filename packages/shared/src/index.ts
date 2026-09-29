@@ -17,4 +17,5 @@ export * from './race/index.js';
 export * from './spies/index.js';
 export * from './bingo/index.js';
 export * from './cryptid/index.js';
+export * from './flip7/index.js';
 export * from './tourney/index.js';

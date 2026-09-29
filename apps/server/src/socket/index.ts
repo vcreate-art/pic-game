@@ -14,6 +14,7 @@ import type { RaceRoom } from '../games/race/RaceRoom.js';
 import type { SpiesRoom } from '../games/spies/SpiesRoom.js';
 import type { BingoRoom } from '../games/bingo/BingoRoom.js';
 import type { CryptidRoom } from '../games/cryptid/CryptidRoom.js';
+import type { Flip7Room } from '../games/flip7/Flip7Room.js';
 import type { TourneyRoom } from '../games/tourney/TourneyRoom.js';
 import type { RealmsRoom } from '../games/realms/RealmsRoom.js';
 import type { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
@@ -98,6 +99,8 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.room?.kind === 'bingo' && s.playerId ? s.room : null;
     const cryptid = (): CryptidRoom | null =>
       s.room?.kind === 'cryptid' && s.playerId ? s.room : null;
+    const flip7 = (): Flip7Room | null =>
+      s.room?.kind === 'flip7' && s.playerId ? s.room : null;
     const tourney = (): TourneyRoom | null =>
       s.room?.kind === 'tourney' && s.playerId ? s.room : null;
 
@@ -646,6 +649,24 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
     }));
     socket.on('cryptid:rematch', cryptidAct((r, id) => r.rematch(id)));
     socket.on('cryptid:toLobby', cryptidAct((r, id) => r.toLobby(id)));
+
+    // ---- Flip 7. The room checks turns; every move rebroadcasts the table,
+    // so each takes from the chat bucket.
+    const flip7Act = <P>(fn: (room: Flip7Room, playerId: string, p: P) => void) => (p?: P) => {
+      const room = flip7();
+      if (!room || !s.playerId || !s.chat.tryTake()) return;
+      fn(room, s.playerId, p as P);
+    };
+    socket.on('flip7:settings', flip7Act((r, id, p) => r.updateSettings(id, p ?? {})));
+    socket.on('flip7:hit', flip7Act((r, id) => r.hit(id)));
+    socket.on('flip7:stay', flip7Act((r, id) => r.stay(id)));
+    socket.on('flip7:choose', flip7Act((r, id, p) => {
+      const target = typeof p?.target === 'string' && p.target.length <= 64 ? p.target : null;
+      if (target) r.choose(id, target);
+    }));
+    socket.on('flip7:next', flip7Act((r, id) => r.next(id)));
+    socket.on('flip7:rematch', flip7Act((r, id) => r.rematch(id)));
+    socket.on('flip7:toLobby', flip7Act((r, id) => r.toLobby(id)));
 
     // ---- MK11 Tournament. The room checks who is host; here only shapes, and
     // the chat bucket, since every one of these rebroadcasts the tournament.

@@ -8,6 +8,7 @@ import { RealmsRoom } from '../games/realms/RealmsRoom.js';
 import { SpiesRoom } from '../games/spies/SpiesRoom.js';
 import { BingoRoom } from '../games/bingo/BingoRoom.js';
 import { CryptidRoom } from '../games/cryptid/CryptidRoom.js';
+import { Flip7Room } from '../games/flip7/Flip7Room.js';
 import { TourneyRoom } from '../games/tourney/TourneyRoom.js';
 import { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
 import type { BaseRoom, CorePlayer } from './BaseRoom.js';
@@ -17,7 +18,7 @@ type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 
 /** Any game's room. Callers narrow on `kind`. */
 export type AnyRoom =
-  | SkribblRoom | KungFuRoom | RealmsRoom | FightRoom | RaceRoom | SpiesRoom | BingoRoom | CryptidRoom | TourneyRoom;
+  | SkribblRoom | KungFuRoom | RealmsRoom | FightRoom | RaceRoom | SpiesRoom | BingoRoom | CryptidRoom | Flip7Room | TourneyRoom;
 
 export class RoomManager {
   private readonly rooms = new Map<string, AnyRoom>();
@@ -42,9 +43,11 @@ export class RoomManager {
                   ? new BingoRoom(code, this.io)
                   : kind === 'cryptid'
                     ? new CryptidRoom(code, this.io)
-                    : kind === 'tourney'
-                      ? new TourneyRoom(code, this.io)
-                      : new SkribblRoom(code, this.io);
+                    : kind === 'flip7'
+                      ? new Flip7Room(code, this.io)
+                      : kind === 'tourney'
+                        ? new TourneyRoom(code, this.io)
+                        : new SkribblRoom(code, this.io);
     room.onEmpty = (r) => this.collect(r);
     this.rooms.set(code, room);
     return room;

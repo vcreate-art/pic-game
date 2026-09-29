@@ -8,6 +8,7 @@ import { RaceGame } from '../components/race/RaceGame.js';
 import { SpiesGame } from '../components/spies/SpiesGame.js';
 import { BingoGame } from '../components/bingo/BingoGame.js';
 import { CryptidGame } from '../components/cryptid/CryptidGame.js';
+import { Flip7Game } from '../components/flip7/Flip7Game.js';
 import { TourneyGame } from '../components/tourney/TourneyGame.js';
 import { Lobby } from '../components/Lobby.js';
 import { Gallery } from '../components/Gallery.js';
@@ -145,6 +146,8 @@ function RoomPage() {
   if (room.kind === 'bingo') return <BingoGame onLeave={leave} />;
 
   if (room.kind === 'cryptid') return <CryptidGame onLeave={leave} />;
+
+  if (room.kind === 'flip7') return <Flip7Game onLeave={leave} />;
 
   if (room.kind === 'tourney') return <TourneyGame onLeave={leave} />;
 

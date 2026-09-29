@@ -17,6 +17,7 @@ import type { RacePublic } from './race/types.js';
 import type { SpiesPublic } from './spies/types.js';
 import type { BingoPublic } from './bingo/types.js';
 import type { CryptidPublic } from './cryptid/types.js';
+import type { Flip7Public } from './flip7/types.js';
 import type { TourneyPublic } from './tourney/types.js';
 
 export interface Avatar {
@@ -162,13 +163,13 @@ export interface Drawing {
 }
 
 /** Which game a room is playing. Fixed when the room is created. */
-export type GameKind = 'skribbl' | 'kungfu' | 'realms' | 'fight' | 'race' | 'spies' | 'bingo' | 'cryptid' | 'tourney';
+export type GameKind = 'skribbl' | 'kungfu' | 'realms' | 'fight' | 'race' | 'spies' | 'bingo' | 'cryptid' | 'flip7' | 'tourney';
 
-export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies', 'bingo', 'cryptid', 'tourney'];
+export const GAME_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies', 'bingo', 'cryptid', 'flip7', 'tourney'];
 
 /** The ones with a playable interface. A kind can exist on the server before
  *  it has a screen, and the picker should only offer what can be played. */
-export const PLAYABLE_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies', 'bingo', 'cryptid', 'tourney'];
+export const PLAYABLE_KINDS: readonly GameKind[] = ['skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies', 'bingo', 'cryptid', 'flip7', 'tourney'];
 
 export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
   skribbl: { name: 'Draw & Guess', blurb: 'One draws a secret word, everyone else races to guess.' },
@@ -180,6 +181,7 @@ export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
   tourney: { name: 'MK11 Tournament', blurb: 'Points, rising entry fees and best-of-3 MK11 matches. Last one standing wins.' },
   bingo: { name: 'Bingo', blurb: 'Fill your grid, call numbers in turn, or play the 75-ball hall game.' },
   cryptid: { name: 'Cryptid', blurb: 'One clue each, one creature on the map. Ask, search, and find it first.' },
+  flip7: { name: 'Flip 7', blurb: 'Flip cards, dodge duplicates, bank before you bust. Seven different numbers wins big.' },
 };
 
 /** What every room reports, whichever game it is running. */
@@ -242,6 +244,11 @@ export interface CryptidRoomState extends RoomStateBase {
   game: CryptidPublic;
 }
 
+export interface Flip7RoomState extends RoomStateBase {
+  kind: 'flip7';
+  game: Flip7Public;
+}
+
 export interface TourneyRoomState extends RoomStateBase {
   kind: 'tourney';
   game: TourneyPublic;
@@ -251,7 +258,7 @@ export interface TourneyRoomState extends RoomStateBase {
  *  a compile error rather than an undefined at runtime. */
 export type RoomState =
   | SkribblRoomState | KungFuRoomState | RealmsRoomState | FightRoomState | RaceRoomState
-  | SpiesRoomState | BingoRoomState | CryptidRoomState | TourneyRoomState;
+  | SpiesRoomState | BingoRoomState | CryptidRoomState | Flip7RoomState | TourneyRoomState;
 
 /** `divider` marks a new turn: the chat draws it as a rule, not a line of text. */
 export type ChatKind = 'chat' | 'system' | 'correct' | 'close' | 'secret' | 'divider';

@@ -3,7 +3,7 @@
 import { io } from 'socket.io-client';
 
 const URL = process.env.PIC_GAME_URL ?? 'http://localhost:3001';
-const KINDS = ['skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies', 'bingo', 'cryptid', 'tourney'];
+const KINDS = ['skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies', 'bingo', 'cryptid', 'flip7', 'tourney'];
 const pass = [], fail = [];
 const ok = (m) => { pass.push(m); console.log(`  \x1b[32mPASS\x1b[0m ${m}`); };
 const bad = (m, d = '') => { fail.push(m); console.log(`  \x1b[31mFAIL\x1b[0m ${m}${d ? ` — ${d}` : ''}`); };

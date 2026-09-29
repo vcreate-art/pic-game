@@ -14,6 +14,7 @@ import type { DeathCause, Ghost, RaceEvent, RacePublic, RaceSettings } from './r
 import type { CardColor, SpiesPublic, SpiesSettings, SpyRole, SpyTeam } from './spies/types.js';
 import type { BingoCard, BingoPublic, BingoSettings } from './bingo/types.js';
 import type { CryptidClue, CryptidPublic, CryptidSettings } from './cryptid/types.js';
+import type { Flip7Public, Flip7Settings } from './flip7/types.js';
 import type {
   ManualBonus, MatchScore, TourneyBonuses, TourneyPublic, TourneySettings,
 } from './tourney/types.js';
@@ -178,6 +179,17 @@ export interface ClientToServerEvents {
   'cryptid:rematch': () => void;
   'cryptid:toLobby': () => void;
 
+  // ---- Flip 7 ----
+  'flip7:settings': (p: Partial<Flip7Settings>) => void;
+  'flip7:hit': () => void;
+  'flip7:stay': () => void;
+  /** Who the action card you drew goes to. */
+  'flip7:choose': (p: { target: string }) => void;
+  /** Host: deal the next round once the scores are in. */
+  'flip7:next': () => void;
+  'flip7:rematch': () => void;
+  'flip7:toLobby': () => void;
+
   // ---- MK11 Tournament: the host runs it, everyone else watches ----
   'tourney:settings': (p: Partial<Omit<TourneySettings, 'bonuses'>> & { bonuses?: Partial<TourneyBonuses> }) => void;
   /** Host: someone without the app, by name. */
@@ -328,6 +340,9 @@ export interface ServerToClientEvents {
   'cryptid:state': (p: CryptidPublic) => void;
   /** Your own clue. Sent to your socket alone; null when you have none. */
   'cryptid:clue': (p: { clue: CryptidClue | null }) => void;
+
+  // ---- Flip 7: everything is face up, so the state is the whole story ----
+  'flip7:state': (p: Flip7Public) => void;
 
   // ---- MK11 Tournament ----
   'tourney:state': (p: TourneyPublic) => void;
