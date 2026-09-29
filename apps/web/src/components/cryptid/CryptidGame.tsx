@@ -229,6 +229,46 @@ export function CryptidGame({ onLeave }: { onLeave: () => void }) {
   );
 }
 
+/**
+ * What this phase is for and what you can do in it, shown before a space is
+ * picked. Questions and searches only exist on a normal turn, so setup says
+ * so rather than leaving them to be discovered.
+ */
+function Guide({ game, myTurn, turnName }: { game: CryptidPublic; myTurn: boolean; turnName: string }) {
+  if (game.phase === 'setup') {
+    return (
+      <>
+        <strong className="cguide__title">Setup · {game.setupLeft} cube{game.setupLeft === 1 ? '' : 's'} to go</strong>
+        <p className="cactions__hint">
+          Everyone puts down two cubes first, each on a space their own clue rules out.
+          Questions and searches start once setup is done.
+        </p>
+        {myTurn && <p className="cactions__hint"><b>Your go:</b> tap a space your clue rules out.</p>}
+      </>
+    );
+  }
+  if (game.phase === 'penalty' && myTurn) {
+    return (
+      <>
+        <strong className="cguide__title">You owe a cube</strong>
+        <p className="cactions__hint">You were told no, so tap a space your own clue rules out and put a cube there.</p>
+      </>
+    );
+  }
+  if (game.phase === 'turn' && myTurn) {
+    return (
+      <>
+        <strong className="cguide__title">Your turn: do one of these</strong>
+        <ul className="cguide__list">
+          <li><b>Question</b>: tap a space, then pick a player. Their clue answers: a disk for could be, a cube for no.</li>
+          <li><b>Search</b>: tap a space your clue allows. Everyone answers in turn; all yes and you have found it.</li>
+        </ul>
+      </>
+    );
+  }
+  return <p className="cactions__hint">Waiting for {turnName}. Tap any space to see what is on it.</p>;
+}
+
 /** What the selected space allows the player to do right now. */
 function Actions(props: {
   game: CryptidPublic;
@@ -248,9 +288,7 @@ function Actions(props: {
   if (h === null) {
     return (
       <section className="card cactions">
-        <p className="cactions__hint">
-          {myTurn ? 'Tap a space on the map to act on it.' : 'Tap a space to see what is on it.'}
-        </p>
+        <Guide game={game} myTurn={myTurn} turnName={game.turn ? name(game.turn) : 'Someone'} />
       </section>
     );
   }

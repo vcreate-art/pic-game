@@ -1798,6 +1798,9 @@ button, input { font: inherit; color: inherit; }
 /* actions */
 .cactions { display: flex; flex-direction: column; gap: 10px; }
 .cactions__hint { margin: 0; color: var(--ink-soft); font-size: 13.5px; }
+.cguide__title { font-family: var(--display); font-size: 16px; line-height: 1.2; }
+.cguide__list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink-soft); }
+.cguide__list b, .cactions__hint b { color: var(--ink); }
 .cactions__space { display: flex; flex-direction: column; gap: 2px; }
 .cactions__space strong { font-family: var(--display); font-size: 22px; line-height: 1; }
 .cactions__space span { font-size: 13px; color: var(--ink-soft); text-transform: capitalize; }
