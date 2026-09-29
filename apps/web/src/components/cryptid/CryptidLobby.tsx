@@ -10,6 +10,11 @@ const MODES = [
   { advanced: true, name: 'Advanced', blurb: 'Adds black structures, and clues that say where it is NOT. Harder to read.' },
 ];
 
+const SETUPS = [
+  { setupCubes: true, name: 'Two cubes each', blurb: 'The box rules: everyone rules out two spaces before the first question.' },
+  { setupCubes: false, name: 'Skip setup', blurb: 'Straight to the questions. Quicker, with less to go on at the start.' },
+];
+
 export function CryptidLobby({ onLeave }: { onLeave: () => void }) {
   const room = useGame(selectCryptid);
   const isHost = useGame(selectIsHost);
@@ -60,8 +65,28 @@ export function CryptidLobby({ onLeave }: { onLeave: () => void }) {
             </div>
           </div>
 
+          <div className="settings__modes">
+            <span className="settings__label">Setup</span>
+            <div className="modes">
+              {SETUPS.map((m) => (
+                <button
+                  key={m.name}
+                  type="button"
+                  className={`mode ${settings.setupCubes === m.setupCubes ? 'is-active' : ''}`}
+                  disabled={!isHost}
+                  aria-pressed={settings.setupCubes === m.setupCubes}
+                  onClick={() => socket.emit('cryptid:settings', { setupCubes: m.setupCubes })}
+                >
+                  <strong>{m.name}</strong>
+                  <span>{m.blurb}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <ol className="clobby__rules">
             <li>Everyone gets one secret clue. Together they point at exactly one space.</li>
+            {settings.setupCubes && <li>First, everyone puts down two cubes on spaces their clue rules out.</li>}
             <li>On your turn, <b>question</b> a player about a space, or <b>search</b> one your clue allows.</li>
             <li>A disk means "could be here", a cube means "cannot be". Told no? You put down a cube too.</li>
             <li>Search the one space every clue allows, and you win.</li>

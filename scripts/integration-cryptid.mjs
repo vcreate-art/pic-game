@@ -73,6 +73,11 @@ check(A.last('cryptid:state')?.settings.advanced !== true, 'only the host change
 A.emit('cryptid:settings', { advanced: true });
 await sleep(150);
 check(B.last('cryptid:state')?.settings.advanced === true, 'the host turns on the advanced game');
+A.emit('cryptid:settings', { setupCubes: false });
+await sleep(150);
+check(B.last('cryptid:state')?.settings.setupCubes === false, 'setup cubes can be switched off');
+A.emit('cryptid:settings', { setupCubes: true });
+await sleep(150);
 
 console.log('\n\x1b[1m3. Dealing\x1b[0m');
 A.emit('game:start');

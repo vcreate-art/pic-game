@@ -25,19 +25,23 @@ export interface CryptidGame {
   gone: string[];
 }
 
-export function newCryptid(board: CryptidBoard, order: string[], clues: CryptidClue[], answer: number): CryptidGame {
+/** `setupCubes` is how many each player puts down before the first turn;
+ *  with none, the game opens on that turn. */
+export function newCryptid(
+  board: CryptidBoard, order: string[], clues: CryptidClue[], answer: number, setupCubes = SETUP_CUBES,
+): CryptidGame {
   const byId: Record<string, CryptidClue> = {};
   const owed: Record<string, number> = {};
   order.forEach((id, i) => {
     byId[id] = clues[i]!;
-    owed[id] = SETUP_CUBES;
+    owed[id] = setupCubes;
   });
   return {
     board,
     order: [...order],
     clues: byId,
     answer,
-    stage: 'setup',
+    stage: setupCubes > 0 ? 'setup' : 'turn',
     turn: 0,
     owed,
     disks: Array.from({ length: HEXES }, () => []),

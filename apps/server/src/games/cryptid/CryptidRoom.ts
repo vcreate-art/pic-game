@@ -1,5 +1,5 @@
 import {
-  CRYPTID_DEFAULTS, CRYPTID_MAX_PLAYERS, CRYPTID_MIN_PLAYERS, CryptidError, autoMove, clueText,
+  CRYPTID_DEFAULTS, CRYPTID_MAX_PLAYERS, CRYPTID_MIN_PLAYERS, CryptidError, SETUP_CUBES, autoMove, clueText,
   cryptidTurn, depart, generatePuzzle, hexLabel, newCryptid, placeCube, question, search, setupLeft,
   type CryptidClue, type CryptidGame, type CryptidPublic, type CryptidSettings, type RoomState,
 } from '@pic-game/shared';
@@ -108,6 +108,7 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
   updateSettings(by: string, patch: Partial<CryptidSettings>): void {
     if (by !== this.hostId || !this.canSetUp()) return;
     if (typeof patch.advanced === 'boolean') this.settings.advanced = patch.advanced;
+    if (typeof patch.setupCubes === 'boolean') this.settings.setupCubes = patch.setupCubes;
     this.broadcast();
   }
 
@@ -127,10 +128,15 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
     // Five at most; anyone past that watches this one.
     const seats = shuffle(here).slice(0, CRYPTID_MAX_PLAYERS);
     const puzzle = generatePuzzle(seats.length, this.settings.advanced, Math.random);
-    this.game = newCryptid(puzzle.board, seats, puzzle.clues, puzzle.answer);
+    const cubes = this.settings.setupCubes ? SETUP_CUBES : 0;
+    this.game = newCryptid(puzzle.board, seats, puzzle.clues, puzzle.answer, cubes);
     this.departed = {};
     for (const id of this.players.keys()) this.sendClue(id);
-    this.systemMessage(`A new map. ${this.nameOf(seats[0]!)} goes first: everyone puts down two cubes where their clue rules the creature out.`);
+    this.systemMessage(
+      cubes
+        ? `A new map. ${this.nameOf(seats[0]!)} goes first: everyone puts down two cubes where their clue rules the creature out.`
+        : `A new map, no setup cubes. ${this.nameOf(seats[0]!)} asks first.`,
+    );
     this.afterMove();
   }
 

@@ -68,9 +68,12 @@ export type CryptidClue = CryptidClueBase & { not: boolean };
 export interface CryptidSettings {
   /** Black structures and "not" clues. */
   advanced: boolean;
+  /** Start with the box's setup round, two cubes each, or go straight to the
+   *  first question. */
+  setupCubes: boolean;
 }
 
-export const CRYPTID_DEFAULTS: CryptidSettings = { advanced: false };
+export const CRYPTID_DEFAULTS: CryptidSettings = { advanced: false, setupCubes: true };
 
 export const CRYPTID_MIN_PLAYERS = 3;
 export const CRYPTID_MAX_PLAYERS = 5;

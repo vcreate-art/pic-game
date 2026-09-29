@@ -223,6 +223,16 @@ describe('setup', () => {
     expect(g.cubes.filter(Boolean)).toHaveLength(6);
   });
 
+  it('can be skipped: with no setup cubes, the first player asks straight away', () => {
+    const f = fixture();
+    const board = f.board;
+    const g = newCryptid(board, f.g.order, f.g.order.map((id) => f.g.clues[id]!), f.g.answer, 0);
+    expect(g.stage).toBe('turn');
+    expect(cryptidTurn(g)).toBe('A');
+    expect(setupLeft(g)).toBe(0);
+    expect(question(g, 'A', 'B', first(board, 'swamp'))).toBe(true);
+  });
+
   it('offers only the spaces a cube may go', () => {
     const { g, board } = fixture();
     const spaces = cubeSpaces(g, 'A');
