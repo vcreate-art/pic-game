@@ -38,13 +38,15 @@ export function MazeGame({ onLeave }: { onLeave: () => void }) {
       seed: game.seed,
       cols: game.cols,
       rows: game.rows,
+      theme: game.theme,
+      fog: game.settings.fog,
       mySeat,
       names,
       radar: game.settings.radar,
       endsAt: game.endsAt,
       live: game.phase === 'playing',
     });
-  }, [game?.seed, game?.cols, game?.rows, mySeat, names.join('|'), game?.settings.radar, game?.endsAt, game?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [game?.seed, game?.cols, game?.rows, game?.theme, game?.settings.fog, mySeat, names.join('|'), game?.settings.radar, game?.endsAt, game?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!room || !me || !game) return null;
   if (game.phase === 'lobby') return <MazeLobby onLeave={onLeave} />;

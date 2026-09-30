@@ -681,7 +681,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       const keys = Number(p?.keys);
       const aim = Number(p?.aim);
       if (!Number.isSafeInteger(seq) || !Number.isInteger(keys) || !Number.isInteger(aim)) return;
-      room.input(s.playerId, { seq, keys, aim, fire: p?.fire === true });
+      room.input(s.playerId, { seq, keys, aim, fire: p?.fire === true, alt: p?.alt === true });
     });
     const mazeAct = <P>(fn: (room: MazeRoom, playerId: string, p: P) => void) => (p?: P) => {
       const room = maze();

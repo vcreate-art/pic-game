@@ -50,16 +50,24 @@ check(state.settings.powerups === true, 'power-ups are on by default');
 A.emit('maze:settings', { powerups: 'yes' });
 await sleep(120);
 check(state.settings.powerups === true, 'power-ups take only a true or false');
+check(state.settings.theme === 'random' && state.settings.fog === false, 'a random look and no fog by default');
+A.emit('maze:settings', { theme: 'lava', fog: 'on' });
+await sleep(120);
+check(state.settings.theme === 'random' && state.settings.fog === false, 'only real looks and a true or false for fog');
+A.emit('maze:settings', { theme: 'temple', fog: true });
+await sleep(120);
+check(state.settings.theme === 'temple' && state.settings.fog === true, 'the host picks the temple, with fog');
 
 console.log('\n\x1b[1m3. The match\x1b[0m');
 A.emit('game:start');
 await sleep(700);
 check(state.phase === 'playing' && state.players.length === 2 && state.seed > 0, 'playing, with a seed for the maze');
+check(state.theme === 'temple', `the match is in the look picked (${state.theme})`);
 check(state.cols >= 12 && state.rows >= 8, `a maze sized for two (${state.cols}×${state.rows})`);
 const n = A.frames().length;
 check(n >= 15 && n <= 25, `frames stream at about 30 a second (${n} in 0.7s)`);
 let f = A.frames().at(-1);
-check(f.p.length === 2 && f.p.every((p) => p.length === 9 && (p[4] & 1)), 'both players alive in the frame, with their power-ups');
+check(f.p.length === 2 && f.p.every((p) => p.length === 11 && (p[4] & 1)), 'both players alive in the frame, with stack, shield and speed');
 check(Array.isArray(f.u), 'frames carry the pickups');
 const seatA = state.players.indexOf(c.playerId);
 const seatB = state.players.indexOf(jb.playerId);
@@ -105,6 +113,14 @@ if (!moved) bad('could not find a way to walk to test stopping');
 console.log('\n\x1b[1m5. Shooting\x1b[0m');
 const before = A.frames().at(-1).b.length;
 await moveFor(0, 12, true, 1024);
+// The secondary with nothing on the stack fires nothing.
+const bulletsBefore = A.frames().at(-1).b.filter((b) => b[3] === seatA).length;
+for (let i = 0; i < 6; i++) {
+  A.emit('maze:input', { seq: ++seq, keys: 0, aim: 1024, fire: false, alt: true });
+  await sleep(33);
+}
+await sleep(100);
+check(A.frames().at(-1).b.filter((b) => b[3] === seatA).length <= bulletsBefore, 'the secondary with an empty stack fires nothing');
 const shots = new Set(A.frames().slice(-15).flatMap((fr) => fr.b.filter((b) => b[3] === seatA).map((b) => b[0])));
 check(shots.size >= 1, `holding fire shoots (${shots.size} bullets seen)`);
 check(shots.size <= 3, 'at the fire rate, not every tick');

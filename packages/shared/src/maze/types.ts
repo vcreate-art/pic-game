@@ -57,7 +57,10 @@ export interface MazeInput {
   seq: number;
   keys: number;
   aim: number;
+  /** The gun, held. */
   fire: boolean;
+  /** The secondary: whatever power-up is on top of your stack, held. */
+  alt: boolean;
 }
 
 export type MazeRadar = 'all' | 'firing';
@@ -70,32 +73,79 @@ export interface MazeSettings {
   radar: MazeRadar;
   /** Pickups in the maze, swaps on kills, and the odd shuffle. */
   powerups: boolean;
+  /** How the maze looks; `random` picks one each match. */
+  theme: MazeThemeChoice;
+  /** You see only what your player could: anything round a corner is dark. */
+  fog: boolean;
 }
 
-export const MAZE_DEFAULTS: MazeSettings = { minutes: 5, killLimit: 15, radar: 'all', powerups: true };
+/**
+ * The looks a maze comes in. Only the drawing differs; the layout, and
+ * everything that stops a bullet, is the same whichever it is.
+ */
+export type MazeTheme = 'neon' | 'temple' | 'industrial';
+export type MazeThemeChoice = MazeTheme | 'random';
+export const MAZE_THEMES: readonly MazeTheme[] = ['neon', 'temple', 'industrial'];
+export const MAZE_THEME_NAMES: Record<MazeTheme, string> = {
+  neon: 'Neon grid', temple: 'Jungle temple', industrial: 'Industrial base',
+};
+
+export const MAZE_DEFAULTS: MazeSettings = {
+  minutes: 5, killLimit: 15, radar: 'all', powerups: true, theme: 'random', fog: false,
+};
 
 // ---------------------------------------------------------------- power-ups
 
 /**
- * What a player can hold, one at a time:
- *  - speed: faster for a while
- *  - missile: shots that fly through walls and hit harder
- *  - spread: a shotgun, five pellets a blast at short range
- *  - life: a shield worth a second health bar, used up first
+ * The pickups in the maze, in two kinds.
+ *
+ * Items go on a stack, the last picked up on top, and the secondary button
+ * uses whatever is on top:
+ *  - speed: pressed, faster for a while
+ *  - missile: held, shots that fly through walls and hit harder
+ *  - spread: held, a shotgun, five pellets a blast at short range
+ *
+ * A shield sits apart from the stack, so it stacks with any of them: a
+ * second health bar, spent first. Nobody can hold two shields at once.
  */
-export type PowerKind = 'speed' | 'missile' | 'spread' | 'life';
-export const POWER_KINDS: readonly PowerKind[] = ['speed', 'missile', 'spread', 'life'];
+export type PowerKind = 'speed' | 'missile' | 'spread' | 'shield';
+export const POWER_KINDS: readonly PowerKind[] = ['speed', 'missile', 'spread', 'shield'];
+export type ItemKind = Exclude<PowerKind, 'shield'>;
+export const ITEM_KINDS: readonly ItemKind[] = ['speed', 'missile', 'spread'];
+/** Most items one player can carry; past that, pickups are left lying. */
+export const MAX_ITEMS = 3;
 /** In frames a power travels as its index here plus one; 0 is none. */
 export const powerCode = (k: PowerKind | null): number => (k ? POWER_KINDS.indexOf(k) + 1 : 0);
 export const powerOf = (code: number): PowerKind | null => POWER_KINDS[code - 1] ?? null;
 
+/**
+ * A stack of items as one number for a frame: each item's code (1 to 3) in
+ * base 4, the top of the stack in the lowest digit.
+ */
+export function packItems(kinds: readonly ItemKind[]): number {
+  let n = 0;
+  for (let i = kinds.length - 1; i >= 0; i--) n = n * 4 + powerCode(kinds[i]!);
+  return n;
+}
+
+/** The stack from a frame, top first. */
+export function unpackItems(n: number): ItemKind[] {
+  const out: ItemKind[] = [];
+  while (n > 0) {
+    const k = powerOf(n % 4);
+    if (k && k !== 'shield') out.push(k);
+    n = Math.floor(n / 4);
+  }
+  return out;
+}
+
 export const POWER_NAMES: Record<PowerKind, string> = {
-  speed: 'Speed', missile: 'Ghost missiles', spread: 'Spread shot', life: 'Double life',
+  speed: 'Speed', missile: 'Ghost missiles', spread: 'Spread shot', shield: 'Shield',
 };
 
 /** How much of each you get: ticks of speed, missiles, blasts, shield points. */
 export const POWER_AMOUNT: Record<PowerKind, number> = {
-  speed: 10 * MAZE_HZ, missile: 6, spread: 8, life: MAX_HP,
+  speed: 10 * MAZE_HZ, missile: 6, spread: 8, shield: MAX_HP,
 };
 
 export const SPEED_BOOST = 1.6;
@@ -129,6 +179,8 @@ export interface MazePublic {
   players: string[];
   /** The maze is rebuilt on every client from these. */
   seed: number;
+  /** This match's look, settled from the setting when it began. */
+  theme: MazeTheme;
   cols: number;
   rows: number;
   scores: Record<string, MazeScore>;
@@ -145,13 +197,17 @@ export const SHOT = { BULLET: 0, MISSILE: 1, PELLET: 2 } as const;
 
 /**
  * One tick of the match, sent unreliably: a late frame is useless.
- *  - p: per seat [x, y, aim, hp, flags, ack, respawnIn, power, powerLeft]
+ *  - p: per seat [x, y, aim, hp, flags, ack, respawnIn, items, topLeft, shield, speedLeft]
+ *    where items is the stack packed by packItems, and topLeft is what is
+ *    left of the top item (missiles or blasts)
  *  - b: bullets [id, x, y, seat, shot]
  *  - u: pickups lying in the maze [id, power, x, y]
  */
+export type MazeFramePlayer = [number, number, number, number, number, number, number, number, number, number, number];
+
 export interface MazeFrame {
   t: number;
-  p: [number, number, number, number, number, number, number, number, number][];
+  p: MazeFramePlayer[];
   b: [number, number, number, number, number][];
   u: [number, number, number, number][];
 }

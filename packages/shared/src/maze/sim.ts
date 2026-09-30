@@ -1,9 +1,9 @@
 import { cellCentre, mazeSolidAt, worldH, worldW, type MazeMap } from './map.js';
 import {
   BULLET_DAMAGE, BULLET_LIFE, BULLET_SPEED, CELL, FIRE_EVERY, KILL_SWAP_CHANCE, MAX_HP, MAZE_DT, MAZE_TILE,
-  MISSILE, MV, PF, PICKUP_EVERY, PICKUP_R, PLAYER_R, PLAYER_SPEED, POWER_AMOUNT, POWER_KINDS, PROTECT_TICKS,
+  MAX_ITEMS, MISSILE, MV, PF, PICKUP_EVERY, PICKUP_R, PLAYER_R, PLAYER_SPEED, POWER_AMOUNT, POWER_KINDS, PROTECT_TICKS,
   RADAR_TICKS, REGEN_AFTER, REGEN_PER_TICK, RESPAWN_TICKS, SHOT, SHUFFLE_EVERY, SPEED_BOOST, SPREAD,
-  fromAim, powerCode, type MazeEvent, type MazeFrame, type MazeInput, type PowerKind,
+  fromAim, packItems, powerCode, type ItemKind, type MazeEvent, type MazeFrame, type MazeInput, type PowerKind,
 } from './types.js';
 
 type Rng = () => number;
@@ -47,8 +47,8 @@ function settle(m: MazeMap, x: number, y: number, dir: number, r: number, axis: 
   return v;
 }
 
-/** How fast a player walks, with or without Speed. */
-export const speedFor = (power: PowerKind | null): number => PLAYER_SPEED * (power === 'speed' ? SPEED_BOOST : 1);
+/** How fast a player walks, with Speed running or not. */
+export const speedFor = (boosted: boolean): number => PLAYER_SPEED * (boosted ? SPEED_BOOST : 1);
 
 /** One tick of walking for these keys. Used by the server, and by the client
  *  to predict its own player between frames. */
@@ -64,9 +64,10 @@ export function walk(m: MazeMap, pos: { x: number; y: number }, keys: number, sp
 
 // -------------------------------------------------------------------- world
 
-export interface Power {
-  kind: PowerKind;
-  /** Ticks of speed, missiles or blasts left, or shield points. */
+/** An item on a player's stack. */
+export interface Item {
+  kind: ItemKind;
+  /** Missiles or blasts left; a Speed item is used whole. */
   left: number;
 }
 
@@ -88,7 +89,16 @@ export interface MazeFighter {
   deaths: number;
   /** Not in the match right now (disconnected): not drawn, not hit, not spawned. */
   away: boolean;
-  power: Power | null;
+  /** Items, the top of the stack last: the secondary button uses that one. */
+  items: Item[];
+  /** Shield points, spent before health. */
+  shield: number;
+  /** Ticks of Speed still running. */
+  speedLeft: number;
+  /** Tick the secondary may next fire. */
+  nextAlt: number;
+  /** Whether the secondary was held last tick, to catch a fresh press. */
+  altWas: boolean;
 }
 
 export type ShotKind = (typeof SHOT)[keyof typeof SHOT];
@@ -138,7 +148,8 @@ export function createWorld(map: MazeMap, ids: string[], rng: Rng, powerups = fa
   ids.forEach((id, seat) => {
     const f: MazeFighter = {
       id, seat, x: 0, y: 0, aim: 0, hp: MAX_HP, alive: true, respawnAt: 0, safeUntil: 0,
-      lastHurt: -REGEN_AFTER, lastShot: -RADAR_TICKS, nextShot: 0, kills: 0, deaths: 0, away: false, power: null,
+      lastHurt: -REGEN_AFTER, lastShot: -RADAR_TICKS, nextShot: 0, kills: 0, deaths: 0, away: false,
+      items: [], shield: 0, speedLeft: 0, nextAlt: 0, altWas: false,
     };
     w.fighters.push(f);
     place(w, f);
@@ -179,8 +190,22 @@ function place(w: MazeWorld, f: MazeFighter): void {
   f.lastHurt = w.tick - REGEN_AFTER;
 }
 
-/** A full power of this kind. */
-export const freshPower = (kind: PowerKind): Power => ({ kind, left: POWER_AMOUNT[kind] });
+/** A full item of this kind. */
+export const freshItem = (kind: ItemKind): Item => ({ kind, left: POWER_AMOUNT[kind] });
+
+/** Whether this player can take this pickup right now: a shield only with
+ *  none already, an item only with room on the stack. */
+export function canTake(f: MazeFighter, kind: PowerKind): boolean {
+  return kind === 'shield' ? f.shield <= 0 : f.items.length < MAX_ITEMS;
+}
+
+/** Gives a player a pickup's power, if they can take it. */
+export function take(f: MazeFighter, kind: PowerKind): boolean {
+  if (!canTake(f, kind)) return false;
+  if (kind === 'shield') f.shield = POWER_AMOUNT.shield;
+  else f.items.push(freshItem(kind));
+  return true;
+}
 
 /**
  * One tick. `inputs` holds this tick's controls by seat; a seat with none
@@ -202,11 +227,14 @@ export function stepWorld(w: MazeWorld, inputs: (MazeInput | null)[]): MazeEvent
     }
     const inp = inputs[f.seat];
     if (inp) {
-      walk(w.map, f, inp.keys, speedFor(f.power?.kind ?? null));
+      walk(w.map, f, inp.keys, speedFor(f.speedLeft > 0));
       f.aim = inp.aim;
       if (inp.fire && t >= f.nextShot) fire(w, f);
+      useItem(w, f, inp.alt === true);
+    } else {
+      f.altWas = false;
     }
-    if (f.power?.kind === 'speed' && --f.power.left <= 0) f.power = null;
+    if (f.speedLeft > 0) f.speedLeft--;
     if (f.hp < MAX_HP && t - f.lastHurt >= REGEN_AFTER) f.hp = Math.min(MAX_HP, f.hp + REGEN_PER_TICK);
   }
 
@@ -271,38 +299,60 @@ function shoot(w: MazeWorld, f: MazeFighter, angle: number, speed: number, life:
   });
 }
 
-function fire(w: MazeWorld, f: MazeFighter): void {
-  // Shooting ends spawn protection: you cannot hide behind it and fire.
+/** Shooting at all ends spawn protection: you cannot hide behind it and fire. */
+function shot(w: MazeWorld, f: MazeFighter): void {
   f.safeUntil = Math.min(f.safeUntil, w.tick);
   f.lastShot = w.tick;
+}
+
+/** The gun: always ordinary bullets. */
+function fire(w: MazeWorld, f: MazeFighter): void {
+  shot(w, f);
+  shoot(w, f, fromAim(f.aim), BULLET_SPEED, BULLET_LIFE, SHOT.BULLET, BULLET_DAMAGE);
+  f.nextShot = w.tick + FIRE_EVERY;
+}
+
+/**
+ * The secondary: the item on top of the stack. Speed starts on a fresh press
+ * (holding the button does not burn a second one); missiles and the spread
+ * fire while held, each at its own rate. An item is gone once used up, and
+ * the one under it is next.
+ */
+function useItem(w: MazeWorld, f: MazeFighter, held: boolean): void {
+  const pressed = held && !f.altWas;
+  f.altWas = held;
+  const top = f.items[f.items.length - 1];
+  if (!top || !held) return;
+  if (top.kind === 'speed') {
+    if (!pressed) return;
+    f.speedLeft += POWER_AMOUNT.speed;
+    f.items.pop();
+    return;
+  }
+  if (w.tick < f.nextAlt) return;
+  shot(w, f);
   const a = fromAim(f.aim);
-  const p = f.power;
-  if (p?.kind === 'missile') {
+  if (top.kind === 'missile') {
     shoot(w, f, a, MISSILE.speed, MISSILE.life, SHOT.MISSILE, MISSILE.damage);
-    f.nextShot = w.tick + MISSILE.every;
-    if (--p.left <= 0) f.power = null;
-  } else if (p?.kind === 'spread') {
+    f.nextAlt = w.tick + MISSILE.every;
+  } else {
     for (let i = 0; i < SPREAD.pellets; i++) {
       const off = (i / (SPREAD.pellets - 1) - 0.5) * SPREAD.arc;
       shoot(w, f, a + off, SPREAD.speed, SPREAD.life, SHOT.PELLET, SPREAD.damage);
     }
-    f.nextShot = w.tick + SPREAD.every;
-    if (--p.left <= 0) f.power = null;
-  } else {
-    shoot(w, f, a, BULLET_SPEED, BULLET_LIFE, SHOT.BULLET, BULLET_DAMAGE);
-    f.nextShot = w.tick + FIRE_EVERY;
+    f.nextAlt = w.tick + SPREAD.every;
   }
+  if (--top.left <= 0) f.items.pop();
 }
 
 function hurt(w: MazeWorld, f: MazeFighter, by: number, damage: number, events: MazeEvent[]): void {
   f.lastHurt = w.tick;
   events.push({ k: 'hit', v: f.seat, by, x: Math.round(f.x), y: Math.round(f.y) });
-  // A Double life shield takes it first.
-  if (f.power?.kind === 'life') {
-    const soak = Math.min(f.power.left, damage);
-    f.power.left -= soak;
+  // A shield takes it first.
+  if (f.shield > 0) {
+    const soak = Math.min(f.shield, damage);
+    f.shield -= soak;
     damage -= soak;
-    if (f.power.left <= 0) f.power = null;
   }
   f.hp -= damage;
   if (f.hp > 0) return;
@@ -313,39 +363,50 @@ function hurt(w: MazeWorld, f: MazeFighter, by: number, damage: number, events: 
   const killer = w.fighters[by];
   if (killer && killer !== f) killer.kills++;
   events.push({ k: 'kill', v: f.seat, by });
+  f.speedLeft = 0;
+  f.shield = 0;
   if (w.powerups && killer && killer !== f) afterKill(w, killer, f, events);
-  else f.power = null;
+  else f.items = [];
 }
 
 /**
- * A kill's power-ups. Sometimes the two swap: the killer takes what the victim
- * had, and the victim comes back with the killer's. Otherwise the victim's
- * drops where they fell, for anyone to grab.
+ * A kill's items (shields are not part of it). Sometimes the two stacks swap:
+ * the killer takes the victim's, and the victim comes back with the killer's.
+ * Otherwise the victim's scatter where they fell, for anyone to grab.
  */
 function afterKill(w: MazeWorld, killer: MazeFighter, victim: MazeFighter, events: MazeEvent[]): void {
-  const theirs = victim.power && victim.power.left > 0 ? victim.power : null;
-  const mine = killer.power;
-  if ((theirs || mine) && w.rng() < KILL_SWAP_CHANCE) {
-    killer.power = theirs;
-    victim.power = mine;
+  const theirs = victim.items;
+  const mine = killer.items;
+  if ((theirs.length || mine.length) && w.rng() < KILL_SWAP_CHANCE) {
+    killer.items = theirs;
+    victim.items = mine;
     events.push({ k: 'swap', a: killer.seat, b: victim.seat });
     return;
   }
-  victim.power = null;
-  if (theirs) w.pickups.push({ id: w.nextPickup++, kind: theirs.kind, x: victim.x, y: victim.y });
+  victim.items = [];
+  theirs.forEach((it, i) => {
+    // Spread round the body, so they are separate things to pick up.
+    const a = (i / Math.max(1, theirs.length)) * Math.PI * 2;
+    const r = theirs.length > 1 ? 18 : 0;
+    const x = victim.x + Math.cos(a) * r;
+    const y = victim.y + Math.sin(a) * r;
+    w.pickups.push({ id: w.nextPickup++, kind: it.kind, x: mazeSolidAt(w.map, x, y) ? victim.x : x, y: mazeSolidAt(w.map, x, y) ? victim.y : y });
+  });
 }
 
-/** Walking over a pickup takes it, replacing whatever you held. */
+/** Walking over a pickup takes it, if you can: see `canTake`. One you
+ *  cannot take stays where it is for someone who can. */
 function collect(w: MazeWorld, events: MazeEvent[]): void {
   if (!w.pickups.length) return;
   const left: Pickup[] = [];
   for (const u of w.pickups) {
-    const f = w.fighters.find((p) => p.alive && !p.away && Math.hypot(p.x - u.x, p.y - u.y) <= PLAYER_R + PICKUP_R);
+    const f = w.fighters.find((p) => p.alive && !p.away && canTake(p, u.kind)
+      && Math.hypot(p.x - u.x, p.y - u.y) <= PLAYER_R + PICKUP_R);
     if (!f) {
       left.push(u);
       continue;
     }
-    f.power = freshPower(u.kind);
+    take(f, u.kind);
     events.push({ k: 'pick', s: f.seat, p: powerCode(u.kind), x: Math.round(u.x), y: Math.round(u.y) });
   }
   w.pickups = left;
@@ -371,19 +432,19 @@ function spawnPickups(w: MazeWorld): void {
 }
 
 /**
- * Deals everyone's power-ups out again at random among the living, some of
- * whom may come away empty-handed. Returns false when nobody held anything.
+ * Deals everyone's item stacks out again at random among the living, whole,
+ * so someone may come away empty-handed. Shields stay put. Returns false when
+ * nobody held anything.
  */
 export function shufflePowers(w: MazeWorld): boolean {
   const live = w.fighters.filter((f) => f.alive && !f.away);
-  const held = live.map((f) => f.power).filter((p): p is Power => !!p);
-  if (!held.length || live.length < 2) return false;
-  const pool: (Power | null)[] = [...held, ...Array(live.length - held.length).fill(null)];
+  if (live.length < 2 || !live.some((f) => f.items.length)) return false;
+  const pool = live.map((f) => f.items);
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(w.rng() * (i + 1));
     [pool[i], pool[j]] = [pool[j]!, pool[i]!];
   }
-  live.forEach((f, i) => (f.power = pool[i] ?? null));
+  live.forEach((f, i) => (f.items = pool[i]!));
   return true;
 }
 
@@ -420,8 +481,10 @@ export function toMazeFrame(w: MazeWorld, acks: number[]): MazeFrame {
         | (w.tick - f.lastShot < RADAR_TICKS ? PF.RADAR : 0) | (f.away ? PF.AWAY : 0),
       acks[f.seat] ?? -1,
       f.alive ? 0 : Math.max(0, f.respawnAt - w.tick),
-      powerCode(f.power?.kind ?? null),
-      f.power ? Math.ceil(f.power.left) : 0,
+      packItems([...f.items].reverse().map((it) => it.kind)),
+      f.items.length ? f.items[f.items.length - 1]!.left : 0,
+      Math.ceil(f.shield),
+      f.speedLeft,
     ]),
     b: w.bullets.map((b) => [b.id, Math.round(b.x), Math.round(b.y), b.seat, b.shot]),
     u: w.pickups.map((u) => [u.id, powerCode(u.kind), Math.round(u.x), Math.round(u.y)]),

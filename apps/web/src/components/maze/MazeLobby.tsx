@@ -1,10 +1,18 @@
-import { MAZE_KILL_LIMITS, MAZE_MAX_PLAYERS, MAZE_MIN_PLAYERS, MAZE_MINUTES, type MazeRadar } from '@pic-game/shared';
+import {
+  MAZE_KILL_LIMITS, MAZE_MAX_PLAYERS, MAZE_MIN_PLAYERS, MAZE_MINUTES, MAZE_THEMES, MAZE_THEME_NAMES,
+  type MazeRadar, type MazeThemeChoice,
+} from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectIsHost, selectMaze, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { InviteCard } from '../InviteCard.js';
 import { KickButton } from '../KickButton.js';
 import { CONTROL_HELP, ControlsPicker, useMazeControls } from './controls.js';
+
+const THEMES: { value: MazeThemeChoice; name: string }[] = [
+  { value: 'random', name: 'Surprise me' },
+  ...MAZE_THEMES.map((t) => ({ value: t, name: MAZE_THEME_NAMES[t] })),
+];
 
 const RADARS: { value: MazeRadar; name: string; blurb: string }[] = [
   { value: 'all', name: 'Everyone', blurb: 'The mini map shows every player, all the time.' },
@@ -86,6 +94,27 @@ export function MazeLobby({ onLeave }: { onLeave: () => void }) {
           </div>
 
           <label className="settings__row bingolobby__row">
+            <span className="settings__label">Look</span>
+            <select
+              className="spytimes__select"
+              value={settings.theme}
+              disabled={!isHost}
+              onChange={(e) => socket.emit('maze:settings', { theme: e.target.value as MazeThemeChoice })}
+            >
+              {THEMES.map((t) => <option key={t.value} value={t.value}>{t.name}</option>)}
+            </select>
+          </label>
+          <label className="settings__row bingolobby__row">
+            <span className="settings__label">Fog: see only what you could</span>
+            <input
+              type="checkbox"
+              className="bingolobby__check"
+              checked={settings.fog}
+              disabled={!isHost}
+              onChange={(e) => socket.emit('maze:settings', { fog: e.target.checked })}
+            />
+          </label>
+          <label className="settings__row bingolobby__row">
             <span className="settings__label">Power-ups</span>
             <input
               type="checkbox"
@@ -107,8 +136,9 @@ export function MazeLobby({ onLeave }: { onLeave: () => void }) {
             <li>Health comes back if you stay out of trouble for a few seconds.</li>
             {settings.powerups && (
               <li>
-                Grab <b>Speed</b>, <b>Ghost missiles</b> (through walls), <b>Spread shot</b> or <b>Double life</b>.
-                A kill may swap power-ups, and now and then everyone's get shuffled.
+                Grab <b>Speed</b>, <b>Ghost missiles</b> (through walls) and <b>Spread shot</b>: they stack, up to
+                three, and your second button uses the last one you picked up. A <b>Shield</b> goes on top of
+                any of them, one at a time. A kill may swap stacks, and now and then everyone's get shuffled.
               </li>
             )}
           </ol>

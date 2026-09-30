@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BULLET_DAMAGE, CELL, MAX_HP, MAZE_TILE, MISSILE, MV, PF, PLAYER_R, PLAYER_SPEED, POWER_AMOUNT, PROTECT_TICKS,
-  RESPAWN_TICKS, SPEED_BOOST, SPREAD, cellCentre, createWorld, freshPower, generateMaze, mazeSize, mazeSolidAt,
+  BULLET_DAMAGE, CELL, MAX_HP, MAX_ITEMS, MAZE_TILE, MISSILE, MV, PF, PLAYER_R, PLAYER_SPEED, POWER_AMOUNT, PROTECT_TICKS,
+  RESPAWN_TICKS, SPEED_BOOST, SPREAD, cellCentre, createWorld, freshItem, generateMaze, mazeSize, mazeSolidAt,
+  packItems, unpackItems,
   moveBody, pickupCap, powerCode, seededRng, setAway, shufflePowers, speedFor, stepWorld, toAim, toMazeFrame,
-  walk, wallAt,
+  walk, wallAt, TILE_KIND, mazeTileAt,
   type MazeEvent, type MazeInput, type MazeMap, type MazeWorld,
 } from '../index.js';
 
@@ -74,6 +75,59 @@ describe('the maze', () => {
   });
 });
 
+describe('rooms and cover', () => {
+  it('has an arena in the middle and rooms besides', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const m = generateMaze(seed, 20, 14);
+      const arena = m.rooms!.filter((r) => r.arena);
+      expect(arena).toHaveLength(1);
+      const a = arena[0]!;
+      // Roughly central.
+      expect(Math.abs(a.x + a.w / 2 - m.w / 2)).toBeLessThan(CELL * 2);
+      expect(Math.abs(a.y + a.h / 2 - m.h / 2)).toBeLessThan(CELL * 2);
+      expect(m.rooms!.filter((r) => !r.arena).length).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it('puts cover in the open areas, never on a cell middle', () => {
+    let cover = 0;
+    for (let seed = 1; seed <= 10; seed++) {
+      const m = generateMaze(seed, 20, 14);
+      for (let i = 0; i < m.walls.length; i++) {
+        if (m.walls[i] !== TILE_KIND.COVER) continue;
+        cover++;
+        const x = i % m.w;
+        const y = Math.floor(i / m.w);
+        // Cell floors are tiles 1-3 of each 4; cover stands on the lines between.
+        expect(x % CELL === 0 || y % CELL === 0).toBe(true);
+      }
+      for (let r = 0; r < m.rows; r++) for (let c = 0; c < m.cols; c++) {
+        const [x, y] = cellCentre(c, r);
+        expect(mazeTileAt(m, Math.floor(x / MAZE_TILE), Math.floor(y / MAZE_TILE))).toBe(TILE_KIND.FLOOR);
+      }
+    }
+    expect(cover).toBeGreaterThan(50);
+  });
+
+  it('cover stops bullets and players like a wall', () => {
+    const m = generateMaze(4, 20, 14);
+    const i = m.walls.indexOf(TILE_KIND.COVER);
+    const x = i % m.w;
+    const y = Math.floor(i / m.w);
+    expect(wallAt(m, x, y)).toBe(true);
+    expect(mazeSolidAt(m, (x + 0.5) * MAZE_TILE, (y + 0.5) * MAZE_TILE)).toBe(true);
+  });
+
+  it('is joined up across many seeds and sizes, cover and all', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const { cols, rows } = mazeSize(2 + (seed % 9));
+      const m = generateMaze(seed * 7, cols, rows);
+      const open = m.walls.reduce((n, v) => n + (v ? 0 : 1), 0);
+      expect(reachable(m)).toBe(open);
+    }
+  });
+});
+
 describe('moving', () => {
   const m = generateMaze(5, 12, 8);
 
@@ -134,7 +188,7 @@ function duel(): MazeWorld {
   return w;
 }
 
-const input = (seq: number, over: Partial<MazeInput> = {}): MazeInput => ({ seq, keys: 0, aim: 0, fire: false, ...over });
+const input = (seq: number, over: Partial<MazeInput> = {}): MazeInput => ({ seq, keys: 0, aim: 0, fire: false, alt: false, ...over });
 
 describe('shooting', () => {
   it('a bullet flies until it hits someone, who loses health', () => {
@@ -239,139 +293,222 @@ function powered(): MazeWorld {
   return w;
 }
 
-/** Fires once from A at B and lets the shot land. */
-function shootAtB(w: MazeWorld, seq = 1): MazeEvent[] {
-  const events = stepWorld(w, [input(seq, { fire: true, aim: toAim(0) }), null]);
+/** Fires once from A at B, with the gun or the secondary, and lets it land. */
+function shootAtB(w: MazeWorld, seq = 1, alt = false): MazeEvent[] {
+  const events = stepWorld(w, [input(seq, { fire: !alt, alt, aim: toAim(0) }), null]);
   for (let i = 0; i < 40; i++) events.push(...stepWorld(w, [null, null]));
   return events;
 }
 
-describe('power-ups', () => {
-  it('Speed: 60% faster, for ten seconds', () => {
-    const w = powered();
-    const a = w.fighters[0]!;
-    a.power = freshPower('speed');
-    const x = a.x;
-    stepWorld(w, [input(1, { keys: MV.DOWN }), null]);
-    expect(a.y - 150).toBeCloseTo((PLAYER_SPEED * SPEED_BOOST) / 30, 5);
-    expect(a.x).toBe(x);
-    expect(speedFor('speed')).toBe(PLAYER_SPEED * SPEED_BOOST);
-    for (let i = 0; i < POWER_AMOUNT.speed; i++) stepWorld(w, [null, null]);
-    expect(a.power).toBeNull();
-  });
-
-  it('Ghost missiles: through walls, hit harder, six of them', () => {
+describe('the gun and the secondary', () => {
+  it('the gun always fires plain bullets, whatever is on the stack', () => {
     const w = powered();
     const [a, b] = w.fighters;
-    // A wall column between them.
+    a!.items = [freshItem('missile')];
+    shootAtB(w);
+    expect(b!.hp).toBe(MAX_HP - BULLET_DAMAGE);
+    expect(a!.items[0]!.left).toBe(POWER_AMOUNT.missile);
+  });
+
+  it('the secondary uses the top of the stack, the last picked up', () => {
+    const w = powered();
+    const [a, b] = w.fighters;
+    a!.items = [freshItem('spread'), freshItem('missile')];
+    shootAtB(w, 1, true);
+    expect(b!.hp).toBe(MAX_HP - MISSILE.damage);
+    expect(a!.items.map((i) => i.kind)).toEqual(['spread', 'missile']);
+    expect(a!.items[1]!.left).toBe(POWER_AMOUNT.missile - 1);
+  });
+
+  it('a used-up item goes, and the one under it is next', () => {
+    const w = powered();
+    const a = w.fighters[0]!;
+    a.items = [freshItem('spread'), { kind: 'missile', left: 1 }];
+    stepWorld(w, [input(1, { alt: true, aim: toAim(Math.PI / 2) }), null]);
+    expect(a.items.map((i) => i.kind)).toEqual(['spread']);
+    for (let i = 2; i < 20; i++) stepWorld(w, [input(i, { alt: true, aim: toAim(Math.PI / 2) }), null]);
+    expect(w.bullets.filter((b) => b.shot === 2).length).toBeGreaterThan(0);
+  });
+
+  it('with nothing on the stack, the secondary does nothing', () => {
+    const w = powered();
+    stepWorld(w, [input(1, { alt: true }), null]);
+    expect(w.bullets).toHaveLength(0);
+  });
+
+  it('Speed starts on a press, and holding does not burn the next one', () => {
+    const w = powered();
+    const a = w.fighters[0]!;
+    a.items = [freshItem('speed'), freshItem('speed')];
+    for (let i = 1; i <= 5; i++) stepWorld(w, [input(i, { alt: true }), null]);
+    expect(a.items).toHaveLength(1);
+    expect(a.speedLeft).toBeGreaterThan(POWER_AMOUNT.speed - 10);
+    stepWorld(w, [input(6), null]);
+    stepWorld(w, [input(7, { alt: true }), null]);
+    expect(a.items).toHaveLength(0);
+    // Two Speeds back to back run end to end.
+    expect(a.speedLeft).toBeGreaterThan(POWER_AMOUNT.speed);
+  });
+
+  it('Speed: 60% faster while it runs, then back to normal', () => {
+    const w = powered();
+    const a = w.fighters[0]!;
+    a.speedLeft = 3;
+    stepWorld(w, [input(1, { keys: MV.DOWN }), null]);
+    expect(a.y - 150).toBeCloseTo((PLAYER_SPEED * SPEED_BOOST) / 30, 5);
+    expect(speedFor(true)).toBe(PLAYER_SPEED * SPEED_BOOST);
+    for (let i = 0; i < 5; i++) stepWorld(w, [null, null]);
+    expect(a.speedLeft).toBe(0);
+    const y = a.y;
+    stepWorld(w, [input(2, { keys: MV.DOWN }), null]);
+    expect(a.y - y).toBeCloseTo(PLAYER_SPEED / 30, 5);
+  });
+
+  it('Ghost missiles go through walls; bullets do not', () => {
+    const w = powered();
+    const [a, b] = w.fighters;
     const tx = Math.floor(300 / MAZE_TILE);
     for (let ty = 1; ty < w.map.h - 1; ty++) w.map.walls[ty * w.map.w + tx] = 1;
-    a!.power = freshPower('missile');
-    shootAtB(w);
+    a!.items = [freshItem('missile')];
+    shootAtB(w, 1, true);
     expect(b!.hp).toBe(MAX_HP - MISSILE.damage);
-    expect(a!.power!.left).toBe(POWER_AMOUNT.missile - 1);
-    // An ordinary shot now stops at the wall.
-    a!.power = null;
     shootAtB(w, 2);
     expect(b!.hp).toBe(MAX_HP - MISSILE.damage);
   });
 
-  it('Spread shot: five pellets a blast, and blasts run out', () => {
-    const w = powered();
-    const a = w.fighters[0]!;
-    a.power = freshPower('spread');
-    stepWorld(w, [input(1, { fire: true, aim: toAim(Math.PI / 2) }), null]);
-    expect(w.bullets).toHaveLength(SPREAD.pellets);
-    expect(new Set(w.bullets.map((b) => Math.round(Math.atan2(b.vy, b.vx) * 100))).size).toBe(SPREAD.pellets);
-    for (let i = 2; i < 200 && a.power; i++) stepWorld(w, [input(i, { fire: true, aim: toAim(Math.PI / 2) }), null]);
-    expect(a.power).toBeNull();
-  });
-
-  it('Spread shot up close hits with several pellets', () => {
+  it('Spread shot: five pellets a blast, several land up close', () => {
     const w = powered();
     const [a, b] = w.fighters;
     b!.x = 170;
-    a!.power = freshPower('spread');
-    shootAtB(w);
+    a!.items = [freshItem('spread')];
+    shootAtB(w, 1, true);
     expect(MAX_HP - b!.hp).toBeGreaterThanOrEqual(SPREAD.damage * 3);
+    expect(a!.items[0]!.left).toBe(POWER_AMOUNT.spread - 1);
   });
+});
 
-  it('Double life: the shield takes the hits first', () => {
+describe('shields', () => {
+  it('take the hits first, then health', () => {
     const w = powered();
     const b = w.fighters[1]!;
-    b.power = freshPower('life');
+    b.shield = POWER_AMOUNT.shield;
     for (let i = 0; i < 5; i++) shootAtB(w, i + 1);
     expect(b.alive).toBe(true);
     expect(b.hp).toBe(MAX_HP);
-    expect(b.power).toBeNull();
+    expect(b.shield).toBe(0);
     shootAtB(w, 9);
     expect(b.hp).toBe(MAX_HP - BULLET_DAMAGE);
   });
 
-  it('walking over a pickup takes it, replacing what you held', () => {
+  it('sit beside the stack, and a second one is left lying', () => {
     const w = powered();
     const a = w.fighters[0]!;
-    a.power = freshPower('speed');
-    w.pickups.push({ id: 1, kind: 'missile', x: a.x + 10, y: a.y });
-    const ev = stepWorld(w, [null, null]);
-    expect(a.power).toEqual(freshPower('missile'));
+    a.items = [freshItem('missile')];
+    w.pickups.push({ id: 1, kind: 'shield', x: a.x + 5, y: a.y });
+    stepWorld(w, [null, null]);
+    expect(a.shield).toBe(POWER_AMOUNT.shield);
+    expect(a.items).toHaveLength(1);
+    w.pickups.push({ id: 2, kind: 'shield', x: a.x + 5, y: a.y });
+    stepWorld(w, [null, null]);
+    expect(w.pickups.map((u) => u.id)).toEqual([2]);
+    // Once it is spent, the next one can be had.
+    a.shield = 0;
+    stepWorld(w, [null, null]);
     expect(w.pickups).toHaveLength(0);
-    expect(ev).toContainEqual({ k: 'pick', s: 0, p: powerCode('missile'), x: Math.round(a.x + 10), y: Math.round(a.y) });
+    expect(a.shield).toBe(POWER_AMOUNT.shield);
+  });
+});
+
+describe('pickups', () => {
+  it('stack up, the newest on top', () => {
+    const w = powered();
+    const a = w.fighters[0]!;
+    for (const [id, kind] of [[1, 'speed'], [2, 'spread']] as const) {
+      w.pickups.push({ id, kind, x: a.x + 5, y: a.y });
+      const ev = stepWorld(w, [null, null]);
+      expect(ev).toContainEqual({ k: 'pick', s: 0, p: powerCode(kind), x: Math.round(a.x + 5), y: Math.round(a.y) });
+    }
+    expect(a.items.map((i) => i.kind)).toEqual(['speed', 'spread']);
   });
 
-  it('pickups appear over time, up to a cap, away from players', () => {
+  it('a full stack leaves the next one lying', () => {
+    const w = powered();
+    const a = w.fighters[0]!;
+    a.items = Array.from({ length: MAX_ITEMS }, () => freshItem('speed'));
+    w.pickups.push({ id: 1, kind: 'missile', x: a.x + 5, y: a.y });
+    stepWorld(w, [null, null]);
+    expect(w.pickups).toHaveLength(1);
+    expect(a.items).toHaveLength(MAX_ITEMS);
+  });
+
+  it('appear over time, up to a cap, away from players', () => {
     const m = generateMaze(8, 14, 10);
     const w = createWorld(m, ['A', 'B', 'C', 'D'], seededRng(2), true);
     for (let i = 0; i < 60 * 30; i++) stepWorld(w, [null, null, null, null]);
     expect(w.pickups.length).toBe(pickupCap(w));
     for (const u of w.pickups) expect(mazeSolidAt(m, u.x, u.y)).toBe(false);
   });
+});
 
-  it('a kill can swap the two players power-ups', () => {
+describe('kills and shuffles', () => {
+  it('a kill can swap the two stacks', () => {
     const w = powered();
     const [a, b] = w.fighters;
-    // A holds nothing, so shoots a plain bullet; B holds missiles.
-    b!.power = freshPower('missile');
+    a!.items = [freshItem('speed')];
+    b!.items = [freshItem('missile'), freshItem('spread')];
     b!.hp = BULLET_DAMAGE;
     b!.lastHurt = w.tick; // no health back before the shot lands
     w.rng = () => 0; // always swap
     const ev = shootAtB(w);
     expect(ev).toContainEqual({ k: 'swap', a: 0, b: 1 });
-    expect(a!.power?.kind).toBe('missile');
-    expect(b!.power).toBeNull();
+    expect(a!.items.map((i) => i.kind)).toEqual(['missile', 'spread']);
+    expect(b!.items.map((i) => i.kind)).toEqual(['speed']);
   });
 
-  it('otherwise the victim drops theirs where they fell', () => {
+  it('otherwise the victim scatters theirs where they fell', () => {
     const w = powered();
     const b = w.fighters[1]!;
-    b.power = freshPower('speed');
+    b.items = [freshItem('speed'), freshItem('missile')];
+    b.shield = 0;
     b.hp = BULLET_DAMAGE;
     b.lastHurt = w.tick;
     w.rng = () => 0.99; // never swap
     const ev = shootAtB(w);
     expect(ev.some((e) => e.k === 'swap')).toBe(false);
-    expect(b.power).toBeNull();
-    expect(w.pickups).toEqual([{ id: 1, kind: 'speed', x: 500, y: 150 }]);
+    expect(b.items).toHaveLength(0);
+    expect(w.pickups.map((u) => u.kind).sort()).toEqual(['missile', 'speed']);
+    for (const u of w.pickups) expect(Math.hypot(u.x - 500, u.y - 150)).toBeLessThanOrEqual(20);
   });
 
-  it('a shuffle deals the power-ups out again among the living', () => {
+  it('a shuffle deals whole stacks round the living; shields stay put', () => {
     const m = generateMaze(8, 14, 10);
     const w = createWorld(m, ['A', 'B', 'C', 'D'], seededRng(5), true);
-    w.fighters[0]!.power = freshPower('speed');
-    w.fighters[1]!.power = freshPower('life');
+    w.fighters[0]!.items = [freshItem('speed'), freshItem('spread')];
+    w.fighters[1]!.items = [freshItem('missile')];
+    w.fighters[2]!.shield = 50;
     expect(shufflePowers(w)).toBe(true);
-    const kinds = w.fighters.map((f) => f.power?.kind ?? null).filter(Boolean).sort();
-    expect(kinds).toEqual(['life', 'speed']);
-    for (const f of w.fighters) f.power = null;
+    const stacks = w.fighters.map((f) => f.items.map((i) => i.kind).join('+')).filter(Boolean).sort();
+    expect(stacks).toEqual(['missile', 'speed+spread']);
+    expect(w.fighters[2]!.shield).toBe(50);
+    for (const f of w.fighters) f.items = [];
     expect(shufflePowers(w)).toBe(false);
   });
+});
 
-  it('frames carry each player power and the pickups', () => {
+describe('frames', () => {
+  it('pack the stack, top first, and carry shield and speed', () => {
+    expect(unpackItems(packItems(['missile', 'speed', 'spread']))).toEqual(['missile', 'speed', 'spread']);
+    expect(unpackItems(0)).toEqual([]);
     const w = powered();
-    w.fighters[0]!.power = freshPower('missile');
-    w.pickups.push({ id: 3, kind: 'life', x: 300, y: 100 });
+    const a = w.fighters[0]!;
+    a.items = [freshItem('speed'), { kind: 'missile', left: 4 }];
+    a.shield = 60;
+    a.speedLeft = 90;
+    w.pickups.push({ id: 3, kind: 'shield', x: 300, y: 100 });
     const f = toMazeFrame(w, [0, 0]);
-    expect(f.p[0]!.slice(7)).toEqual([powerCode('missile'), POWER_AMOUNT.missile]);
-    expect(f.u).toEqual([[3, powerCode('life'), 300, 100]]);
+    const p = f.p[0]!;
+    expect(unpackItems(p[7])).toEqual(['missile', 'speed']);
+    expect(p.slice(8)).toEqual([4, 60, 90]);
+    expect(f.u).toEqual([[3, powerCode('shield'), 300, 100]]);
   });
 });

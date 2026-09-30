@@ -14,7 +14,7 @@ function room(): MazeMap {
   return { cols, rows, w, h, walls };
 }
 
-const player = (x: number, y: number, flags: number = PF.ALIVE): MazeFrame['p'][number] => [x, y, 0, 100, flags, 0, 0, 0, 0];
+const player = (x: number, y: number, flags: number = PF.ALIVE): MazeFrame['p'][number] => [x, y, 0, 100, flags, 0, 0, 0, 0, 0, 0];
 
 describe('keyboard lock-on', () => {
   const m = room();

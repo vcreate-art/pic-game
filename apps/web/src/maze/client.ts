@@ -1,21 +1,28 @@
 import {
-  FIRE_EVERY, MAX_HP, MAZE_COLORS, MAZE_HZ, MAZE_TILE, MISSILE, MV, PF, PICKUP_R, PLAYER_R, POWER_AMOUNT,
-  POWER_NAMES, SHOT, SPREAD, fromAim, generateMaze, powerOf, speedFor, toAim, walk, wallAt, worldH, worldW,
-  type MazeEvent, type MazeFrame, type MazeInput, type MazeMap, type MazeRadar, type PowerKind,
+  FIRE_EVERY, MAX_HP, MAZE_COLORS, MAZE_HZ, MISSILE, MV, PF, PICKUP_R, PLAYER_R, POWER_AMOUNT, POWER_NAMES, SHOT,
+  fromAim, generateMaze, powerOf, speedFor, toAim, unpackItems, walk, worldH, worldW,
+  type ItemKind, type MazeEvent, type MazeFrame, type MazeFramePlayer, type MazeInput, type MazeMap, type MazeRadar,
+  type MazeTheme, type PowerKind,
 } from '@pic-game/shared';
 import { serverNow } from '../net/clock.js';
+import { THEME_LOOK, buildFloor, buildMini, buildWalls } from './art.js';
+import { visibility, type Light } from './light.js';
 import { LOCK_KEEP, inSight, lockOrder, nextLock } from './lock.js';
 
 const STEP_MS = 1000 / MAZE_HZ;
 /** World pixels across the screen: wider screens see more, up to a point. */
 const VIEW_WORLD_W = 1000;
 const MINIMAP_W = 200;
+/** How far you can see with fog on. */
+const FOG_RANGE = 760;
 
 /**
  * Two ways to play, chosen per player:
- *  - mouse: WASD or the arrows move, the mouse aims, click fires
+ *  - mouse: WASD or the arrows move, the mouse aims; left click (or Space)
+ *    fires the gun, right click (or E) uses the top power-up
  *  - keys: WASD moves and the arrows shoot, eight ways, twin-stick style;
- *    U (or Space) fires the way you are facing, I locks on, O lets go
+ *    U (or Space) fires the way you face, J uses the top power-up, I locks
+ *    on and O lets go
  */
 export type MazeControls = 'mouse' | 'keys';
 
@@ -30,14 +37,16 @@ function dirOf(bits: number): number | null {
 }
 
 export const POWER_COLORS: Record<PowerKind, string> = {
-  speed: '#22d3ee', missile: '#f472b6', spread: '#fb923c', life: '#60a5fa',
+  speed: '#22d3ee', missile: '#f472b6', spread: '#fb923c', shield: '#60a5fa',
 };
-const POWER_GLYPH: Record<PowerKind, string> = { speed: '»', missile: '◆', spread: '⁂', life: '+' };
+const POWER_GLYPH: Record<PowerKind, string> = { speed: '»', missile: '◆', spread: '⁂', shield: '◉' };
 
 export interface MazeMeta {
   seed: number;
   cols: number;
   rows: number;
+  theme: MazeTheme;
+  fog: boolean;
   /** Seat of this client's player, or -1 when watching. */
   mySeat: number;
   names: string[];
@@ -68,6 +77,9 @@ function typing(target: EventTarget | null): boolean {
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
 }
 
+/** The item on top of a player's stack, from a frame. */
+const topItem = (p: MazeFramePlayer | undefined): ItemKind | null => (p ? unpackItems(p[7])[0] ?? null : null);
+
 /**
  * The match on this screen: input, prediction and drawing.
  *
@@ -85,7 +97,11 @@ export class MazeClient {
   private map: MazeMap | null = null;
   private mapKey = '';
   private floor: HTMLCanvasElement | null = null;
+  private walls: HTMLCanvasElement | null = null;
   private mini: HTMLCanvasElement | null = null;
+  /** Screen-sized scratch canvases for the dark and the fog. */
+  private dark: HTMLCanvasElement | null = null;
+  private fogLayer: HTMLCanvasElement | null = null;
 
   private prev: MazeFrame | null = null;
   private cur: MazeFrame | null = null;
@@ -106,7 +122,9 @@ export class MazeClient {
   private moveKeys = 0;
   private arrowKeys = 0;
   private fireKey = false;
+  private altKey = false;
   private mouseDown = false;
+  private rightDown = false;
   private mouse = { x: 0, y: 0, in: false };
   private aim = 0;
   private send: ((i: MazeInput) => void) | null = null;
@@ -115,6 +133,7 @@ export class MazeClient {
   private feed: FeedLine[] = [];
   private flashes = new Map<number, number>();
   private hurtAt = 0;
+  private shakeAt = 0;
   private toast: { text: string; at: number } | null = null;
   /** Keyboard only: the seat our aim is locked on to, if any. */
   private lock: number | null = null;
@@ -172,15 +191,16 @@ export class MazeClient {
   }
 
   setMeta(meta: MazeMeta): void {
-    const key = `${meta.seed}:${meta.cols}:${meta.rows}`;
+    const key = `${meta.seed}:${meta.cols}:${meta.rows}:${meta.theme}`;
     if (key !== this.mapKey) {
       this.mapKey = key;
       this.map = generateMaze(meta.seed, meta.cols, meta.rows);
-      this.floor = this.mini = null;
+      this.floor = this.walls = this.mini = null;
       this.prev = this.cur = null;
       this.pending = [];
       this.sparks = [];
       this.feed = [];
+      this.lock = null;
     }
     this.meta = meta;
   }
@@ -203,15 +223,15 @@ export class MazeClient {
 
   /**
    * Keyboard lock-on: the nearest enemy in sight, or, pressed again, the next
-   * nearest after the one held. Behind walls counts only with Ghost missiles,
-   * which go through them.
+   * nearest after the one held. Behind walls counts only with Ghost missiles
+   * on top of the stack, since they go through them.
    */
   private cycleLock(): void {
     const m = this.meta;
     const f = this.cur;
     const map = this.map;
     if (!m || !f || !map || m.mySeat < 0) return;
-    const through = powerOf(f.p[m.mySeat]?.[7] ?? 0) === 'missile';
+    const through = topItem(f.p[m.mySeat]) === 'missile';
     this.lock = nextLock(lockOrder(map, f, m.mySeat, this.me, through), this.lock);
     if (this.lock === null) this.toast = { text: 'Nobody in sight to lock on to', at: performance.now() };
   }
@@ -227,7 +247,7 @@ export class MazeClient {
     }
     // The lock holds through cover, but says so: Ghost missiles aside, shots
     // at someone round a corner only hit the wall.
-    const through = powerOf(this.cur?.p[this.meta?.mySeat ?? -1]?.[7] ?? 0) === 'missile';
+    const through = topItem(this.cur?.p[this.meta?.mySeat ?? -1]) === 'missile';
     this.lockBlocked = !!this.map && !through && !inSight(this.map, this.me.x, this.me.y, p[0], p[1]);
   }
 
@@ -239,9 +259,11 @@ export class MazeClient {
     if (arrow) this.arrowKeys |= arrow;
     const keysOnly = this.controls === 'keys';
     if (e.code === 'Space' || (keysOnly && e.code === 'KeyU')) this.fireKey = true;
+    if (e.code === (keysOnly ? 'KeyJ' : 'KeyE')) this.altKey = true;
     if (keysOnly && e.code === 'KeyI' && !e.repeat) this.cycleLock();
     if (keysOnly && e.code === 'KeyO') this.lock = null;
-    if (move || arrow || e.code === 'Space' || (keysOnly && ['KeyU', 'KeyI', 'KeyO'].includes(e.code))) e.preventDefault();
+    const ours = keysOnly ? ['Space', 'KeyU', 'KeyJ', 'KeyI', 'KeyO'] : ['Space', 'KeyE'];
+    if (move || arrow || ours.includes(e.code)) e.preventDefault();
   };
 
   private onUp = (e: KeyboardEvent) => {
@@ -250,13 +272,16 @@ export class MazeClient {
     if (move) this.moveKeys &= ~move;
     if (arrow) this.arrowKeys &= ~arrow;
     if (e.code === 'Space' || e.code === 'KeyU') this.fireKey = false;
+    if (e.code === 'KeyJ' || e.code === 'KeyE') this.altKey = false;
   };
 
   private release = () => {
     this.moveKeys = 0;
     this.arrowKeys = 0;
     this.fireKey = false;
+    this.altKey = false;
     this.mouseDown = false;
+    this.rightDown = false;
   };
 
   /** Movement bits: with the mouse aiming, the arrows move too. */
@@ -268,20 +293,27 @@ export class MazeClient {
     return this.controls === 'keys' ? this.arrowKeys !== 0 || this.fireKey : this.mouseDown || this.fireKey;
   }
 
+  private get usingItem(): boolean {
+    return this.altKey || (this.controls === 'mouse' && this.rightDown);
+  }
+
   private onMove = (e: MouseEvent) => {
     const r = this.canvas!.getBoundingClientRect();
     this.mouse = { x: e.clientX - r.left, y: e.clientY - r.top, in: true };
   };
 
   private onPress = (e: MouseEvent) => {
-    if (e.button !== 0 || this.controls !== 'mouse') return;
-    this.mouseDown = true;
+    if (this.controls !== 'mouse') return;
+    if (e.button === 0) this.mouseDown = true;
+    else if (e.button === 2) this.rightDown = true;
+    else return;
     this.onMove(e);
     e.preventDefault();
   };
 
   private onRelease = (e: MouseEvent) => {
     if (e.button === 0) this.mouseDown = false;
+    if (e.button === 2) this.rightDown = false;
   };
 
   private onLeave = () => {
@@ -315,24 +347,21 @@ export class MazeClient {
   pushEvents(events: MazeEvent[]): void {
     if (document.hidden) return;
     const m = this.meta;
+    const now = performance.now();
     const name = (s: number) => (s === m?.mySeat ? 'You' : m?.names[s] ?? 'Someone');
     const line = (text: string, color: string) => {
-      this.feed.unshift({ text, color, at: performance.now() });
+      this.feed.unshift({ text, color, at: now });
       this.feed.length = Math.min(this.feed.length, 5);
     };
     for (const e of events) {
       if (e.k === 'hit') {
         this.burst(e.x, e.y, 10, '#fecaca', 140, 0.35);
-        if (e.v === m?.mySeat) this.hurtAt = performance.now();
+        if (e.v === m?.mySeat) this.hurtAt = now;
       } else if (e.k === 'kill') {
         const f = this.cur?.p[e.v];
         if (f) this.burst(f[0], f[1], 34, MAZE_COLORS[e.v % MAZE_COLORS.length]!, 220, 0.8);
-        this.feed.unshift({
-          text: e.by === e.v ? `${name(e.v)} went down` : `${name(e.by)} ✦ ${name(e.v)}`,
-          color: MAZE_COLORS[e.by % MAZE_COLORS.length]!,
-          at: performance.now(),
-        });
-        this.feed.length = Math.min(this.feed.length, 5);
+        if (e.v === m?.mySeat || e.by === m?.mySeat) this.shakeAt = now;
+        line(e.by === e.v ? `${name(e.v)} went down` : `${name(e.by)} ✦ ${name(e.v)}`, MAZE_COLORS[e.by % MAZE_COLORS.length]!);
       } else if (e.k === 'spawn') {
         this.burst(e.x, e.y, 18, '#e0f2fe', 120, 0.5);
       } else if (e.k === 'pick') {
@@ -343,7 +372,7 @@ export class MazeClient {
       } else if (e.k === 'swap') {
         line(`${name(e.a)} ⇄ ${name(e.b)}: power-ups swapped`, '#e2e8f0');
       } else if (e.k === 'shuffle') {
-        this.toast = { text: 'Power-ups shuffled!', at: performance.now() };
+        this.toast = { text: 'Power-ups shuffled!', at: now };
         line("Everyone's power-ups shuffled", '#fde68a');
       }
     }
@@ -358,7 +387,7 @@ export class MazeClient {
     const ack = p[5];
     this.pending = this.pending.filter((i) => i.seq > ack);
     const pos = { x: p[0], y: p[1] };
-    const speed = speedFor(powerOf(p[7]));
+    const speed = speedFor(p[10] > 0);
     if (p[4] & PF.ALIVE) for (const i of this.pending) walk(this.map, pos, i.keys, speed);
     // Small differences are the usual drift of float maths; large ones (a
     // respawn, a correction) are taken at once rather than slid across.
@@ -412,17 +441,19 @@ export class MazeClient {
       ? dirOf(this.arrowKeys) ?? (locked ? Math.atan2(locked[1] - this.me.y, locked[0] - this.me.x) : null) ?? dirOf(this.moveKeys) ?? this.aim
       : this.aimAt();
     const alive = (me[4] & PF.ALIVE) !== 0 && (me[4] & PF.AWAY) === 0;
-    const input: MazeInput = { seq: ++this.seq, keys: alive ? this.keys : 0, aim: toAim(this.aim), fire: alive && this.firing };
+    const input: MazeInput = {
+      seq: ++this.seq, keys: alive ? this.keys : 0, aim: toAim(this.aim),
+      fire: alive && this.firing, alt: alive && this.usingItem,
+    };
     this.send(input);
     this.pending.push(input);
     if (this.pending.length > 90) this.pending.shift();
     this.mePrev = { ...this.me };
     this.meAt = performance.now();
-    const power = powerOf(me[7]);
-    if (alive) walk(map, this.me, input.keys, speedFor(power));
+    if (alive) walk(map, this.me, input.keys, speedFor(me[10] > 0));
     if (this.cooldown > 0) this.cooldown--;
     if (input.fire && this.cooldown <= 0) {
-      this.cooldown = power === 'missile' ? MISSILE.every : power === 'spread' ? SPREAD.every : FIRE_EVERY;
+      this.cooldown = FIRE_EVERY;
       this.flashes.set(m.mySeat, performance.now());
     }
   }
@@ -456,61 +487,16 @@ export class MazeClient {
 
   // ----------------------------------------------------------------- draw
 
-  /** The maze drawn once: floor, walls with a lit top edge, and a faint grid. */
-  private buildFloor(map: MazeMap): HTMLCanvasElement {
-    const c = document.createElement('canvas');
-    c.width = worldW(map);
-    c.height = worldH(map);
-    const g = c.getContext('2d')!;
-    g.fillStyle = '#131a24';
-    g.fillRect(0, 0, c.width, c.height);
-    g.strokeStyle = 'rgba(148, 163, 184, 0.06)';
-    g.lineWidth = 1;
-    for (let x = 0; x <= map.w; x++) {
-      g.beginPath();
-      g.moveTo(x * MAZE_TILE + 0.5, 0);
-      g.lineTo(x * MAZE_TILE + 0.5, c.height);
-      g.stroke();
+  private screenCanvas(which: 'dark' | 'fogLayer'): [HTMLCanvasElement, CanvasRenderingContext2D] {
+    const main = this.canvas!;
+    let c = this[which];
+    if (!c || c.width !== main.width || c.height !== main.height) {
+      c = document.createElement('canvas');
+      c.width = main.width;
+      c.height = main.height;
+      this[which] = c;
     }
-    for (let y = 0; y <= map.h; y++) {
-      g.beginPath();
-      g.moveTo(0, y * MAZE_TILE + 0.5);
-      g.lineTo(c.width, y * MAZE_TILE + 0.5);
-      g.stroke();
-    }
-    for (let ty = 0; ty < map.h; ty++) {
-      for (let tx = 0; tx < map.w; tx++) {
-        if (!wallAt(map, tx, ty)) continue;
-        const x = tx * MAZE_TILE;
-        const y = ty * MAZE_TILE;
-        g.fillStyle = '#334155';
-        g.fillRect(x, y, MAZE_TILE, MAZE_TILE);
-        // Lit edges where the wall meets open floor, for a raised look.
-        g.fillStyle = '#64748b';
-        if (!wallAt(map, tx, ty - 1)) g.fillRect(x, y, MAZE_TILE, 4);
-        if (!wallAt(map, tx - 1, ty)) g.fillRect(x, y, 3, MAZE_TILE);
-        g.fillStyle = '#1e293b';
-        if (!wallAt(map, tx, ty + 1)) g.fillRect(x, y + MAZE_TILE - 5, MAZE_TILE, 5);
-        if (!wallAt(map, tx + 1, ty)) g.fillRect(x + MAZE_TILE - 3, y, 3, MAZE_TILE);
-      }
-    }
-    return c;
-  }
-
-  private buildMini(map: MazeMap): HTMLCanvasElement {
-    const k = MINIMAP_W / worldW(map);
-    const c = document.createElement('canvas');
-    c.width = MINIMAP_W;
-    c.height = Math.round(worldH(map) * k);
-    const g = c.getContext('2d')!;
-    g.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    g.fillRect(0, 0, c.width, c.height);
-    g.fillStyle = '#475569';
-    const t = MAZE_TILE * k;
-    for (let ty = 0; ty < map.h; ty++) {
-      for (let tx = 0; tx < map.w; tx++) if (wallAt(map, tx, ty)) g.fillRect(tx * t, ty * t, Math.ceil(t), Math.ceil(t));
-    }
-    return c;
+    return [c, c.getContext('2d')!];
   }
 
   private draw(): void {
@@ -522,7 +508,7 @@ export class MazeClient {
     const dpr = c.width / Math.max(1, c.clientWidth);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const { scale, w, h } = this.viewport();
-    g.fillStyle = '#0b1018';
+    g.fillStyle = m ? THEME_LOOK[m.theme].void : '#0b1018';
     g.fillRect(0, 0, w, h);
     if (!m || !map || !this.cur) {
       g.fillStyle = '#94a3b8';
@@ -531,8 +517,10 @@ export class MazeClient {
       g.fillText('Entering the maze…', w / 2, h / 2);
       return;
     }
-    this.floor ??= this.buildFloor(map);
-    this.mini ??= this.buildMini(map);
+    this.floor ??= buildFloor(map, m.theme, m.seed);
+    this.walls ??= buildWalls(map, m.theme, m.seed);
+    this.mini ??= buildMini(map, m.theme, MINIMAP_W);
+    const look = THEME_LOOK[m.theme];
 
     const now = performance.now();
     const alpha = Math.min(1, (now - this.curAt) / STEP_MS);
@@ -548,13 +536,32 @@ export class MazeClient {
     const focus = mine ? (meAlive ? me : { x: mine[0], y: mine[1] }) : { x: worldW(map) / 2, y: worldH(map) / 2 };
     // Always centred on the player, even at the edge of the maze: held back at
     // the border, a player in a corner would slide under the mini map.
-    this.cam = { x: focus.x, y: focus.y };
+    const shake = Math.max(0, 1 - (now - this.shakeAt) / 280) * 7;
+    this.cam = { x: focus.x + (Math.random() - 0.5) * shake, y: focus.y + (Math.random() - 0.5) * shake };
+
+    // Where everyone is this frame, and who we can see.
+    const fog = m.fog && m.mySeat >= 0 && m.live;
+    const people = cur.p.map((pl, seat) => {
+      const pp = prev.p[seat] ?? pl;
+      const isMe = seat === m.mySeat;
+      return {
+        seat, pl, isMe,
+        x: isMe ? me.x : lerp(pp[0], pl[0], alpha),
+        y: isMe ? me.y : lerp(pp[1], pl[1], alpha),
+        up: (pl[4] & PF.ALIVE) !== 0 && !(pl[4] & PF.AWAY),
+      };
+    }).filter((p) => p.up);
+    const seen = (x: number, y: number) =>
+      !fog || (Math.hypot(x - focus.x, y - focus.y) <= FOG_RANGE && inSight(map, focus.x, focus.y, x, y));
+    const shown = people.filter((p) => p.isMe || seen(p.x, p.y));
+
+    const toWorld = (ctx: CanvasRenderingContext2D, d = 1) => {
+      ctx.setTransform(d * scale, 0, 0, d * scale, d * (w / 2 - this.cam.x * scale), d * (h / 2 - this.cam.y * scale));
+    };
 
     g.save();
-    g.translate(w / 2, h / 2);
-    g.scale(scale, scale);
-    g.translate(-this.cam.x, -this.cam.y);
-    g.imageSmoothingEnabled = false;
+    toWorld(g, dpr);
+    g.imageSmoothingEnabled = true;
     g.drawImage(this.floor, 0, 0);
 
     // Pickups: a glowing token that bobs, with its power's mark.
@@ -566,6 +573,7 @@ export class MazeClient {
     // Bullets: a bright streak from where each was a moment ago. Missiles are
     // fat and trail; pellets are small.
     const was = new Map(prev.b.map((b) => [b[0], b]));
+    const lights: (Light & { color?: string })[] = [];
     g.lineCap = 'round';
     for (const b of cur.b) {
       const p = was.get(b[0]) ?? b;
@@ -588,33 +596,35 @@ export class MazeClient {
         g.arc(x, y, 3.5, 0, Math.PI * 2);
         g.fill();
       }
+      lights.push({ x, y, r: shot === SHOT.MISSILE ? 110 : 60, k: 0.7, color: col });
     }
     g.shadowBlur = 0;
 
-    // Players.
-    cur.p.forEach((pl, seat) => {
-      const flags = pl[4];
-      if (!(flags & PF.ALIVE) || flags & PF.AWAY) return;
-      const pp = prev.p[seat] ?? pl;
-      const isMe = seat === m.mySeat;
-      const x = isMe ? me.x : lerp(pp[0], pl[0], alpha);
-      const y = isMe ? me.y : lerp(pp[1], pl[1], alpha);
-      const a = isMe && m.live ? this.aim : fromAim(pl[2]);
-      const power = powerOf(pl[7] ?? 0);
-      this.drawPlayer(g, x, y, a, seat, pl[3], (flags & PF.SAFE) !== 0, isMe, now, power);
-      if (seat === this.lock && this.controls === 'keys') this.drawLock(g, x, y, now);
-      // Keyboard aiming has no cursor, so show the way we face.
-      if (isMe && m.live && this.controls === 'keys') {
+    // Players: bodies now; names go on last, over the walls and the dark.
+    for (const p of shown) {
+      const a = p.isMe && m.live ? this.aim : fromAim(p.pl[2]);
+      this.drawPlayer(g, p.x, p.y, a, p.seat, (p.pl[4] & PF.SAFE) !== 0, p.isMe, now, topItem(p.pl), p.pl[9] > 0, p.pl[10] > 0);
+      if (p.isMe && m.live && this.controls === 'keys') {
+        // Keyboard aiming has no cursor, so show the way we face; red when a
+        // locked target is round a corner.
         g.strokeStyle = this.lock !== null && this.lockBlocked ? 'rgba(248, 113, 113, 0.8)' : 'rgba(248, 250, 252, 0.35)';
         g.setLineDash([4, 6]);
         g.lineWidth = 2;
         g.beginPath();
-        g.moveTo(x + Math.cos(a) * (PLAYER_R + 14), y + Math.sin(a) * (PLAYER_R + 14));
-        g.lineTo(x + Math.cos(a) * 120, y + Math.sin(a) * 120);
+        g.moveTo(p.x + Math.cos(a) * (PLAYER_R + 14), p.y + Math.sin(a) * (PLAYER_R + 14));
+        g.lineTo(p.x + Math.cos(a) * 120, p.y + Math.sin(a) * 120);
         g.stroke();
         g.setLineDash([]);
       }
-    });
+      const flash = this.flashes.get(p.seat);
+      const lit = flash && now - flash < 90;
+      lights.push({ x: p.x, y: p.y, r: p.isMe ? look.playerLight : look.playerLight * 0.55, k: p.isMe ? 1 : 0.8 });
+      if (lit) lights.push({ x: p.x + Math.cos(a) * 24, y: p.y + Math.sin(a) * 24, r: 150, k: 0.9, color: '#fde68a' });
+    }
+    for (const u of cur.u ?? []) {
+      const kind = powerOf(u[1]);
+      if (kind) lights.push({ x: u[2], y: u[3], r: 80, k: 0.6, color: POWER_COLORS[kind] });
+    }
 
     for (const s of this.sparks) {
       g.globalAlpha = Math.max(0, s.life / s.max);
@@ -622,9 +632,94 @@ export class MazeClient {
       g.fillRect(s.x - s.size / 2, s.y - s.size / 2, s.size, s.size);
     }
     g.globalAlpha = 1;
+
+    // The walls, standing up over whatever is just behind them.
+    g.drawImage(this.walls, 0, 0);
     g.restore();
 
-    this.drawHud(g, w, h, cur, now, meAlive);
+    this.drawDark(g, look, lights, toWorld, dpr);
+    if (fog) this.drawFog(g, map, focus, toWorld, dpr);
+
+    // Names and health, over everything in the world.
+    g.save();
+    toWorld(g, dpr);
+    for (const p of shown) {
+      this.drawTag(g, p.x, p.y, p.seat, p.pl[3], p.pl[9], p.isMe);
+      if (p.seat === this.lock && this.controls === 'keys') this.drawLock(g, p.x, p.y, now);
+    }
+    g.restore();
+
+    this.drawHud(g, w, h, cur, now, meAlive, fog, seen);
+  }
+
+  /**
+   * The theme's darkness, with light cut out round players, shots, pickups and
+   * muzzle flashes, and a soft bloom of colour where the light is coloured.
+   */
+  private drawDark(
+    g: CanvasRenderingContext2D, look: (typeof THEME_LOOK)[MazeTheme], lights: (Light & { color?: string })[],
+    toWorld: (ctx: CanvasRenderingContext2D, d?: number) => void, dpr: number,
+  ): void {
+    const [d, dg] = this.screenCanvas('dark');
+    dg.setTransform(1, 0, 0, 1, 0, 0);
+    dg.globalCompositeOperation = 'source-over';
+    dg.clearRect(0, 0, d.width, d.height);
+    dg.fillStyle = `rgba(${look.ambientRgb}, ${look.ambient})`;
+    dg.fillRect(0, 0, d.width, d.height);
+    dg.globalCompositeOperation = 'destination-out';
+    toWorld(dg, dpr);
+    for (const l of lights) {
+      const grad = dg.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r);
+      grad.addColorStop(0, `rgba(0, 0, 0, ${l.k})`);
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      dg.fillStyle = grad;
+      dg.fillRect(l.x - l.r, l.y - l.r, l.r * 2, l.r * 2);
+    }
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.drawImage(d, 0, 0);
+    // Coloured light adds to what is under it.
+    toWorld(g, dpr);
+    g.globalCompositeOperation = 'lighter';
+    for (const l of lights) {
+      if (!l.color) continue;
+      const r = l.r * 0.6;
+      const grad = g.createRadialGradient(l.x, l.y, 0, l.x, l.y, r);
+      grad.addColorStop(0, `${l.color}40`);
+      grad.addColorStop(1, `${l.color}00`);
+      g.fillStyle = grad;
+      g.fillRect(l.x - r, l.y - r, r * 2, r * 2);
+    }
+    g.restore();
+  }
+
+  /** Fog: everything our player could not see from where they stand is dark. */
+  private drawFog(
+    g: CanvasRenderingContext2D, map: MazeMap, from: { x: number; y: number },
+    toWorld: (ctx: CanvasRenderingContext2D, d?: number) => void, dpr: number,
+  ): void {
+    const [f, fg] = this.screenCanvas('fogLayer');
+    fg.setTransform(1, 0, 0, 1, 0, 0);
+    fg.globalCompositeOperation = 'source-over';
+    fg.clearRect(0, 0, f.width, f.height);
+    fg.fillStyle = 'rgba(2, 3, 6, 0.94)';
+    fg.fillRect(0, 0, f.width, f.height);
+    fg.globalCompositeOperation = 'destination-out';
+    toWorld(fg, dpr);
+    const poly = visibility(map, from.x, from.y, FOG_RANGE);
+    // A shadow on the cut-out softens its edge.
+    fg.shadowColor = 'black';
+    fg.shadowBlur = 24 * dpr;
+    fg.fillStyle = 'black';
+    fg.beginPath();
+    poly.forEach(([x, y], i) => (i ? fg.lineTo(x, y) : fg.moveTo(x, y)));
+    fg.closePath();
+    fg.fill();
+    fg.shadowBlur = 0;
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.drawImage(f, 0, 0);
+    g.restore();
   }
 
   /** Four brackets turning round a locked-on target. */
@@ -670,44 +765,65 @@ export class MazeClient {
   }
 
   private drawPlayer(
-    g: CanvasRenderingContext2D, x: number, y: number, a: number, seat: number, hp: number,
-    safe: boolean, isMe: boolean, now: number, power: PowerKind | null,
+    g: CanvasRenderingContext2D, x: number, y: number, a: number, seat: number, safe: boolean, isMe: boolean,
+    now: number, item: ItemKind | null, shielded: boolean, fast: boolean,
   ): void {
     const col = MAZE_COLORS[seat % MAZE_COLORS.length]!;
-    // Holding a power: a glow in its colour. Double life: a shield bubble.
-    if (power) {
-      const pc = POWER_COLORS[power];
-      g.save();
-      g.shadowColor = pc;
+    g.save();
+    // A shadow under the body, so players sit on the floor.
+    g.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    g.beginPath();
+    g.ellipse(x + 3, y + 5, PLAYER_R, PLAYER_R * 0.7, 0, 0, Math.PI * 2);
+    g.fill();
+    // What they are carrying glows in its colour; a shield is a bubble.
+    if (item || shielded || fast) {
       g.shadowBlur = 14;
-      g.strokeStyle = pc;
-      g.lineWidth = power === 'life' ? 3 : 2;
-      g.globalAlpha = power === 'life' ? 0.9 : 0.55 + Math.sin(now / 150) * 0.25;
-      g.beginPath();
-      g.arc(x, y, PLAYER_R + (power === 'life' ? 7 : 4), 0, Math.PI * 2);
-      g.stroke();
-      if (power === 'speed') {
+      if (item) {
+        const pc = POWER_COLORS[item];
+        g.shadowColor = pc;
+        g.strokeStyle = pc;
+        g.lineWidth = 2;
+        g.globalAlpha = 0.55 + Math.sin(now / 150) * 0.25;
+        g.beginPath();
+        g.arc(x, y, PLAYER_R + 4, 0, Math.PI * 2);
+        g.stroke();
+      }
+      if (shielded) {
+        g.shadowColor = POWER_COLORS.shield;
+        g.globalAlpha = 0.9;
+        g.strokeStyle = POWER_COLORS.shield;
+        g.lineWidth = 3;
+        g.beginPath();
+        g.arc(x, y, PLAYER_R + 8, 0, Math.PI * 2);
+        g.stroke();
+        g.globalAlpha = 0.12;
+        g.fillStyle = POWER_COLORS.shield;
+        g.fill();
+      }
+      if (fast) {
         // Speed lines behind, against the way we face.
+        g.shadowColor = POWER_COLORS.speed;
+        g.strokeStyle = POWER_COLORS.speed;
+        g.globalAlpha = 0.8;
         g.lineWidth = 2;
         for (const off of [-6, 0, 6]) {
           g.beginPath();
           g.moveTo(x - Math.cos(a) * (PLAYER_R + 6) - Math.sin(a) * off, y - Math.sin(a) * (PLAYER_R + 6) + Math.cos(a) * off);
-          g.lineTo(x - Math.cos(a) * (PLAYER_R + 16) - Math.sin(a) * off, y - Math.sin(a) * (PLAYER_R + 16) + Math.cos(a) * off);
+          g.lineTo(x - Math.cos(a) * (PLAYER_R + 18) - Math.sin(a) * off, y - Math.sin(a) * (PLAYER_R + 18) + Math.cos(a) * off);
           g.stroke();
         }
       }
-      g.restore();
     }
+    g.restore();
     if (safe && Math.floor(now / 120) % 2) g.globalAlpha = 0.45;
-    // Gun first, under the body.
+    // Gun first, under the body. The barrel shows what the secondary will fire.
     g.save();
     g.translate(x, y);
     g.rotate(a);
-    // A wider barrel for the spread shot, a pink one for missiles.
-    const wide = power === 'spread' ? 2.5 : 0;
+    const wide = item === 'spread' ? 2.5 : 0;
     g.fillStyle = '#0f172a';
     g.fillRect(PLAYER_R - 4, -3.5 - wide, 14, 7 + wide * 2);
-    g.fillStyle = power === 'missile' ? POWER_COLORS.missile : power === 'spread' ? POWER_COLORS.spread : '#cbd5e1';
+    g.fillStyle = item === 'missile' ? POWER_COLORS.missile : item === 'spread' ? POWER_COLORS.spread : '#cbd5e1';
     g.fillRect(PLAYER_R - 3, -2.5 - wide, 12, 5 + wide * 2);
     const flash = this.flashes.get(seat);
     if (flash && now - flash < 70) {
@@ -737,23 +853,33 @@ export class MazeClient {
       g.stroke();
     }
     g.globalAlpha = 1;
-    // Name, and health once it is not full.
+  }
+
+  /** A name, and health (with any shield) once it is not full. */
+  private drawTag(g: CanvasRenderingContext2D, x: number, y: number, seat: number, hp: number, shield: number, isMe: boolean): void {
     const name = isMe ? 'You' : this.meta?.names[seat] ?? '';
     g.font = '700 11px Inter, system-ui, sans-serif';
     g.textAlign = 'center';
     g.fillStyle = 'rgba(15, 23, 42, 0.8)';
-    g.fillText(name, x + 1, y - PLAYER_R - 9);
+    g.fillText(name, x + 1, y - PLAYER_R - 11);
     g.fillStyle = '#f1f5f9';
-    g.fillText(name, x, y - PLAYER_R - 10);
-    if (hp < MAX_HP) {
+    g.fillText(name, x, y - PLAYER_R - 12);
+    if (hp < MAX_HP || shield > 0) {
       g.fillStyle = 'rgba(15, 23, 42, 0.8)';
-      g.fillRect(x - 16, y + PLAYER_R + 6, 32, 5);
+      g.fillRect(x - 16, y + PLAYER_R + 8, 32, 5);
       g.fillStyle = hp > 40 ? '#4ade80' : '#f87171';
-      g.fillRect(x - 16, y + PLAYER_R + 6, 32 * (hp / MAX_HP), 5);
+      g.fillRect(x - 16, y + PLAYER_R + 8, 32 * (hp / MAX_HP), 5);
+      if (shield > 0) {
+        g.fillStyle = POWER_COLORS.shield;
+        g.fillRect(x - 16, y + PLAYER_R + 8, 32 * (shield / POWER_AMOUNT.shield), 2);
+      }
     }
   }
 
-  private drawHud(g: CanvasRenderingContext2D, w: number, h: number, f: MazeFrame, now: number, meAlive: boolean): void {
+  private drawHud(
+    g: CanvasRenderingContext2D, w: number, h: number, f: MazeFrame, now: number, meAlive: boolean,
+    fog: boolean, seen: (x: number, y: number) => boolean,
+  ): void {
     const m = this.meta!;
     const map = this.map!;
     // A red edge when hit.
@@ -766,7 +892,7 @@ export class MazeClient {
       g.fillRect(0, 0, w, h);
     }
 
-    // The mini map, top right: walls, everyone the radar allows, and our view.
+    // The mini map, top right: walls, pickups, everyone the radar allows, and our view.
     const mini = this.mini!;
     const mk = MINIMAP_W / worldW(map);
     const mx = w - MINIMAP_W - 12;
@@ -805,7 +931,8 @@ export class MazeClient {
       const flags = p[4];
       if (!(flags & PF.ALIVE) || flags & PF.AWAY) return;
       const isMe = seat === m.mySeat;
-      if (!isMe && m.radar === 'firing' && !(flags & PF.RADAR) && m.mySeat >= 0) return;
+      // The radar rule, and, with fog, anyone we can see anyway.
+      if (!isMe && m.radar === 'firing' && !(flags & PF.RADAR) && m.mySeat >= 0 && !(fog && seen(p[0], p[1]))) return;
       const x = mx + (isMe ? this.me.x : p[0]) * mk;
       const y = my + (isMe ? this.me.y : p[1]) * mk;
       g.beginPath();
@@ -859,37 +986,52 @@ export class MazeClient {
       return;
     }
 
-    // Our health, bottom left.
+    // Our health, bottom left, with the shield over it in blue.
     const hp = mine[3];
+    const shield = mine[9];
     g.fillStyle = 'rgba(15, 23, 42, 0.8)';
     g.fillRect(14, h - 36, 204, 22);
     g.fillStyle = hp > 40 ? '#4ade80' : '#f87171';
     g.fillRect(16, h - 34, 200 * (hp / MAX_HP), 18);
-    const power = powerOf(mine[7] ?? 0);
-    const store = mine[8] ?? 0;
-    if (power === 'life') {
-      // The shield, as a blue bar over the health.
-      g.fillStyle = POWER_COLORS.life;
-      g.fillRect(16, h - 34, 200 * (store / POWER_AMOUNT.life), 7);
+    if (shield > 0) {
+      g.fillStyle = POWER_COLORS.shield;
+      g.fillRect(16, h - 34, 200 * (shield / POWER_AMOUNT.shield), 7);
     }
     g.fillStyle = '#0f172a';
     g.textAlign = 'left';
     g.font = '800 13px Inter, system-ui, sans-serif';
-    g.fillText(power === 'life' ? `${hp} HP + ${store} shield` : `${hp} HP`, 22, h - 20);
-    if (power) {
-      const col = POWER_COLORS[power];
-      const detail = power === 'speed' ? `${Math.ceil(store / MAZE_HZ)}s`
-        : power === 'missile' || power === 'spread' ? `${store} left` : '';
-      const label = `${POWER_GLYPH[power]}  ${POWER_NAMES[power]}${detail ? ` · ${detail}` : ''}`;
-      g.font = '800 14px Inter, system-ui, sans-serif';
-      const tw = g.measureText(label).width;
-      g.fillStyle = 'rgba(15, 23, 42, 0.85)';
-      g.fillRect(14, h - 66, tw + 20, 24);
-      g.strokeStyle = col;
-      g.lineWidth = 2;
-      g.strokeRect(14, h - 66, tw + 20, 24);
-      g.fillStyle = col;
-      g.fillText(label, 24, h - 49);
+    g.fillText(shield > 0 ? `${hp} HP + ${shield} shield` : `${hp} HP`, 22, h - 20);
+
+    // The stack, top first: the one the secondary will use, then what is under it.
+    const stack = unpackItems(mine[7]);
+    let sx = 14;
+    const sy = h - 68;
+    if (mine[10] > 0) {
+      sx = this.chip(g, sx, sy, `${POWER_GLYPH.speed} Speed ${Math.ceil(mine[10] / MAZE_HZ)}s`, POWER_COLORS.speed, true) + 6;
+    }
+    stack.forEach((kind, i) => {
+      const label = i === 0
+        ? `${POWER_GLYPH[kind]} ${POWER_NAMES[kind]}${kind === 'speed' ? '' : ` · ${mine[8]}`}`
+        : POWER_GLYPH[kind];
+      sx = this.chip(g, sx, sy, label, POWER_COLORS[kind], i === 0) + 6;
+    });
+    if (stack.length) {
+      g.font = '700 11px Inter, system-ui, sans-serif';
+      g.fillStyle = 'rgba(203, 213, 225, 0.8)';
+      g.fillText(this.controls === 'keys' ? 'J to use' : 'Right click or E to use', 16, sy - 8);
+    }
+
+    // Keyboard only: the keys, as a reminder.
+    if (m.live && this.controls === 'keys') {
+      g.textAlign = 'right';
+      g.font = '700 12px Inter, system-ui, sans-serif';
+      g.fillStyle = this.lock === null ? 'rgba(203, 213, 225, 0.75)' : '#fca5a5';
+      g.fillText(
+        this.lock === null
+          ? 'U fire  ·  J power-up  ·  I lock on'
+          : `Locked: ${m.names[this.lock] ?? ''}${this.lockBlocked ? ' (blocked)' : ''}  ·  U fire  ·  J power-up  ·  I next  ·  O let go`,
+        w - 16, h - 18,
+      );
     }
 
     if (!meAlive && !(mine[4] & PF.AWAY)) {
@@ -902,19 +1044,6 @@ export class MazeClient {
       g.font = '600 15px Inter, system-ui, sans-serif';
       g.fillStyle = '#cbd5e1';
       g.fillText(`Back in ${Math.ceil(mine[6] / MAZE_HZ)}…`, w / 2, h / 2 + 20);
-    }
-
-    // Keyboard only: the lock keys, as a reminder.
-    if (m.live && this.controls === 'keys') {
-      g.textAlign = 'right';
-      g.font = '700 12px Inter, system-ui, sans-serif';
-      g.fillStyle = this.lock === null ? 'rgba(203, 213, 225, 0.75)' : '#fca5a5';
-      g.fillText(
-        this.lock === null
-          ? 'U fire  ·  I lock on'
-          : `Locked: ${m.names[this.lock] ?? ''}${this.lockBlocked ? ' (blocked)' : ''}  ·  U fire  ·  I next  ·  O let go`,
-        w - 16, h - 18,
-      );
     }
 
     // A crosshair where the mouse is.
@@ -930,6 +1059,24 @@ export class MazeClient {
       g.moveTo(x, y + 5); g.lineTo(x, y + 15);
       g.stroke();
     }
+  }
+
+  /** A labelled chip on the HUD; returns where it ends. */
+  private chip(g: CanvasRenderingContext2D, x: number, y: number, label: string, color: string, strong: boolean): number {
+    g.font = `800 ${strong ? 14 : 13}px Inter, system-ui, sans-serif`;
+    g.textAlign = 'left';
+    const tw = g.measureText(label).width;
+    const wdt = tw + 18;
+    g.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    g.fillRect(x, y - 17, wdt, 24);
+    g.strokeStyle = color;
+    g.globalAlpha = strong ? 1 : 0.6;
+    g.lineWidth = 2;
+    g.strokeRect(x, y - 17, wdt, 24);
+    g.fillStyle = color;
+    g.fillText(label, x + 9, y);
+    g.globalAlpha = 1;
+    return x + wdt;
   }
 }
 

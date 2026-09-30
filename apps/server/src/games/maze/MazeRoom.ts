@@ -1,8 +1,8 @@
 import { performance } from 'node:perf_hooks';
 import {
-  AIM_STEPS, MAZE_DEFAULTS, MAZE_HZ, MAZE_KILL_LIMITS, MAZE_MAX_PLAYERS, MAZE_MIN_PLAYERS, MAZE_MINUTES,
+  AIM_STEPS, MAZE_DEFAULTS, MAZE_HZ, MAZE_THEMES, MAZE_KILL_LIMITS, MAZE_MAX_PLAYERS, MAZE_MIN_PLAYERS, MAZE_MINUTES,
   createWorld, generateMaze, mazeSize, setAway, stepWorld, toMazeFrame,
-  type MazeEvent, type MazeInput, type MazePhase, type MazePublic, type MazeSettings, type MazeWorld,
+  type MazeEvent, type MazeInput, type MazePhase, type MazePublic, type MazeSettings, type MazeTheme, type MazeWorld,
   type RoomState,
 } from '@pic-game/shared';
 import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
@@ -47,6 +47,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
   private world: MazeWorld | null = null;
   private seats: Seat[] = [];
   private seed = 0;
+  private theme: MazeTheme = 'neon';
   private endsAt = 0;
   private winners: string[] = [];
   private loop: ReturnType<typeof setTimeout> | null = null;
@@ -122,6 +123,8 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
     if ((MAZE_KILL_LIMITS as readonly number[]).includes(patch.killLimit as number)) this.settings.killLimit = patch.killLimit!;
     if (patch.radar === 'all' || patch.radar === 'firing') this.settings.radar = patch.radar;
     if (typeof patch.powerups === 'boolean') this.settings.powerups = patch.powerups;
+    if (patch.theme === 'random' || MAZE_THEMES.includes(patch.theme as MazeTheme)) this.settings.theme = patch.theme!;
+    if (typeof patch.fog === 'boolean') this.settings.fog = patch.fog;
     this.broadcast();
   }
 
@@ -136,6 +139,9 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
     }
     const { cols, rows } = mazeSize(here.length);
     this.seed = Math.floor(Math.random() * 2 ** 31);
+    this.theme = this.settings.theme === 'random'
+      ? MAZE_THEMES[Math.floor(Math.random() * MAZE_THEMES.length)]!
+      : this.settings.theme;
     this.world = createWorld(generateMaze(this.seed, cols, rows), here, Math.random, this.settings.powerups);
     this.seats = here.map(() => ({ queue: [], last: null, seen: -1, ack: -1, starved: 0 }));
     this.winners = [];
@@ -162,6 +168,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
       keys: raw.keys & 15,
       aim: ((raw.aim % AIM_STEPS) + AIM_STEPS) % AIM_STEPS,
       fire: raw.fire === true,
+      alt: raw.alt === true,
     });
     if (s.queue.length > MAX_QUEUE) s.queue.splice(0, s.queue.length - MAX_QUEUE);
   }
@@ -205,7 +212,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
         s.ack = next.seq;
         s.starved = 0;
       } else if (s.last && ++s.starved > HOLD_TICKS) {
-        s.last = { ...s.last, keys: 0, fire: false };
+        s.last = { ...s.last, keys: 0, fire: false, alt: false };
       }
       return s.last;
     });
@@ -267,6 +274,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
       settings: { ...this.settings },
       players: w ? w.fighters.map((f) => f.id) : [],
       seed: this.seed,
+      theme: this.theme,
       cols: w?.map.cols ?? 0,
       rows: w?.map.rows ?? 0,
       scores,
