@@ -5,7 +5,7 @@ import {
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
 import {
-  CHAT_BUCKET, DRAW_BUCKET, FIGHT_INPUT_BUCKET, MAX_NAME_LEN, RACE_POS_BUCKET, SUGGEST_BUCKET,
+  CHAT_BUCKET, DRAW_BUCKET, FIGHT_INPUT_BUCKET, MAX_NAME_LEN, MAZE_INPUT_BUCKET, RACE_POS_BUCKET, SUGGEST_BUCKET,
 } from '../config.js';
 import type { AnyRoom, RoomManager } from '../core/RoomManager.js';
 import type { FightRoom } from '../games/fight/FightRoom.js';
@@ -15,6 +15,7 @@ import type { SpiesRoom } from '../games/spies/SpiesRoom.js';
 import type { BingoRoom } from '../games/bingo/BingoRoom.js';
 import type { CryptidRoom } from '../games/cryptid/CryptidRoom.js';
 import type { Flip7Room } from '../games/flip7/Flip7Room.js';
+import type { MazeRoom } from '../games/maze/MazeRoom.js';
 import type { TourneyRoom } from '../games/tourney/TourneyRoom.js';
 import type { RealmsRoom } from '../games/realms/RealmsRoom.js';
 import type { SkribblRoom } from '../games/skribbl/SkribblRoom.js';
@@ -36,6 +37,7 @@ interface Session {
   suggest: TokenBucket;
   fight: TokenBucket;
   race: TokenBucket;
+  maze: TokenBucket;
 }
 
 function cleanName(raw: unknown): string | null {
@@ -74,6 +76,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       suggest: new TokenBucket(SUGGEST_BUCKET.capacity, SUGGEST_BUCKET.refillPerSec),
       fight: new TokenBucket(FIGHT_INPUT_BUCKET.capacity, FIGHT_INPUT_BUCKET.refillPerSec),
       race: new TokenBucket(RACE_POS_BUCKET.capacity, RACE_POS_BUCKET.refillPerSec),
+      maze: new TokenBucket(MAZE_INPUT_BUCKET.capacity, MAZE_INPUT_BUCKET.refillPerSec),
     };
 
     const bind = (room: AnyRoom, playerId: string) => {
@@ -101,6 +104,8 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.room?.kind === 'cryptid' && s.playerId ? s.room : null;
     const flip7 = (): Flip7Room | null =>
       s.room?.kind === 'flip7' && s.playerId ? s.room : null;
+    const maze = (): MazeRoom | null =>
+      s.room?.kind === 'maze' && s.playerId ? s.room : null;
     const tourney = (): TourneyRoom | null =>
       s.room?.kind === 'tourney' && s.playerId ? s.room : null;
 
@@ -667,6 +672,25 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
     socket.on('flip7:next', flip7Act((r, id) => r.next(id)));
     socket.on('flip7:rematch', flip7Act((r, id) => r.rematch(id)));
     socket.on('flip7:toLobby', flip7Act((r, id) => r.toLobby(id)));
+
+    // ---- Maze Wars. Inputs come thirty a second, on their own bucket.
+    socket.on('maze:input', (p) => {
+      const room = maze();
+      if (!room || !s.playerId || !s.maze.tryTake()) return;
+      const seq = Number(p?.seq);
+      const keys = Number(p?.keys);
+      const aim = Number(p?.aim);
+      if (!Number.isSafeInteger(seq) || !Number.isInteger(keys) || !Number.isInteger(aim)) return;
+      room.input(s.playerId, { seq, keys, aim, fire: p?.fire === true });
+    });
+    const mazeAct = <P>(fn: (room: MazeRoom, playerId: string, p: P) => void) => (p?: P) => {
+      const room = maze();
+      if (!room || !s.playerId || !s.chat.tryTake()) return;
+      fn(room, s.playerId, p as P);
+    };
+    socket.on('maze:settings', mazeAct((r, id, p) => r.updateSettings(id, p ?? {})));
+    socket.on('maze:rematch', mazeAct((r, id) => r.rematch(id)));
+    socket.on('maze:toLobby', mazeAct((r, id) => r.toLobby(id)));
 
     // ---- MK11 Tournament. The room checks who is host; here only shapes, and
     // the chat bucket, since every one of these rebroadcasts the tournament.

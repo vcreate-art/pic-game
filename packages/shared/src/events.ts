@@ -15,6 +15,7 @@ import type { CardColor, SpiesPublic, SpiesSettings, SpyRole, SpyTeam } from './
 import type { BingoCard, BingoPublic, BingoSettings } from './bingo/types.js';
 import type { CryptidClue, CryptidPublic, CryptidSettings } from './cryptid/types.js';
 import type { Flip7Public, Flip7Settings } from './flip7/types.js';
+import type { MazeEvent, MazeFrame, MazeInput, MazePublic, MazeSettings } from './maze/types.js';
 import type {
   ManualBonus, MatchScore, TourneyBonuses, TourneyPublic, TourneySettings,
 } from './tourney/types.js';
@@ -190,6 +191,14 @@ export interface ClientToServerEvents {
   'flip7:rematch': () => void;
   'flip7:toLobby': () => void;
 
+  // ---- Maze Wars ----
+  'maze:settings': (p: Partial<MazeSettings>) => void;
+  /** One tick of controls. Sent every tick, volatile: a lost one is replaced
+   *  by the next a thirtieth of a second later. */
+  'maze:input': (p: MazeInput) => void;
+  'maze:rematch': () => void;
+  'maze:toLobby': () => void;
+
   // ---- MK11 Tournament: the host runs it, everyone else watches ----
   'tourney:settings': (p: Partial<Omit<TourneySettings, 'bonuses'>> & { bonuses?: Partial<TourneyBonuses> }) => void;
   /** Host: someone without the app, by name. */
@@ -343,6 +352,13 @@ export interface ServerToClientEvents {
 
   // ---- Flip 7: everything is face up, so the state is the whole story ----
   'flip7:state': (p: Flip7Public) => void;
+
+  // ---- Maze Wars ----
+  'maze:state': (p: MazePublic) => void;
+  /** One tick of the match. Volatile: a late frame is useless. */
+  'maze:frame': (p: MazeFrame) => void;
+  /** Hits, kills and spawns. Reliable, so the feed never misses a kill. */
+  'maze:events': (p: MazeEvent[]) => void;
 
   // ---- MK11 Tournament ----
   'tourney:state': (p: TourneyPublic) => void;

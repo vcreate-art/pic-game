@@ -79,3 +79,7 @@ export const FIGHT_RESUME_MS = 3_000;
 
 /** Position updates from a runner: a dozen a second, with plenty of slack. */
 export const RACE_POS_BUCKET = { capacity: 60, refillPerSec: 30 };
+
+/** Maze Wars controls: one a tick, thirty a second, with room for a burst
+ *  after a stall. */
+export const MAZE_INPUT_BUCKET = { capacity: 60, refillPerSec: 40 };

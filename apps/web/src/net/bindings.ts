@@ -1,6 +1,7 @@
 import type { CanvasEngine } from '../canvas/engine.js';
 import { getFightView } from '../fight/instance.js';
 import { getRaceView } from '../race/instance.js';
+import { getMazeClient } from '../maze/client.js';
 import { useGame } from '../store/game.js';
 import { getSocket } from './socket.js';
 import { syncClock } from './clock.js';
@@ -106,6 +107,11 @@ export function bindSocket(engine: CanvasEngine): () => void {
   // --- flip 7 ---
   socket.on('flip7:state', (game) => g().setFlip7(game));
 
+  // --- maze wars: frames and the feed go straight to the client, like strokes ---
+  socket.on('maze:state', (game) => g().setMaze(game));
+  socket.on('maze:frame', (f) => getMazeClient().pushFrame(f));
+  socket.on('maze:events', (evs) => getMazeClient().pushEvents(evs));
+
   // --- mk11 tournament ---
   socket.on('tourney:state', (game) => g().setTourney(game));
 
@@ -135,7 +141,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
       'fight:state', 'fight:frame', 'fight:events',
       'race:state', 'race:ghosts', 'race:events',
       'spies:state', 'spies:key',
-      'bingo:state', 'bingo:card', 'cryptid:state', 'cryptid:clue', 'flip7:state', 'tourney:state',
+      'bingo:state', 'bingo:card', 'cryptid:state', 'cryptid:clue', 'flip7:state', 'maze:state', 'maze:frame', 'maze:events', 'tourney:state',
     ] as const) {
       socket.off(ev);
     }
