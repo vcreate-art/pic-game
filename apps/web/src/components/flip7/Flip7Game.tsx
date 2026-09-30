@@ -167,7 +167,6 @@ export function Flip7Game({ onLeave }: { onLeave: () => void }) {
               </button>
               <button type="button" className="f7btn f7btn--stay" disabled={!myTurn} onClick={() => socket.emit('flip7:stay')}>
                 Stay
-                <small>bank {roundScore(game.hands[me]!)}</small>
               </button>
               {odds && game.hands[me]?.status === 'active' && <BustOdds game={game} me={me} />}
             </div>

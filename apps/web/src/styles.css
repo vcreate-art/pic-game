@@ -2077,7 +2077,6 @@ button, input { font: inherit; color: inherit; }
   font-family: var(--display); font-size: 24px; font-weight: 800; color: #fff; box-shadow: 0 4px 0 oklch(0 0 0 / .2);
   transition: transform .08s ease, box-shadow .08s ease, opacity .2s ease;
 }
-.f7btn small { font-family: var(--ui); font-size: 11px; font-weight: 600; opacity: .85; }
 .f7btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 oklch(0 0 0 / .2); }
 .f7btn:disabled { opacity: .35; cursor: default; }
 .f7btn--hit { background: var(--f7-magenta); }
