@@ -4,6 +4,7 @@ import {
   type MazeEvent, type MazeFrame, type MazeInput, type MazeMap, type MazeRadar, type PowerKind,
 } from '@pic-game/shared';
 import { serverNow } from '../net/clock.js';
+import { LOCK_KEEP, inSight, lockOrder, nextLock } from './lock.js';
 
 const STEP_MS = 1000 / MAZE_HZ;
 /** World pixels across the screen: wider screens see more, up to a point. */
@@ -14,7 +15,7 @@ const MINIMAP_W = 200;
  * Two ways to play, chosen per player:
  *  - mouse: WASD or the arrows move, the mouse aims, click fires
  *  - keys: WASD moves and the arrows shoot, eight ways, twin-stick style;
- *    Space fires the way you are facing
+ *    U (or Space) fires the way you are facing, I locks on, O lets go
  */
 export type MazeControls = 'mouse' | 'keys';
 
@@ -104,7 +105,7 @@ export class MazeClient {
   private controls: MazeControls = 'mouse';
   private moveKeys = 0;
   private arrowKeys = 0;
-  private space = false;
+  private fireKey = false;
   private mouseDown = false;
   private mouse = { x: 0, y: 0, in: false };
   private aim = 0;
@@ -115,6 +116,10 @@ export class MazeClient {
   private flashes = new Map<number, number>();
   private hurtAt = 0;
   private toast: { text: string; at: number } | null = null;
+  /** Keyboard only: the seat our aim is locked on to, if any. */
+  private lock: number | null = null;
+  /** A wall stands between us and the locked target: our shots will hit it. */
+  private lockBlocked = false;
   private cam = { x: 0, y: 0 };
 
   // ------------------------------------------------------------ lifecycle
@@ -192,7 +197,38 @@ export class MazeClient {
 
   setControls(c: MazeControls): void {
     this.controls = c;
+    this.lock = null;
     this.release();
+  }
+
+  /**
+   * Keyboard lock-on: the nearest enemy in sight, or, pressed again, the next
+   * nearest after the one held. Behind walls counts only with Ghost missiles,
+   * which go through them.
+   */
+  private cycleLock(): void {
+    const m = this.meta;
+    const f = this.cur;
+    const map = this.map;
+    if (!m || !f || !map || m.mySeat < 0) return;
+    const through = powerOf(f.p[m.mySeat]?.[7] ?? 0) === 'missile';
+    this.lock = nextLock(lockOrder(map, f, m.mySeat, this.me, through), this.lock);
+    if (this.lock === null) this.toast = { text: 'Nobody in sight to lock on to', at: performance.now() };
+  }
+
+  /** Drops a lock whose target has died, left, or got too far away. */
+  private checkLock(): void {
+    const p = this.lock === null ? null : this.cur?.p[this.lock];
+    this.lockBlocked = false;
+    if (!p) return;
+    if (!(p[4] & PF.ALIVE) || p[4] & PF.AWAY || Math.hypot(p[0] - this.me.x, p[1] - this.me.y) > LOCK_KEEP) {
+      this.lock = null;
+      return;
+    }
+    // The lock holds through cover, but says so: Ghost missiles aside, shots
+    // at someone round a corner only hit the wall.
+    const through = powerOf(this.cur?.p[this.meta?.mySeat ?? -1]?.[7] ?? 0) === 'missile';
+    this.lockBlocked = !!this.map && !through && !inSight(this.map, this.me.x, this.me.y, p[0], p[1]);
   }
 
   private onDown = (e: KeyboardEvent) => {
@@ -201,8 +237,11 @@ export class MazeClient {
     const arrow = ARROWS[e.code];
     if (move) this.moveKeys |= move;
     if (arrow) this.arrowKeys |= arrow;
-    if (e.code === 'Space') this.space = true;
-    if (move || arrow || e.code === 'Space') e.preventDefault();
+    const keysOnly = this.controls === 'keys';
+    if (e.code === 'Space' || (keysOnly && e.code === 'KeyU')) this.fireKey = true;
+    if (keysOnly && e.code === 'KeyI' && !e.repeat) this.cycleLock();
+    if (keysOnly && e.code === 'KeyO') this.lock = null;
+    if (move || arrow || e.code === 'Space' || (keysOnly && ['KeyU', 'KeyI', 'KeyO'].includes(e.code))) e.preventDefault();
   };
 
   private onUp = (e: KeyboardEvent) => {
@@ -210,13 +249,13 @@ export class MazeClient {
     const arrow = ARROWS[e.code];
     if (move) this.moveKeys &= ~move;
     if (arrow) this.arrowKeys &= ~arrow;
-    if (e.code === 'Space') this.space = false;
+    if (e.code === 'Space' || e.code === 'KeyU') this.fireKey = false;
   };
 
   private release = () => {
     this.moveKeys = 0;
     this.arrowKeys = 0;
-    this.space = false;
+    this.fireKey = false;
     this.mouseDown = false;
   };
 
@@ -226,7 +265,7 @@ export class MazeClient {
   }
 
   private get firing(): boolean {
-    return this.controls === 'keys' ? this.arrowKeys !== 0 || this.space : this.mouseDown || this.space;
+    return this.controls === 'keys' ? this.arrowKeys !== 0 || this.fireKey : this.mouseDown || this.fireKey;
   }
 
   private onMove = (e: MouseEvent) => {
@@ -366,7 +405,12 @@ export class MazeClient {
     const map = this.map;
     const me = m && this.cur?.p[m.mySeat];
     if (!m || !map || !m.live || m.mySeat < 0 || !me || !this.send) return;
-    this.aim = this.controls === 'keys' ? dirOf(this.arrowKeys) ?? dirOf(this.moveKeys) ?? this.aim : this.aimAt();
+    this.checkLock();
+    const locked = this.lock === null ? null : this.cur?.p[this.lock];
+    // Keyboard: the arrows win while held; then a lock-on; then the way we walk.
+    this.aim = this.controls === 'keys'
+      ? dirOf(this.arrowKeys) ?? (locked ? Math.atan2(locked[1] - this.me.y, locked[0] - this.me.x) : null) ?? dirOf(this.moveKeys) ?? this.aim
+      : this.aimAt();
     const alive = (me[4] & PF.ALIVE) !== 0 && (me[4] & PF.AWAY) === 0;
     const input: MazeInput = { seq: ++this.seq, keys: alive ? this.keys : 0, aim: toAim(this.aim), fire: alive && this.firing };
     this.send(input);
@@ -502,14 +546,9 @@ export class MazeClient {
     const k = Math.min(1, (now - this.meAt) / STEP_MS);
     const me = { x: lerp(this.mePrev.x, this.me.x, k), y: lerp(this.mePrev.y, this.me.y, k) };
     const focus = mine ? (meAlive ? me : { x: mine[0], y: mine[1] }) : { x: worldW(map) / 2, y: worldH(map) / 2 };
-    const halfW = w / 2 / scale;
-    const halfH = h / 2 / scale;
-    this.cam = {
-      x: Math.max(halfW, Math.min(worldW(map) - halfW, focus.x)),
-      y: Math.max(halfH, Math.min(worldH(map) - halfH, focus.y)),
-    };
-    if (worldW(map) < halfW * 2) this.cam.x = worldW(map) / 2;
-    if (worldH(map) < halfH * 2) this.cam.y = worldH(map) / 2;
+    // Always centred on the player, even at the edge of the maze: held back at
+    // the border, a player in a corner would slide under the mini map.
+    this.cam = { x: focus.x, y: focus.y };
 
     g.save();
     g.translate(w / 2, h / 2);
@@ -563,9 +602,10 @@ export class MazeClient {
       const a = isMe && m.live ? this.aim : fromAim(pl[2]);
       const power = powerOf(pl[7] ?? 0);
       this.drawPlayer(g, x, y, a, seat, pl[3], (flags & PF.SAFE) !== 0, isMe, now, power);
+      if (seat === this.lock && this.controls === 'keys') this.drawLock(g, x, y, now);
       // Keyboard aiming has no cursor, so show the way we face.
       if (isMe && m.live && this.controls === 'keys') {
-        g.strokeStyle = 'rgba(248, 250, 252, 0.35)';
+        g.strokeStyle = this.lock !== null && this.lockBlocked ? 'rgba(248, 113, 113, 0.8)' : 'rgba(248, 250, 252, 0.35)';
         g.setLineDash([4, 6]);
         g.lineWidth = 2;
         g.beginPath();
@@ -585,6 +625,27 @@ export class MazeClient {
     g.restore();
 
     this.drawHud(g, w, h, cur, now, meAlive);
+  }
+
+  /** Four brackets turning round a locked-on target. */
+  private drawLock(g: CanvasRenderingContext2D, x: number, y: number, now: number): void {
+    const r = PLAYER_R + 12;
+    g.save();
+    g.translate(x, y);
+    g.rotate(now / 600);
+    g.strokeStyle = '#f87171';
+    g.lineWidth = 3;
+    g.shadowColor = '#ef4444';
+    g.shadowBlur = 8;
+    for (let i = 0; i < 4; i++) {
+      g.rotate(Math.PI / 2);
+      g.beginPath();
+      g.moveTo(r, -7);
+      g.lineTo(r, -r + 4);
+      g.lineTo(7, -r);
+      g.stroke();
+    }
+    g.restore();
   }
 
   private drawPickup(g: CanvasRenderingContext2D, kind: PowerKind, x: number, y: number, now: number): void {
@@ -715,11 +776,17 @@ export class MazeClient {
     g.lineWidth = 1;
     g.strokeRect(mx + 0.5, my + 0.5, mini.width - 1, mini.height - 1);
     const { scale } = this.viewport();
+    // Our view, kept inside the mini map: at the maze's edge it reaches past it.
+    g.save();
+    g.beginPath();
+    g.rect(mx, my, mini.width, mini.height);
+    g.clip();
     g.strokeStyle = 'rgba(255, 255, 255, 0.35)';
     g.strokeRect(
       mx + (this.cam.x - w / 2 / scale) * mk, my + (this.cam.y - h / 2 / scale) * mk,
       (w / scale) * mk, (h / scale) * mk,
     );
+    g.restore();
     for (const u of f.u ?? []) {
       const kind = powerOf(u[1]);
       if (!kind) continue;
@@ -835,6 +902,19 @@ export class MazeClient {
       g.font = '600 15px Inter, system-ui, sans-serif';
       g.fillStyle = '#cbd5e1';
       g.fillText(`Back in ${Math.ceil(mine[6] / MAZE_HZ)}…`, w / 2, h / 2 + 20);
+    }
+
+    // Keyboard only: the lock keys, as a reminder.
+    if (m.live && this.controls === 'keys') {
+      g.textAlign = 'right';
+      g.font = '700 12px Inter, system-ui, sans-serif';
+      g.fillStyle = this.lock === null ? 'rgba(203, 213, 225, 0.75)' : '#fca5a5';
+      g.fillText(
+        this.lock === null
+          ? 'U fire  ·  I lock on'
+          : `Locked: ${m.names[this.lock] ?? ''}${this.lockBlocked ? ' (blocked)' : ''}  ·  U fire  ·  I next  ·  O let go`,
+        w - 16, h - 18,
+      );
     }
 
     // A crosshair where the mouse is.

@@ -36,7 +36,7 @@ export function useMazeControls(): [MazeControls, (c: MazeControls) => void] {
 
 export const CONTROL_HELP: Record<MazeControls, string> = {
   mouse: 'WASD or arrows to move, mouse to aim, click to shoot.',
-  keys: 'WASD to move, arrows to shoot (eight ways), Space fires ahead.',
+  keys: 'WASD to move, arrows to shoot (eight ways). U fires ahead (Space works too). I locks on to the nearest enemy in sight, again for the next; O lets go.',
 };
 
 export function ControlsPicker({ value, onChange }: { value: MazeControls; onChange: (c: MazeControls) => void }) {

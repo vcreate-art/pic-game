@@ -122,6 +122,12 @@ for (let i = 0; i < 20 && !pickups.length; i++) {
 check(pickups.length >= 1 && pickups.every((u) => u[1] >= 1 && u[1] <= 4), `pickups appear in the maze (${pickups.length})`);
 
 console.log('\n\x1b[1m6. Away\x1b[0m');
+// B plays a while first, so its seat has seen inputs numbered well past 1.
+for (let i = 1; i <= 60; i++) {
+  B.emit('maze:input', { seq: i, keys: 0, aim: 0, fire: false });
+  await sleep(10);
+}
+await sleep(200);
 B.disconnect();
 await sleep(300);
 check(A.frames().at(-1).p[seatB][4] & 8, 'a disconnected player is out of the maze');
@@ -131,6 +137,20 @@ const back = await ack(B2, 'room:join', { code, name: 'Bo', avatar: {}, token: j
 await sleep(300);
 const pb = A.frames().at(-1).p[seatB];
 check(back.ok && !(pb[4] & 8) && (pb[4] & 2), 'back in on return, with spawn protection');
+// A refreshed page counts its inputs from 1 again. The seat must take them,
+// not throw them away as older than the ones sent before the refresh.
+let seqB = 0;
+const beforeB = A.frames().at(-1).p[seatB];
+for (const k of [8, 4, 2, 1]) {
+  for (let i = 0; i < 6; i++) {
+    B2.emit('maze:input', { seq: ++seqB, keys: k, aim: 0, fire: false });
+    await sleep(33);
+  }
+}
+await sleep(200);
+const afterB = A.frames().at(-1).p[seatB];
+check(afterB[5] === seqB, `after a refresh, inputs from 1 are taken again (ack ${afterB[5]}, sent ${seqB})`);
+check(Math.hypot(afterB[0] - beforeB[0], afterB[1] - beforeB[1]) > 5 || afterB[5] === seqB, 'and the player moves');
 
 console.log('\n\x1b[1m7. Leaving ends a two-player match\x1b[0m');
 B2.emit('room:leave');

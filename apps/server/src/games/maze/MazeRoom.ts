@@ -108,7 +108,10 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
     const seat = this.seatOf(id);
     if (!w || seat < 0 || this.stage !== 'playing') return;
     setAway(w, seat, !here);
-    this.seats[seat] = { queue: [], last: null, seen: this.seats[seat]?.seen ?? -1, ack: this.seats[seat]?.ack ?? -1, starved: 0 };
+    // A fresh start for the controls. A player back from a refresh has a new
+    // page counting its inputs from 1, and keeping the old count would throw
+    // every one of them away as stale, freezing them in place.
+    this.seats[seat] = { queue: [], last: null, seen: -1, ack: -1, starved: 0 };
   }
 
   // --------------------------------------------------------------- settings
