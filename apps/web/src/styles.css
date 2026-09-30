@@ -574,7 +574,17 @@ button, input { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- game picker */
 
-.picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+/* Ten games outgrow the screen, so the grid scrolls on its own and the join
+   form stays in view beside it. The padding keeps the tiles' shadows inside
+   the scroll box, and the fade at the foot says there is more below. */
+.picker {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-content: start;
+  max-height: max(320px, calc(100dvh - 250px)); overflow-y: auto; overscroll-behavior: contain;
+  padding: 4px 8px 24px 4px; margin: -4px -8px -24px -4px;
+  scrollbar-width: thin; scrollbar-gutter: stable;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
+}
 
 .pick {
   display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px;
@@ -722,6 +732,8 @@ button, input { font: inherit; color: inherit; }
 
 @media (max-width: 900px) {
   .landing__cols { grid-template-columns: 1fr; }
+  /* Stacked above the form: leave room for it on the same screen. */
+  .picker { max-height: 56dvh; }
 }
 @media (max-width: 560px) {
   .picker { grid-template-columns: 1fr; }
