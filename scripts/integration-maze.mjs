@@ -67,7 +67,7 @@ check(state.cols >= 12 && state.rows >= 8, `a maze sized for two (${state.cols}Ã
 const n = A.frames().length;
 check(n >= 15 && n <= 25, `frames stream at about 30 a second (${n} in 0.7s)`);
 let f = A.frames().at(-1);
-check(f.p.length === 2 && f.p.every((p) => p.length === 11 && (p[4] & 1)), 'both players alive in the frame, with stack, shield and speed');
+check(f.p.length === 2 && f.p.every((p) => p.length === 12 && (p[4] & 1)), 'both players alive in the frame, with stack, shield and run');
 check(Array.isArray(f.u), 'frames carry the pickups');
 const seatA = state.players.indexOf(c.playerId);
 const seatB = state.players.indexOf(jb.playerId);
@@ -92,6 +92,21 @@ check(f.p[seatB][5] === -1, 'a player who sent nothing has nothing acknowledged'
 A.emit('maze:input', { seq: 3, keys: 8, aim: 0, fire: false });
 await sleep(100);
 check(A.frames().at(-1).p[seatA][5] === seq, 'an old input is ignored');
+// Run: pressed, it starts at once, and the next has to wait out a cooldown.
+A.emit('maze:input', { seq: ++seq, keys: 0, aim: 0, fire: false, run: true });
+await sleep(120);
+let pr = A.frames().at(-1).p[seatA];
+check(pr[10] > 0 && pr[11] > pr[10], `a run starts on a press (${pr[10]} ticks left, next in ${pr[11]})`);
+for (let i = 0; i < 3; i++) {
+  A.emit('maze:input', { seq: ++seq, keys: 0, aim: 0, fire: false, run: false });
+  await sleep(33);
+}
+A.emit('maze:input', { seq: ++seq, keys: 0, aim: 0, fire: false, run: true });
+await sleep(120);
+const pr2 = A.frames().at(-1).p[seatA];
+check(pr2[10] < pr[10] && pr2[11] < pr[11], 'pressed again straight after, it does not start another');
+A.emit('maze:input', { seq: ++seq, keys: 0, aim: 0, fire: false, run: false });
+
 // Walk, then go quiet, as a tab in the background would: the player stops.
 const walkable = [8, 4, 2, 1];
 let moved = false;

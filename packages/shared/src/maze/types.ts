@@ -61,6 +61,8 @@ export interface MazeInput {
   fire: boolean;
   /** The secondary: whatever power-up is on top of your stack, held. */
   alt: boolean;
+  /** Run: a burst of speed on a press, then a cooldown. */
+  run: boolean;
 }
 
 export type MazeRadar = 'all' | 'firing';
@@ -100,18 +102,17 @@ export const MAZE_DEFAULTS: MazeSettings = {
  * The pickups in the maze, in two kinds.
  *
  * Items go on a stack, the last picked up on top, and the secondary button
- * uses whatever is on top:
- *  - speed: pressed, faster for a while
- *  - missile: held, shots that fly through walls and hit harder
- *  - spread: held, a shotgun, five pellets a blast at short range
+ * fires whatever is on top, while held:
+ *  - missile: shots that fly through walls and hit harder
+ *  - spread: a shotgun, five pellets a blast at short range
  *
  * A shield sits apart from the stack, so it stacks with any of them: a
  * second health bar, spent first. Nobody can hold two shields at once.
  */
-export type PowerKind = 'speed' | 'missile' | 'spread' | 'shield';
-export const POWER_KINDS: readonly PowerKind[] = ['speed', 'missile', 'spread', 'shield'];
+export type PowerKind = 'missile' | 'spread' | 'shield';
+export const POWER_KINDS: readonly PowerKind[] = ['missile', 'spread', 'shield'];
 export type ItemKind = Exclude<PowerKind, 'shield'>;
-export const ITEM_KINDS: readonly ItemKind[] = ['speed', 'missile', 'spread'];
+export const ITEM_KINDS: readonly ItemKind[] = ['missile', 'spread'];
 /** Most items one player can carry; past that, pickups are left lying. */
 export const MAX_ITEMS = 3;
 /** In frames a power travels as its index here plus one; 0 is none. */
@@ -119,7 +120,7 @@ export const powerCode = (k: PowerKind | null): number => (k ? POWER_KINDS.index
 export const powerOf = (code: number): PowerKind | null => POWER_KINDS[code - 1] ?? null;
 
 /**
- * A stack of items as one number for a frame: each item's code (1 to 3) in
+ * A stack of items as one number for a frame: each item's code (1 or 2) in
  * base 4, the top of the stack in the lowest digit.
  */
 export function packItems(kinds: readonly ItemKind[]): number {
@@ -140,15 +141,18 @@ export function unpackItems(n: number): ItemKind[] {
 }
 
 export const POWER_NAMES: Record<PowerKind, string> = {
-  speed: 'Speed', missile: 'Ghost missiles', spread: 'Spread shot', shield: 'Shield',
+  missile: 'Ghost missiles', spread: 'Spread shot', shield: 'Shield',
 };
 
-/** How much of each you get: ticks of speed, missiles, blasts, shield points. */
+/** How much of each you get: missiles, blasts, shield points. */
 export const POWER_AMOUNT: Record<PowerKind, number> = {
-  speed: 10 * MAZE_HZ, missile: 6, spread: 8, shield: MAX_HP,
+  missile: 6, spread: 8, shield: MAX_HP,
 };
 
+/** How much faster a run is than a walk. */
 export const SPEED_BOOST = 1.6;
+/** A run lasts `ticks`, and the next can start `cooldown` ticks after it ends. */
+export const RUN = { ticks: 2 * MAZE_HZ, cooldown: 6 * MAZE_HZ } as const;
 export const MISSILE = { speed: 560, damage: 40, life: 45, every: 10 } as const;
 export const SPREAD = { pellets: 5, arc: 0.55, speed: 700, damage: 14, life: 13, every: 12 } as const;
 /** Chance that a kill swaps the killer's and victim's power-ups, rather than
@@ -197,13 +201,16 @@ export const SHOT = { BULLET: 0, MISSILE: 1, PELLET: 2 } as const;
 
 /**
  * One tick of the match, sent unreliably: a late frame is useless.
- *  - p: per seat [x, y, aim, hp, flags, ack, respawnIn, items, topLeft, shield, speedLeft]
- *    where items is the stack packed by packItems, and topLeft is what is
- *    left of the top item (missiles or blasts)
+ *  - p: per seat [x, y, aim, hp, flags, ack, respawnIn, items, topLeft, shield, runLeft, runWait]
+ *    where items is the stack packed by packItems, topLeft is what is left
+ *    of the top item (missiles or blasts), runLeft the ticks of a run still
+ *    going, and runWait the ticks until the next run can start
  *  - b: bullets [id, x, y, seat, shot]
  *  - u: pickups lying in the maze [id, power, x, y]
  */
-export type MazeFramePlayer = [number, number, number, number, number, number, number, number, number, number, number];
+export type MazeFramePlayer = [
+  number, number, number, number, number, number, number, number, number, number, number, number,
+];
 
 export interface MazeFrame {
   t: number;

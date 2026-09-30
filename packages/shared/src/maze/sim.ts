@@ -2,7 +2,7 @@ import { cellCentre, mazeSolidAt, worldH, worldW, type MazeMap } from './map.js'
 import {
   BULLET_DAMAGE, BULLET_LIFE, BULLET_SPEED, CELL, FIRE_EVERY, KILL_SWAP_CHANCE, MAX_HP, MAZE_DT, MAZE_TILE,
   MAX_ITEMS, MISSILE, MV, PF, PICKUP_EVERY, PICKUP_R, PLAYER_R, PLAYER_SPEED, POWER_AMOUNT, POWER_KINDS, PROTECT_TICKS,
-  RADAR_TICKS, REGEN_AFTER, REGEN_PER_TICK, RESPAWN_TICKS, SHOT, SHUFFLE_EVERY, SPEED_BOOST, SPREAD,
+  RADAR_TICKS, REGEN_AFTER, REGEN_PER_TICK, RESPAWN_TICKS, RUN, SHOT, SHUFFLE_EVERY, SPEED_BOOST, SPREAD,
   fromAim, packItems, powerCode, type ItemKind, type MazeEvent, type MazeFrame, type MazeInput, type PowerKind,
 } from './types.js';
 
@@ -47,7 +47,7 @@ function settle(m: MazeMap, x: number, y: number, dir: number, r: number, axis: 
   return v;
 }
 
-/** How fast a player walks, with Speed running or not. */
+/** How fast a player moves, running or walking. */
 export const speedFor = (boosted: boolean): number => PLAYER_SPEED * (boosted ? SPEED_BOOST : 1);
 
 /** One tick of walking for these keys. Used by the server, and by the client
@@ -67,7 +67,7 @@ export function walk(m: MazeMap, pos: { x: number; y: number }, keys: number, sp
 /** An item on a player's stack. */
 export interface Item {
   kind: ItemKind;
-  /** Missiles or blasts left; a Speed item is used whole. */
+  /** Missiles or blasts left. */
   left: number;
 }
 
@@ -93,8 +93,12 @@ export interface MazeFighter {
   items: Item[];
   /** Shield points, spent before health. */
   shield: number;
-  /** Ticks of Speed still running. */
-  speedLeft: number;
+  /** Ticks of a run still going. */
+  runLeft: number;
+  /** Tick the next run may start. */
+  runReadyAt: number;
+  /** Whether run was held last tick, so holding it does not start another. */
+  runWas: boolean;
   /** Tick the secondary may next fire. */
   nextAlt: number;
   /** Whether the secondary was held last tick, to catch a fresh press. */
@@ -149,7 +153,7 @@ export function createWorld(map: MazeMap, ids: string[], rng: Rng, powerups = fa
     const f: MazeFighter = {
       id, seat, x: 0, y: 0, aim: 0, hp: MAX_HP, alive: true, respawnAt: 0, safeUntil: 0,
       lastHurt: -REGEN_AFTER, lastShot: -RADAR_TICKS, nextShot: 0, kills: 0, deaths: 0, away: false,
-      items: [], shield: 0, speedLeft: 0, nextAlt: 0, altWas: false,
+      items: [], shield: 0, runLeft: 0, runReadyAt: 0, runWas: false, nextAlt: 0, altWas: false,
     };
     w.fighters.push(f);
     place(w, f);
@@ -227,14 +231,20 @@ export function stepWorld(w: MazeWorld, inputs: (MazeInput | null)[]): MazeEvent
     }
     const inp = inputs[f.seat];
     if (inp) {
-      walk(w.map, f, inp.keys, speedFor(f.speedLeft > 0));
+      const run = inp.run === true;
+      if (run && !f.runWas && t >= f.runReadyAt) {
+        f.runLeft = RUN.ticks;
+        f.runReadyAt = t + RUN.ticks + RUN.cooldown;
+      }
+      f.runWas = run;
+      walk(w.map, f, inp.keys, speedFor(f.runLeft > 0));
       f.aim = inp.aim;
       if (inp.fire && t >= f.nextShot) fire(w, f);
       useItem(w, f, inp.alt === true);
     } else {
       f.altWas = false;
     }
-    if (f.speedLeft > 0) f.speedLeft--;
+    if (f.runLeft > 0) f.runLeft--;
     if (f.hp < MAX_HP && t - f.lastHurt >= REGEN_AFTER) f.hp = Math.min(MAX_HP, f.hp + REGEN_PER_TICK);
   }
 
@@ -313,22 +323,13 @@ function fire(w: MazeWorld, f: MazeFighter): void {
 }
 
 /**
- * The secondary: the item on top of the stack. Speed starts on a fresh press
- * (holding the button does not burn a second one); missiles and the spread
- * fire while held, each at its own rate. An item is gone once used up, and
- * the one under it is next.
+ * The secondary: the item on top of the stack, fired while held, each kind at
+ * its own rate. An item is gone once used up, and the one under it is next.
  */
 function useItem(w: MazeWorld, f: MazeFighter, held: boolean): void {
-  const pressed = held && !f.altWas;
   f.altWas = held;
   const top = f.items[f.items.length - 1];
   if (!top || !held) return;
-  if (top.kind === 'speed') {
-    if (!pressed) return;
-    f.speedLeft += POWER_AMOUNT.speed;
-    f.items.pop();
-    return;
-  }
   if (w.tick < f.nextAlt) return;
   shot(w, f);
   const a = fromAim(f.aim);
@@ -363,7 +364,7 @@ function hurt(w: MazeWorld, f: MazeFighter, by: number, damage: number, events: 
   const killer = w.fighters[by];
   if (killer && killer !== f) killer.kills++;
   events.push({ k: 'kill', v: f.seat, by });
-  f.speedLeft = 0;
+  f.runLeft = 0;
   f.shield = 0;
   if (w.powerups && killer && killer !== f) afterKill(w, killer, f, events);
   else f.items = [];
@@ -484,7 +485,8 @@ export function toMazeFrame(w: MazeWorld, acks: number[]): MazeFrame {
       packItems([...f.items].reverse().map((it) => it.kind)),
       f.items.length ? f.items[f.items.length - 1]!.left : 0,
       Math.ceil(f.shield),
-      f.speedLeft,
+      f.runLeft,
+      f.alive ? Math.max(0, f.runReadyAt - w.tick) : 0,
     ]),
     b: w.bullets.map((b) => [b.id, Math.round(b.x), Math.round(b.y), b.seat, b.shot]),
     u: w.pickups.map((u) => [u.id, powerCode(u.kind), Math.round(u.x), Math.round(u.y)]),

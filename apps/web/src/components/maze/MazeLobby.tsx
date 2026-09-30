@@ -134,11 +134,12 @@ export function MazeLobby({ onLeave }: { onLeave: () => void }) {
           <ol className="clobby__rules">
             <li>Five hits and you are out. You are back in a moment, far from everyone.</li>
             <li>Health comes back if you stay out of trouble for a few seconds.</li>
+            <li><b>Run</b> for a two-second burst of speed; it needs six seconds to recharge.</li>
             {settings.powerups && (
               <li>
-                Grab <b>Speed</b>, <b>Ghost missiles</b> (through walls) and <b>Spread shot</b>: they stack, up to
-                three, and your second button uses the last one you picked up. A <b>Shield</b> goes on top of
-                any of them, one at a time. A kill may swap stacks, and now and then everyone's get shuffled.
+                Grab <b>Ghost missiles</b> (through walls) and <b>Spread shot</b>: they stack, up to three, and
+                your second button fires the last one you picked up. A <b>Shield</b> goes on top of either, one
+                at a time. A kill may swap stacks, and now and then everyone's get shuffled.
               </li>
             )}
           </ol>

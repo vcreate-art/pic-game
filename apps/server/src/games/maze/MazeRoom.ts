@@ -169,6 +169,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
       aim: ((raw.aim % AIM_STEPS) + AIM_STEPS) % AIM_STEPS,
       fire: raw.fire === true,
       alt: raw.alt === true,
+      run: raw.run === true,
     });
     if (s.queue.length > MAX_QUEUE) s.queue.splice(0, s.queue.length - MAX_QUEUE);
   }
@@ -212,7 +213,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
         s.ack = next.seq;
         s.starved = 0;
       } else if (s.last && ++s.starved > HOLD_TICKS) {
-        s.last = { ...s.last, keys: 0, fire: false, alt: false };
+        s.last = { ...s.last, keys: 0, fire: false, alt: false, run: false };
       }
       return s.last;
     });
