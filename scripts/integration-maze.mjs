@@ -46,6 +46,10 @@ check(state === null || state.settings.minutes === 5, 'only the host changes set
 A.emit('maze:settings', { minutes: 7, killLimit: 10, radar: 'firing' });
 await sleep(120);
 check(state.settings.minutes === 5 && state.settings.killLimit === 10 && state.settings.radar === 'firing', 'only offered values are taken');
+check(state.settings.powerups === true, 'power-ups are on by default');
+A.emit('maze:settings', { powerups: 'yes' });
+await sleep(120);
+check(state.settings.powerups === true, 'power-ups take only a true or false');
 
 console.log('\n\x1b[1m3. The match\x1b[0m');
 A.emit('game:start');
@@ -55,7 +59,8 @@ check(state.cols >= 12 && state.rows >= 8, `a maze sized for two (${state.cols}Ã
 const n = A.frames().length;
 check(n >= 15 && n <= 25, `frames stream at about 30 a second (${n} in 0.7s)`);
 let f = A.frames().at(-1);
-check(f.p.length === 2 && f.p.every((p) => p.length === 7 && (p[4] & 1)), 'both players alive in the frame');
+check(f.p.length === 2 && f.p.every((p) => p.length === 9 && (p[4] & 1)), 'both players alive in the frame, with their power-ups');
+check(Array.isArray(f.u), 'frames carry the pickups');
 const seatA = state.players.indexOf(c.playerId);
 const seatB = state.players.indexOf(jb.playerId);
 const [x0, y0] = f.p[seatA];
@@ -106,6 +111,15 @@ check(shots.size <= 3, 'at the fire rate, not every tick');
 A.emit('maze:input', { seq: ++seq, keys: 0, aim: 0, fire: false });
 await sleep(1300);
 check(A.frames().at(-1).b.length <= before, 'bullets die at walls or the end of their range');
+
+console.log('\n\x1b[1m5b. Pickups\x1b[0m');
+// The first pickup appears once the match is a few ticks old, away from players.
+let pickups = [];
+for (let i = 0; i < 20 && !pickups.length; i++) {
+  await sleep(200);
+  pickups = A.frames().at(-1).u;
+}
+check(pickups.length >= 1 && pickups.every((u) => u[1] >= 1 && u[1] <= 4), `pickups appear in the maze (${pickups.length})`);
 
 console.log('\n\x1b[1m6. Away\x1b[0m');
 B.disconnect();

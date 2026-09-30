@@ -68,9 +68,47 @@ export interface MazeSettings {
   /** Kills that end the match; 0 plays to the clock. */
   killLimit: number;
   radar: MazeRadar;
+  /** Pickups in the maze, swaps on kills, and the odd shuffle. */
+  powerups: boolean;
 }
 
-export const MAZE_DEFAULTS: MazeSettings = { minutes: 5, killLimit: 15, radar: 'all' };
+export const MAZE_DEFAULTS: MazeSettings = { minutes: 5, killLimit: 15, radar: 'all', powerups: true };
+
+// ---------------------------------------------------------------- power-ups
+
+/**
+ * What a player can hold, one at a time:
+ *  - speed: faster for a while
+ *  - missile: shots that fly through walls and hit harder
+ *  - spread: a shotgun, five pellets a blast at short range
+ *  - life: a shield worth a second health bar, used up first
+ */
+export type PowerKind = 'speed' | 'missile' | 'spread' | 'life';
+export const POWER_KINDS: readonly PowerKind[] = ['speed', 'missile', 'spread', 'life'];
+/** In frames a power travels as its index here plus one; 0 is none. */
+export const powerCode = (k: PowerKind | null): number => (k ? POWER_KINDS.indexOf(k) + 1 : 0);
+export const powerOf = (code: number): PowerKind | null => POWER_KINDS[code - 1] ?? null;
+
+export const POWER_NAMES: Record<PowerKind, string> = {
+  speed: 'Speed', missile: 'Ghost missiles', spread: 'Spread shot', life: 'Double life',
+};
+
+/** How much of each you get: ticks of speed, missiles, blasts, shield points. */
+export const POWER_AMOUNT: Record<PowerKind, number> = {
+  speed: 10 * MAZE_HZ, missile: 6, spread: 8, life: MAX_HP,
+};
+
+export const SPEED_BOOST = 1.6;
+export const MISSILE = { speed: 560, damage: 40, life: 45, every: 10 } as const;
+export const SPREAD = { pellets: 5, arc: 0.55, speed: 700, damage: 14, life: 13, every: 12 } as const;
+/** Chance that a kill swaps the killer's and victim's power-ups, rather than
+ *  the victim's dropping where they fell. */
+export const KILL_SWAP_CHANCE = 0.5;
+/** Between shuffles of everyone's power-ups, in ticks. */
+export const SHUFFLE_EVERY = { min: 30 * MAZE_HZ, max: 60 * MAZE_HZ } as const;
+/** Ticks between pickups appearing, while there are fewer than the maze holds. */
+export const PICKUP_EVERY = 6 * MAZE_HZ;
+export const PICKUP_R = 16;
 export const MAZE_MINUTES = [3, 5, 8, 12] as const;
 export const MAZE_KILL_LIMITS = [10, 15, 25, 0] as const;
 export const MAZE_MIN_PLAYERS = 2;
@@ -102,22 +140,33 @@ export interface MazePublic {
 /** Player flags in a frame. */
 export const PF = { ALIVE: 1, SAFE: 2, RADAR: 4, AWAY: 8 } as const;
 
+/** What kind of shot a bullet is, in frames. */
+export const SHOT = { BULLET: 0, MISSILE: 1, PELLET: 2 } as const;
+
 /**
  * One tick of the match, sent unreliably: a late frame is useless.
- *  - p: per seat [x, y, aim, hp, flags, ack, respawnIn]
- *  - b: bullets [id, x, y, seat]
+ *  - p: per seat [x, y, aim, hp, flags, ack, respawnIn, power, powerLeft]
+ *  - b: bullets [id, x, y, seat, shot]
+ *  - u: pickups lying in the maze [id, power, x, y]
  */
 export interface MazeFrame {
   t: number;
-  p: [number, number, number, number, number, number, number][];
-  b: [number, number, number, number][];
+  p: [number, number, number, number, number, number, number, number, number][];
+  b: [number, number, number, number, number][];
+  u: [number, number, number, number][];
 }
 
 /** What happened, sent reliably so no kill is ever missed. Seats, not ids. */
 export type MazeEvent =
   | { k: 'hit'; v: number; by: number; x: number; y: number }
   | { k: 'kill'; v: number; by: number }
-  | { k: 'spawn'; s: number; x: number; y: number };
+  | { k: 'spawn'; s: number; x: number; y: number }
+  /** Picked up a power: `p` is its code. */
+  | { k: 'pick'; s: number; p: number; x: number; y: number }
+  /** A kill swapped the two players' power-ups. */
+  | { k: 'swap'; a: number; b: number }
+  /** Everyone's power-ups were shuffled round. */
+  | { k: 'shuffle' };
 
 /** Ten seat colours, far enough apart to tell at a glance on a dark floor. */
 export const MAZE_COLORS = [

@@ -1,7 +1,7 @@
 import {
-  FIRE_EVERY, MAX_HP, MAZE_COLORS, MAZE_HZ, MAZE_TILE, MV, PF, PLAYER_R, fromAim, generateMaze, toAim,
-  walk, wallAt, worldH, worldW,
-  type MazeEvent, type MazeFrame, type MazeInput, type MazeMap, type MazeRadar,
+  FIRE_EVERY, MAX_HP, MAZE_COLORS, MAZE_HZ, MAZE_TILE, MISSILE, MV, PF, PICKUP_R, PLAYER_R, POWER_AMOUNT,
+  POWER_NAMES, SHOT, SPREAD, fromAim, generateMaze, powerOf, speedFor, toAim, walk, wallAt, worldH, worldW,
+  type MazeEvent, type MazeFrame, type MazeInput, type MazeMap, type MazeRadar, type PowerKind,
 } from '@pic-game/shared';
 import { serverNow } from '../net/clock.js';
 
@@ -10,12 +10,28 @@ const STEP_MS = 1000 / MAZE_HZ;
 const VIEW_WORLD_W = 1000;
 const MINIMAP_W = 200;
 
-const KEYS: Record<string, number> = {
-  KeyW: MV.UP, ArrowUp: MV.UP,
-  KeyS: MV.DOWN, ArrowDown: MV.DOWN,
-  KeyA: MV.LEFT, ArrowLeft: MV.LEFT,
-  KeyD: MV.RIGHT, ArrowRight: MV.RIGHT,
+/**
+ * Two ways to play, chosen per player:
+ *  - mouse: WASD or the arrows move, the mouse aims, click fires
+ *  - keys: WASD moves and the arrows shoot, eight ways, twin-stick style;
+ *    Space fires the way you are facing
+ */
+export type MazeControls = 'mouse' | 'keys';
+
+const MOVE: Record<string, number> = { KeyW: MV.UP, KeyS: MV.DOWN, KeyA: MV.LEFT, KeyD: MV.RIGHT };
+const ARROWS: Record<string, number> = { ArrowUp: MV.UP, ArrowDown: MV.DOWN, ArrowLeft: MV.LEFT, ArrowRight: MV.RIGHT };
+
+/** The way a set of direction bits points, or null for none (or opposites). */
+function dirOf(bits: number): number | null {
+  const dx = (bits & MV.RIGHT ? 1 : 0) - (bits & MV.LEFT ? 1 : 0);
+  const dy = (bits & MV.DOWN ? 1 : 0) - (bits & MV.UP ? 1 : 0);
+  return dx || dy ? Math.atan2(dy, dx) : null;
+}
+
+export const POWER_COLORS: Record<PowerKind, string> = {
+  speed: '#22d3ee', missile: '#f472b6', spread: '#fb923c', life: '#60a5fa',
 };
+const POWER_GLYPH: Record<PowerKind, string> = { speed: '»', missile: '◆', spread: '⁂', life: '+' };
 
 export interface MazeMeta {
   seed: number;
@@ -85,8 +101,11 @@ export class MazeClient {
   private cooldown = 0;
 
   // Controls.
-  private keys = 0;
-  private firing = false;
+  private controls: MazeControls = 'mouse';
+  private moveKeys = 0;
+  private arrowKeys = 0;
+  private space = false;
+  private mouseDown = false;
   private mouse = { x: 0, y: 0, in: false };
   private aim = 0;
   private send: ((i: MazeInput) => void) | null = null;
@@ -95,6 +114,7 @@ export class MazeClient {
   private feed: FeedLine[] = [];
   private flashes = new Map<number, number>();
   private hurtAt = 0;
+  private toast: { text: string; at: number } | null = null;
   private cam = { x: 0, y: 0 };
 
   // ------------------------------------------------------------ lifecycle
@@ -170,29 +190,44 @@ export class MazeClient {
 
   // ----------------------------------------------------------------- input
 
+  setControls(c: MazeControls): void {
+    this.controls = c;
+    this.release();
+  }
+
   private onDown = (e: KeyboardEvent) => {
     if (typing(e.target)) return;
-    const bit = KEYS[e.code];
-    if (bit) {
-      this.keys |= bit;
-      e.preventDefault();
-    }
-    if (e.code === 'Space') {
-      this.firing = true;
-      e.preventDefault();
-    }
+    const move = MOVE[e.code];
+    const arrow = ARROWS[e.code];
+    if (move) this.moveKeys |= move;
+    if (arrow) this.arrowKeys |= arrow;
+    if (e.code === 'Space') this.space = true;
+    if (move || arrow || e.code === 'Space') e.preventDefault();
   };
 
   private onUp = (e: KeyboardEvent) => {
-    const bit = KEYS[e.code];
-    if (bit) this.keys &= ~bit;
-    if (e.code === 'Space') this.firing = false;
+    const move = MOVE[e.code];
+    const arrow = ARROWS[e.code];
+    if (move) this.moveKeys &= ~move;
+    if (arrow) this.arrowKeys &= ~arrow;
+    if (e.code === 'Space') this.space = false;
   };
 
   private release = () => {
-    this.keys = 0;
-    this.firing = false;
+    this.moveKeys = 0;
+    this.arrowKeys = 0;
+    this.space = false;
+    this.mouseDown = false;
   };
+
+  /** Movement bits: with the mouse aiming, the arrows move too. */
+  private get keys(): number {
+    return this.controls === 'keys' ? this.moveKeys : this.moveKeys | this.arrowKeys;
+  }
+
+  private get firing(): boolean {
+    return this.controls === 'keys' ? this.arrowKeys !== 0 || this.space : this.mouseDown || this.space;
+  }
 
   private onMove = (e: MouseEvent) => {
     const r = this.canvas!.getBoundingClientRect();
@@ -200,14 +235,14 @@ export class MazeClient {
   };
 
   private onPress = (e: MouseEvent) => {
-    if (e.button !== 0) return;
-    this.firing = true;
+    if (e.button !== 0 || this.controls !== 'mouse') return;
+    this.mouseDown = true;
     this.onMove(e);
     e.preventDefault();
   };
 
   private onRelease = (e: MouseEvent) => {
-    if (e.button === 0) this.firing = false;
+    if (e.button === 0) this.mouseDown = false;
   };
 
   private onLeave = () => {
@@ -242,6 +277,10 @@ export class MazeClient {
     if (document.hidden) return;
     const m = this.meta;
     const name = (s: number) => (s === m?.mySeat ? 'You' : m?.names[s] ?? 'Someone');
+    const line = (text: string, color: string) => {
+      this.feed.unshift({ text, color, at: performance.now() });
+      this.feed.length = Math.min(this.feed.length, 5);
+    };
     for (const e of events) {
       if (e.k === 'hit') {
         this.burst(e.x, e.y, 10, '#fecaca', 140, 0.35);
@@ -257,6 +296,16 @@ export class MazeClient {
         this.feed.length = Math.min(this.feed.length, 5);
       } else if (e.k === 'spawn') {
         this.burst(e.x, e.y, 18, '#e0f2fe', 120, 0.5);
+      } else if (e.k === 'pick') {
+        const kind = powerOf(e.p);
+        if (!kind) continue;
+        this.burst(e.x, e.y, 22, POWER_COLORS[kind], 160, 0.5);
+        line(`${name(e.s)} took ${POWER_NAMES[kind]}`, POWER_COLORS[kind]);
+      } else if (e.k === 'swap') {
+        line(`${name(e.a)} ⇄ ${name(e.b)}: power-ups swapped`, '#e2e8f0');
+      } else if (e.k === 'shuffle') {
+        this.toast = { text: 'Power-ups shuffled!', at: performance.now() };
+        line("Everyone's power-ups shuffled", '#fde68a');
       }
     }
   }
@@ -270,7 +319,8 @@ export class MazeClient {
     const ack = p[5];
     this.pending = this.pending.filter((i) => i.seq > ack);
     const pos = { x: p[0], y: p[1] };
-    if (p[4] & PF.ALIVE) for (const i of this.pending) walk(this.map, pos, i.keys);
+    const speed = speedFor(powerOf(p[7]));
+    if (p[4] & PF.ALIVE) for (const i of this.pending) walk(this.map, pos, i.keys, speed);
     // Small differences are the usual drift of float maths; large ones (a
     // respawn, a correction) are taken at once rather than slid across.
     const off = Math.hypot(pos.x - this.me.x, pos.y - this.me.y);
@@ -316,7 +366,7 @@ export class MazeClient {
     const map = this.map;
     const me = m && this.cur?.p[m.mySeat];
     if (!m || !map || !m.live || m.mySeat < 0 || !me || !this.send) return;
-    this.aim = this.aimAt();
+    this.aim = this.controls === 'keys' ? dirOf(this.arrowKeys) ?? dirOf(this.moveKeys) ?? this.aim : this.aimAt();
     const alive = (me[4] & PF.ALIVE) !== 0 && (me[4] & PF.AWAY) === 0;
     const input: MazeInput = { seq: ++this.seq, keys: alive ? this.keys : 0, aim: toAim(this.aim), fire: alive && this.firing };
     this.send(input);
@@ -324,10 +374,11 @@ export class MazeClient {
     if (this.pending.length > 90) this.pending.shift();
     this.mePrev = { ...this.me };
     this.meAt = performance.now();
-    if (alive) walk(map, this.me, input.keys);
+    const power = powerOf(me[7]);
+    if (alive) walk(map, this.me, input.keys, speedFor(power));
     if (this.cooldown > 0) this.cooldown--;
     if (input.fire && this.cooldown <= 0) {
-      this.cooldown = FIRE_EVERY;
+      this.cooldown = power === 'missile' ? MISSILE.every : power === 'spread' ? SPREAD.every : FIRE_EVERY;
       this.flashes.set(m.mySeat, performance.now());
     }
   }
@@ -467,22 +518,37 @@ export class MazeClient {
     g.imageSmoothingEnabled = false;
     g.drawImage(this.floor, 0, 0);
 
-    // Bullets: a bright streak from where each was a moment ago.
+    // Pickups: a glowing token that bobs, with its power's mark.
+    for (const u of cur.u ?? []) {
+      const kind = powerOf(u[1]);
+      if (kind) this.drawPickup(g, kind, u[2], u[3] + Math.sin(now / 300 + u[0]) * 2.5, now);
+    }
+
+    // Bullets: a bright streak from where each was a moment ago. Missiles are
+    // fat and trail; pellets are small.
     const was = new Map(prev.b.map((b) => [b[0], b]));
     g.lineCap = 'round';
     for (const b of cur.b) {
       const p = was.get(b[0]) ?? b;
       const x = lerp(p[1], b[1], alpha);
       const y = lerp(p[2], b[2], alpha);
-      const col = MAZE_COLORS[b[3] % MAZE_COLORS.length]!;
+      const shot = b[4] ?? SHOT.BULLET;
+      const col = shot === SHOT.MISSILE ? POWER_COLORS.missile : MAZE_COLORS[b[3] % MAZE_COLORS.length]!;
+      const tail = shot === SHOT.MISSILE ? 1.4 : shot === SHOT.PELLET ? 0.35 : 0.6;
       g.strokeStyle = col;
-      g.lineWidth = 3;
+      g.lineWidth = shot === SHOT.MISSILE ? 6 : shot === SHOT.PELLET ? 2.5 : 3;
       g.shadowColor = col;
-      g.shadowBlur = 10;
+      g.shadowBlur = shot === SHOT.MISSILE ? 18 : 10;
       g.beginPath();
-      g.moveTo(x - (b[1] - p[1]) * 0.6, y - (b[2] - p[2]) * 0.6);
+      g.moveTo(x - (b[1] - p[1]) * tail, y - (b[2] - p[2]) * tail);
       g.lineTo(x, y);
       g.stroke();
+      if (shot === SHOT.MISSILE) {
+        g.fillStyle = '#fff';
+        g.beginPath();
+        g.arc(x, y, 3.5, 0, Math.PI * 2);
+        g.fill();
+      }
     }
     g.shadowBlur = 0;
 
@@ -495,7 +561,19 @@ export class MazeClient {
       const x = isMe ? me.x : lerp(pp[0], pl[0], alpha);
       const y = isMe ? me.y : lerp(pp[1], pl[1], alpha);
       const a = isMe && m.live ? this.aim : fromAim(pl[2]);
-      this.drawPlayer(g, x, y, a, seat, pl[3], (flags & PF.SAFE) !== 0, isMe, now);
+      const power = powerOf(pl[7] ?? 0);
+      this.drawPlayer(g, x, y, a, seat, pl[3], (flags & PF.SAFE) !== 0, isMe, now, power);
+      // Keyboard aiming has no cursor, so show the way we face.
+      if (isMe && m.live && this.controls === 'keys') {
+        g.strokeStyle = 'rgba(248, 250, 252, 0.35)';
+        g.setLineDash([4, 6]);
+        g.lineWidth = 2;
+        g.beginPath();
+        g.moveTo(x + Math.cos(a) * (PLAYER_R + 14), y + Math.sin(a) * (PLAYER_R + 14));
+        g.lineTo(x + Math.cos(a) * 120, y + Math.sin(a) * 120);
+        g.stroke();
+        g.setLineDash([]);
+      }
     });
 
     for (const s of this.sparks) {
@@ -509,20 +587,67 @@ export class MazeClient {
     this.drawHud(g, w, h, cur, now, meAlive);
   }
 
+  private drawPickup(g: CanvasRenderingContext2D, kind: PowerKind, x: number, y: number, now: number): void {
+    const col = POWER_COLORS[kind];
+    const pulse = 1 + Math.sin(now / 200) * 0.12;
+    g.shadowColor = col;
+    g.shadowBlur = 16;
+    g.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    g.beginPath();
+    g.arc(x, y, PICKUP_R * pulse, 0, Math.PI * 2);
+    g.fill();
+    g.lineWidth = 3;
+    g.strokeStyle = col;
+    g.stroke();
+    g.shadowBlur = 0;
+    g.fillStyle = col;
+    g.font = '900 16px Inter, system-ui, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(POWER_GLYPH[kind], x, y + 1);
+    g.textBaseline = 'alphabetic';
+  }
+
   private drawPlayer(
     g: CanvasRenderingContext2D, x: number, y: number, a: number, seat: number, hp: number,
-    safe: boolean, isMe: boolean, now: number,
+    safe: boolean, isMe: boolean, now: number, power: PowerKind | null,
   ): void {
     const col = MAZE_COLORS[seat % MAZE_COLORS.length]!;
+    // Holding a power: a glow in its colour. Double life: a shield bubble.
+    if (power) {
+      const pc = POWER_COLORS[power];
+      g.save();
+      g.shadowColor = pc;
+      g.shadowBlur = 14;
+      g.strokeStyle = pc;
+      g.lineWidth = power === 'life' ? 3 : 2;
+      g.globalAlpha = power === 'life' ? 0.9 : 0.55 + Math.sin(now / 150) * 0.25;
+      g.beginPath();
+      g.arc(x, y, PLAYER_R + (power === 'life' ? 7 : 4), 0, Math.PI * 2);
+      g.stroke();
+      if (power === 'speed') {
+        // Speed lines behind, against the way we face.
+        g.lineWidth = 2;
+        for (const off of [-6, 0, 6]) {
+          g.beginPath();
+          g.moveTo(x - Math.cos(a) * (PLAYER_R + 6) - Math.sin(a) * off, y - Math.sin(a) * (PLAYER_R + 6) + Math.cos(a) * off);
+          g.lineTo(x - Math.cos(a) * (PLAYER_R + 16) - Math.sin(a) * off, y - Math.sin(a) * (PLAYER_R + 16) + Math.cos(a) * off);
+          g.stroke();
+        }
+      }
+      g.restore();
+    }
     if (safe && Math.floor(now / 120) % 2) g.globalAlpha = 0.45;
     // Gun first, under the body.
     g.save();
     g.translate(x, y);
     g.rotate(a);
+    // A wider barrel for the spread shot, a pink one for missiles.
+    const wide = power === 'spread' ? 2.5 : 0;
     g.fillStyle = '#0f172a';
-    g.fillRect(PLAYER_R - 4, -3.5, 14, 7);
-    g.fillStyle = '#cbd5e1';
-    g.fillRect(PLAYER_R - 3, -2.5, 12, 5);
+    g.fillRect(PLAYER_R - 4, -3.5 - wide, 14, 7 + wide * 2);
+    g.fillStyle = power === 'missile' ? POWER_COLORS.missile : power === 'spread' ? POWER_COLORS.spread : '#cbd5e1';
+    g.fillRect(PLAYER_R - 3, -2.5 - wide, 12, 5 + wide * 2);
     const flash = this.flashes.get(seat);
     if (flash && now - flash < 70) {
       g.fillStyle = '#fef08a';
@@ -595,6 +720,20 @@ export class MazeClient {
       mx + (this.cam.x - w / 2 / scale) * mk, my + (this.cam.y - h / 2 / scale) * mk,
       (w / scale) * mk, (h / scale) * mk,
     );
+    for (const u of f.u ?? []) {
+      const kind = powerOf(u[1]);
+      if (!kind) continue;
+      const x = mx + u[2] * mk;
+      const y = my + u[3] * mk;
+      g.fillStyle = POWER_COLORS[kind];
+      g.beginPath();
+      g.moveTo(x, y - 4);
+      g.lineTo(x + 4, y);
+      g.lineTo(x, y + 4);
+      g.lineTo(x - 4, y);
+      g.closePath();
+      g.fill();
+    }
     f.p.forEach((p, seat) => {
       const flags = p[4];
       if (!(flags & PF.ALIVE) || flags & PF.AWAY) return;
@@ -636,6 +775,14 @@ export class MazeClient {
     g.font = '800 20px "Baloo 2", system-ui, sans-serif';
     g.fillStyle = left < 30000 ? '#f87171' : '#e2e8f0';
     g.fillText(`${mm}:${String(ss).padStart(2, '0')}`, w / 2, 30);
+    if (this.toast && now - this.toast.at < 2500) {
+      const k = Math.min(1, (2500 - (now - this.toast.at)) / 500);
+      g.globalAlpha = k;
+      g.font = '800 26px "Baloo 2", system-ui, sans-serif';
+      g.fillStyle = '#fde68a';
+      g.fillText(this.toast.text, w / 2, 70);
+      g.globalAlpha = 1;
+    }
 
     const mine = m.mySeat >= 0 ? f.p[m.mySeat] : null;
     if (!mine) {
@@ -651,10 +798,32 @@ export class MazeClient {
     g.fillRect(14, h - 36, 204, 22);
     g.fillStyle = hp > 40 ? '#4ade80' : '#f87171';
     g.fillRect(16, h - 34, 200 * (hp / MAX_HP), 18);
+    const power = powerOf(mine[7] ?? 0);
+    const store = mine[8] ?? 0;
+    if (power === 'life') {
+      // The shield, as a blue bar over the health.
+      g.fillStyle = POWER_COLORS.life;
+      g.fillRect(16, h - 34, 200 * (store / POWER_AMOUNT.life), 7);
+    }
     g.fillStyle = '#0f172a';
     g.textAlign = 'left';
     g.font = '800 13px Inter, system-ui, sans-serif';
-    g.fillText(`${hp} HP`, 22, h - 20);
+    g.fillText(power === 'life' ? `${hp} HP + ${store} shield` : `${hp} HP`, 22, h - 20);
+    if (power) {
+      const col = POWER_COLORS[power];
+      const detail = power === 'speed' ? `${Math.ceil(store / MAZE_HZ)}s`
+        : power === 'missile' || power === 'spread' ? `${store} left` : '';
+      const label = `${POWER_GLYPH[power]}  ${POWER_NAMES[power]}${detail ? ` · ${detail}` : ''}`;
+      g.font = '800 14px Inter, system-ui, sans-serif';
+      const tw = g.measureText(label).width;
+      g.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      g.fillRect(14, h - 66, tw + 20, 24);
+      g.strokeStyle = col;
+      g.lineWidth = 2;
+      g.strokeRect(14, h - 66, tw + 20, 24);
+      g.fillStyle = col;
+      g.fillText(label, 24, h - 49);
+    }
 
     if (!meAlive && !(mine[4] & PF.AWAY)) {
       g.fillStyle = 'rgba(11, 16, 24, 0.55)';
@@ -669,7 +838,7 @@ export class MazeClient {
     }
 
     // A crosshair where the mouse is.
-    if (this.mouse.in && m.live) {
+    if (this.mouse.in && m.live && this.controls === 'mouse') {
       const { x, y } = this.mouse;
       g.strokeStyle = meAlive ? '#f8fafc' : 'rgba(248, 250, 252, 0.3)';
       g.lineWidth = 2;

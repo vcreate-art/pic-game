@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BULLET_DAMAGE, CELL, MAX_HP, MAZE_TILE, MV, PF, PLAYER_R, PROTECT_TICKS, RESPAWN_TICKS, cellCentre,
-  createWorld, generateMaze, mazeSize, mazeSolidAt, moveBody, seededRng, setAway, stepWorld, toAim,
-  toMazeFrame, walk, wallAt,
-  type MazeInput, type MazeMap, type MazeWorld,
+  BULLET_DAMAGE, CELL, MAX_HP, MAZE_TILE, MISSILE, MV, PF, PLAYER_R, PLAYER_SPEED, POWER_AMOUNT, PROTECT_TICKS,
+  RESPAWN_TICKS, SPEED_BOOST, SPREAD, cellCentre, createWorld, freshPower, generateMaze, mazeSize, mazeSolidAt,
+  moveBody, pickupCap, powerCode, seededRng, setAway, shufflePowers, speedFor, stepWorld, toAim, toMazeFrame,
+  walk, wallAt,
+  type MazeEvent, type MazeInput, type MazeMap, type MazeWorld,
 } from '../index.js';
 
 /** Every open tile reachable from the first cell, by flood fill. */
@@ -224,5 +225,153 @@ describe('spawning', () => {
     setAway(w, 1, false);
     expect(w.fighters[1]!.away).toBe(false);
     expect(w.tick < w.fighters[1]!.safeUntil).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------- power-ups
+
+/** The duel, with power-ups on. */
+function powered(): MazeWorld {
+  const w = duel();
+  w.powerups = true;
+  w.pickupAt = Infinity; // no pickups appearing on their own
+  w.shuffleAt = Infinity;
+  return w;
+}
+
+/** Fires once from A at B and lets the shot land. */
+function shootAtB(w: MazeWorld, seq = 1): MazeEvent[] {
+  const events = stepWorld(w, [input(seq, { fire: true, aim: toAim(0) }), null]);
+  for (let i = 0; i < 40; i++) events.push(...stepWorld(w, [null, null]));
+  return events;
+}
+
+describe('power-ups', () => {
+  it('Speed: 60% faster, for ten seconds', () => {
+    const w = powered();
+    const a = w.fighters[0]!;
+    a.power = freshPower('speed');
+    const x = a.x;
+    stepWorld(w, [input(1, { keys: MV.DOWN }), null]);
+    expect(a.y - 150).toBeCloseTo((PLAYER_SPEED * SPEED_BOOST) / 30, 5);
+    expect(a.x).toBe(x);
+    expect(speedFor('speed')).toBe(PLAYER_SPEED * SPEED_BOOST);
+    for (let i = 0; i < POWER_AMOUNT.speed; i++) stepWorld(w, [null, null]);
+    expect(a.power).toBeNull();
+  });
+
+  it('Ghost missiles: through walls, hit harder, six of them', () => {
+    const w = powered();
+    const [a, b] = w.fighters;
+    // A wall column between them.
+    const tx = Math.floor(300 / MAZE_TILE);
+    for (let ty = 1; ty < w.map.h - 1; ty++) w.map.walls[ty * w.map.w + tx] = 1;
+    a!.power = freshPower('missile');
+    shootAtB(w);
+    expect(b!.hp).toBe(MAX_HP - MISSILE.damage);
+    expect(a!.power!.left).toBe(POWER_AMOUNT.missile - 1);
+    // An ordinary shot now stops at the wall.
+    a!.power = null;
+    shootAtB(w, 2);
+    expect(b!.hp).toBe(MAX_HP - MISSILE.damage);
+  });
+
+  it('Spread shot: five pellets a blast, and blasts run out', () => {
+    const w = powered();
+    const a = w.fighters[0]!;
+    a.power = freshPower('spread');
+    stepWorld(w, [input(1, { fire: true, aim: toAim(Math.PI / 2) }), null]);
+    expect(w.bullets).toHaveLength(SPREAD.pellets);
+    expect(new Set(w.bullets.map((b) => Math.round(Math.atan2(b.vy, b.vx) * 100))).size).toBe(SPREAD.pellets);
+    for (let i = 2; i < 200 && a.power; i++) stepWorld(w, [input(i, { fire: true, aim: toAim(Math.PI / 2) }), null]);
+    expect(a.power).toBeNull();
+  });
+
+  it('Spread shot up close hits with several pellets', () => {
+    const w = powered();
+    const [a, b] = w.fighters;
+    b!.x = 170;
+    a!.power = freshPower('spread');
+    shootAtB(w);
+    expect(MAX_HP - b!.hp).toBeGreaterThanOrEqual(SPREAD.damage * 3);
+  });
+
+  it('Double life: the shield takes the hits first', () => {
+    const w = powered();
+    const b = w.fighters[1]!;
+    b.power = freshPower('life');
+    for (let i = 0; i < 5; i++) shootAtB(w, i + 1);
+    expect(b.alive).toBe(true);
+    expect(b.hp).toBe(MAX_HP);
+    expect(b.power).toBeNull();
+    shootAtB(w, 9);
+    expect(b.hp).toBe(MAX_HP - BULLET_DAMAGE);
+  });
+
+  it('walking over a pickup takes it, replacing what you held', () => {
+    const w = powered();
+    const a = w.fighters[0]!;
+    a.power = freshPower('speed');
+    w.pickups.push({ id: 1, kind: 'missile', x: a.x + 10, y: a.y });
+    const ev = stepWorld(w, [null, null]);
+    expect(a.power).toEqual(freshPower('missile'));
+    expect(w.pickups).toHaveLength(0);
+    expect(ev).toContainEqual({ k: 'pick', s: 0, p: powerCode('missile'), x: Math.round(a.x + 10), y: Math.round(a.y) });
+  });
+
+  it('pickups appear over time, up to a cap, away from players', () => {
+    const m = generateMaze(8, 14, 10);
+    const w = createWorld(m, ['A', 'B', 'C', 'D'], seededRng(2), true);
+    for (let i = 0; i < 60 * 30; i++) stepWorld(w, [null, null, null, null]);
+    expect(w.pickups.length).toBe(pickupCap(w));
+    for (const u of w.pickups) expect(mazeSolidAt(m, u.x, u.y)).toBe(false);
+  });
+
+  it('a kill can swap the two players power-ups', () => {
+    const w = powered();
+    const [a, b] = w.fighters;
+    // A holds nothing, so shoots a plain bullet; B holds missiles.
+    b!.power = freshPower('missile');
+    b!.hp = BULLET_DAMAGE;
+    b!.lastHurt = w.tick; // no health back before the shot lands
+    w.rng = () => 0; // always swap
+    const ev = shootAtB(w);
+    expect(ev).toContainEqual({ k: 'swap', a: 0, b: 1 });
+    expect(a!.power?.kind).toBe('missile');
+    expect(b!.power).toBeNull();
+  });
+
+  it('otherwise the victim drops theirs where they fell', () => {
+    const w = powered();
+    const b = w.fighters[1]!;
+    b.power = freshPower('speed');
+    b.hp = BULLET_DAMAGE;
+    b.lastHurt = w.tick;
+    w.rng = () => 0.99; // never swap
+    const ev = shootAtB(w);
+    expect(ev.some((e) => e.k === 'swap')).toBe(false);
+    expect(b.power).toBeNull();
+    expect(w.pickups).toEqual([{ id: 1, kind: 'speed', x: 500, y: 150 }]);
+  });
+
+  it('a shuffle deals the power-ups out again among the living', () => {
+    const m = generateMaze(8, 14, 10);
+    const w = createWorld(m, ['A', 'B', 'C', 'D'], seededRng(5), true);
+    w.fighters[0]!.power = freshPower('speed');
+    w.fighters[1]!.power = freshPower('life');
+    expect(shufflePowers(w)).toBe(true);
+    const kinds = w.fighters.map((f) => f.power?.kind ?? null).filter(Boolean).sort();
+    expect(kinds).toEqual(['life', 'speed']);
+    for (const f of w.fighters) f.power = null;
+    expect(shufflePowers(w)).toBe(false);
+  });
+
+  it('frames carry each player power and the pickups', () => {
+    const w = powered();
+    w.fighters[0]!.power = freshPower('missile');
+    w.pickups.push({ id: 3, kind: 'life', x: 300, y: 100 });
+    const f = toMazeFrame(w, [0, 0]);
+    expect(f.p[0]!.slice(7)).toEqual([powerCode('missile'), POWER_AMOUNT.missile]);
+    expect(f.u).toEqual([[3, powerCode('life'), 300, 100]]);
   });
 });

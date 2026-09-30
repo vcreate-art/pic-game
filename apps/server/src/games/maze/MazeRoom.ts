@@ -118,6 +118,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
     if ((MAZE_MINUTES as readonly number[]).includes(patch.minutes as number)) this.settings.minutes = patch.minutes!;
     if ((MAZE_KILL_LIMITS as readonly number[]).includes(patch.killLimit as number)) this.settings.killLimit = patch.killLimit!;
     if (patch.radar === 'all' || patch.radar === 'firing') this.settings.radar = patch.radar;
+    if (typeof patch.powerups === 'boolean') this.settings.powerups = patch.powerups;
     this.broadcast();
   }
 
@@ -132,7 +133,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
     }
     const { cols, rows } = mazeSize(here.length);
     this.seed = Math.floor(Math.random() * 2 ** 31);
-    this.world = createWorld(generateMaze(this.seed, cols, rows), here, Math.random);
+    this.world = createWorld(generateMaze(this.seed, cols, rows), here, Math.random, this.settings.powerups);
     this.seats = here.map(() => ({ queue: [], last: null, seen: -1, ack: -1, starved: 0 }));
     this.winners = [];
     this.endsAt = Date.now() + this.settings.minutes * 60_000;

@@ -5,6 +5,7 @@ import { getSocket } from '../../net/socket.js';
 import { selectIsHost, selectMaze, useGame } from '../../store/game.js';
 import { Chat } from '../Chat.js';
 import { MazeLobby } from './MazeLobby.js';
+import { CONTROL_HELP, ControlsPicker, useMazeControls } from './controls.js';
 
 const touchOnly = () =>
   typeof window !== 'undefined' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
@@ -14,6 +15,7 @@ export function MazeGame({ onLeave }: { onLeave: () => void }) {
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
   const ref = useRef<HTMLCanvasElement>(null);
+  const [controls, setControls] = useMazeControls();
   const game = room?.game;
   const playing = game?.phase === 'playing';
 
@@ -73,7 +75,7 @@ export function MazeGame({ onLeave }: { onLeave: () => void }) {
             </div>
           )}
           {mySeat >= 0 && playing && touchOnly() && (
-            <p className="fstage__note">Maze Wars needs a keyboard and a mouse.</p>
+            <p className="fstage__note">Maze Wars needs a keyboard.</p>
           )}
         </div>
 
@@ -93,8 +95,15 @@ export function MazeGame({ onLeave }: { onLeave: () => void }) {
                 </li>
               ))}
             </ol>
-            <p className="settings__note settings__note--left">Kills · deaths. Move WASD, aim with the mouse, click to shoot.</p>
+            <p className="settings__note settings__note--left">Kills · deaths.</p>
           </section>
+          {mySeat >= 0 && (
+            <section className="card mzside__controls">
+              <h2 className="card__title">Controls</h2>
+              <ControlsPicker value={controls} onChange={setControls} />
+              <p className="settings__note settings__note--left">{CONTROL_HELP[controls]}</p>
+            </section>
+          )}
           <Chat />
           <button className="btn btn--danger" type="button" onClick={onLeave}>Leave room</button>
         </aside>

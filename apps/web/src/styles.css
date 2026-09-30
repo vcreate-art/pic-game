@@ -2174,3 +2174,11 @@ button, input { font: inherit; color: inherit; }
   .mz { grid-template-columns: 1fr; }
   .mz__stage { height: 70dvh; }
 }
+.mzcontrols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mzcontrols__opt {
+  padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card);
+  font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.mzcontrols__opt:hover { border-color: var(--accent); }
+.mzcontrols__opt.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.mzside__controls { display: flex; flex-direction: column; gap: 8px; }

@@ -4,6 +4,7 @@ import { selectIsHost, selectMaze, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { InviteCard } from '../InviteCard.js';
 import { KickButton } from '../KickButton.js';
+import { CONTROL_HELP, ControlsPicker, useMazeControls } from './controls.js';
 
 const RADARS: { value: MazeRadar; name: string; blurb: string }[] = [
   { value: 'all', name: 'Everyone', blurb: 'The mini map shows every player, all the time.' },
@@ -13,6 +14,7 @@ const RADARS: { value: MazeRadar; name: string; blurb: string }[] = [
 export function MazeLobby({ onLeave }: { onLeave: () => void }) {
   const room = useGame(selectMaze);
   const isHost = useGame(selectIsHost);
+  const [controls, setControls] = useMazeControls();
   const socket = getSocket();
   if (!room) return null;
   const { settings } = room.game;
@@ -83,14 +85,36 @@ export function MazeLobby({ onLeave }: { onLeave: () => void }) {
             </div>
           </div>
 
+          <label className="settings__row bingolobby__row">
+            <span className="settings__label">Power-ups</span>
+            <input
+              type="checkbox"
+              className="bingolobby__check"
+              checked={settings.powerups}
+              disabled={!isHost}
+              onChange={(e) => socket.emit('maze:settings', { powerups: e.target.checked })}
+            />
+          </label>
+
+          <div className="settings__modes">
+            <span className="settings__label">Your controls</span>
+            <ControlsPicker value={controls} onChange={setControls} />
+            <span className="settings__note settings__note--left">{CONTROL_HELP[controls]}</span>
+          </div>
+
           <ol className="clobby__rules">
-            <li><b>WASD</b> or the arrow keys to move, the <b>mouse</b> to aim, <b>click</b> (or hold) to shoot.</li>
             <li>Five hits and you are out. You are back in a moment, far from everyone.</li>
             <li>Health comes back if you stay out of trouble for a few seconds.</li>
+            {settings.powerups && (
+              <li>
+                Grab <b>Speed</b>, <b>Ghost missiles</b> (through walls), <b>Spread shot</b> or <b>Double life</b>.
+                A kill may swap power-ups, and now and then everyone's get shuffled.
+              </li>
+            )}
           </ol>
 
           <p className="settings__note settings__note--left">
-            {MAZE_MIN_PLAYERS} to {MAZE_MAX_PLAYERS} players, a new maze every match. Needs a keyboard and mouse.
+            {MAZE_MIN_PLAYERS} to {MAZE_MAX_PLAYERS} players, a new maze every match. Needs a keyboard.
           </p>
 
           {isHost ? (
