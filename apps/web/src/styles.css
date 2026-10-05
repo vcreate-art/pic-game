@@ -593,9 +593,13 @@ button, input { font: inherit; color: inherit; }
   border-radius: var(--radius); box-shadow: var(--shadow);
   transition: border-color .15s ease, transform .08s ease;
 }
-.pick:hover { border-color: var(--accent); }
+/* Hover and selection take the game's own color rather than the app purple. */
+.pick:hover { border-color: var(--game, var(--accent)); }
 .pick:active { transform: translateY(1px); }
-.pick.is-active { border-color: var(--accent); background: var(--accent-soft); }
+.pick.is-active {
+  border-color: var(--game, var(--accent));
+  background: color-mix(in srgb, var(--game, var(--accent)) 7%, var(--card));
+}
 /* --game is set per tile from GAME_ICONS. */
 .pick .pick__tile {
   display: grid; place-items: center; flex: none;
@@ -609,7 +613,7 @@ button, input { font: inherit; color: inherit; }
 .pick__art { width: 26px; height: 26px; }
 .pick strong { font-family: var(--display); font-size: 15px; }
 .pick span { font-size: 11.5px; color: var(--ink-soft); line-height: 1.35; }
-.pick.is-active strong { color: var(--accent); }
+.pick.is-active strong { color: var(--game, var(--accent)); }
 
 /* ---------------------------------------------------------------- chess */
 
