@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { GAME_LABELS, PLAYABLE_KINDS, type GameKind, type JoinAck } from '@pic-game/shared';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import {
@@ -12,19 +12,20 @@ import { useGame } from '../store/game.js';
 import { Route as rootRoute } from './__root.js';
 
 /** A Record rather than a lookup chain, so a new GameKind fails to compile
- *  until it has an icon. */
-const GAME_ICONS: Record<GameKind, LucideIcon> = {
-  skribbl: Pencil,
-  kungfu: ChessKnight,
-  realms: Rocket,
-  fight: Swords,
-  race: Footprints,
-  spies: VenetianMask,
-  bingo: Grid3x3,
-  cryptid: PawPrint,
-  flip7: Spade,
-  maze: Crosshair,
-  tourney: Trophy,
+ *  until it has an icon and a color. Colors are spread around the wheel so
+ *  neighbours in the grid don't blur together. */
+const GAME_ICONS: Record<GameKind, { icon: LucideIcon; color: string }> = {
+  skribbl: { icon: Pencil, color: '#db2777' },
+  kungfu: { icon: ChessKnight, color: '#0d9488' },
+  realms: { icon: Rocket, color: '#7c3aed' },
+  fight: { icon: Swords, color: '#dc2626' },
+  race: { icon: Footprints, color: '#ea580c' },
+  spies: { icon: VenetianMask, color: '#0284c7' },
+  bingo: { icon: Grid3x3, color: '#16a34a' },
+  cryptid: { icon: PawPrint, color: '#65a30d' },
+  flip7: { icon: Spade, color: '#c026d3' },
+  maze: { icon: Crosshair, color: '#2563eb' },
+  tourney: { icon: Trophy, color: '#ca8a04' },
 };
 
 /** Matches the breakpoint where .landing__cols stacks. */
@@ -90,7 +91,7 @@ function Landing() {
   const picker = !joining && (
     <div className="picker">
       {PLAYABLE_KINDS.map((k) => {
-        const Icon = GAME_ICONS[k];
+        const { icon: Icon, color } = GAME_ICONS[k];
         return (
           <button
             key={k}
@@ -98,8 +99,11 @@ function Landing() {
             className={`pick ${game === k ? 'is-active' : ''}`}
             aria-pressed={game === k}
             onClick={() => setGame(k)}
+            style={{ '--game': color } as CSSProperties}
           >
-            <Icon className="pick__art" aria-hidden="true" strokeWidth={1.75} />
+            <span className="pick__tile" aria-hidden="true">
+              <Icon className="pick__art" strokeWidth={2} />
+            </span>
             <strong>{GAME_LABELS[k].name}</strong>
             <span>{GAME_LABELS[k].blurb}</span>
           </button>
