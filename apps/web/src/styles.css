@@ -131,15 +131,9 @@ button, input { font: inherit; color: inherit; }
   margin: 0 auto; width: 100%; max-width: 1020px;
   display: flex; flex-direction: column; gap: 20px; padding: 28px 0 24px;
 }
-/* Games beside the join form. The picker takes the larger share because it
-   holds three cards to the form's one column. */
-.landing__cols {
-  display: grid; grid-template-columns: 1.55fr 1fr; gap: 36px; align-items: start;
-}
-/* Typing a code hides the picker, so the form takes the middle on its own. */
-.landing__cols.is-single {
-  grid-template-columns: minmax(0, 420px); justify-content: center;
-}
+/* Joining comes first, in a narrow card; the games sit below at full width. */
+.landing__join { width: 100%; max-width: 460px; margin: 0 auto; }
+.landing__games { padding: 18px 18px 20px; }
 /* The join-by-link screen shares .landing but has no picker beside the form,
    so it keeps the narrow width the page had before the picker existed. */
 .landing--narrow { max-width: 440px; }
@@ -574,46 +568,98 @@ button, input { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- game picker */
 
-/* Ten games outgrow the screen, so the grid scrolls on its own and the join
-   form stays in view beside it. The padding keeps the tiles' shadows inside
-   the scroll box, and the fade at the foot says there is more below. */
-.picker {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-content: start;
-  max-height: max(320px, calc(100dvh - 250px)); overflow-y: auto; overscroll-behavior: contain;
-  padding: 4px 8px 24px 4px; margin: -4px -8px -24px -4px;
-  scrollbar-width: thin; scrollbar-gutter: stable;
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
-}
+.picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 
 .pick {
   display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px;
   padding: 14px 12px; text-align: center; cursor: pointer;
   background: var(--card); border: 1px solid var(--line);
-  border-radius: var(--radius); box-shadow: var(--shadow);
+  border-radius: var(--radius);
   transition: border-color .15s ease, transform .08s ease;
 }
 /* Hover and selection take the game's own color rather than the app purple. */
-.pick:hover { border-color: var(--game, var(--accent)); }
+/* Hover only where there is a real pointer: on touch, :hover sticks to the
+   last tapped card and leaves it tilted. */
+@media (hover: hover) {
+  .pick:hover { border-color: var(--game, var(--accent)); }
+  .pick:hover .pick__tile { transform: rotate(-6deg) scale(1.06); }
+}
 .pick:active { transform: translateY(1px); }
 .pick.is-active {
   border-color: var(--game, var(--accent));
   background: color-mix(in srgb, var(--game, var(--accent)) 7%, var(--card));
 }
-/* --game is set per tile from GAME_ICONS. */
-.pick .pick__tile {
+.landing__card .btn--primary {
+  background: var(--game, var(--accent)); border-color: var(--game, var(--accent));
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.landing__card .btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--game, var(--accent)) 85%, #000);
+}
+
+/* --game is set per tile from GAME_ICONS. Doubled up so it outranks
+   `.pick span` inside a card, and still applies in the Create card's header. */
+.pick__tile, .pick .pick__tile {
   display: grid; place-items: center; flex: none;
   width: 48px; height: 48px; margin-bottom: 6px; border-radius: 14px;
   color: var(--game, var(--ink));
   background: color-mix(in srgb, var(--game, var(--ink)) 13%, var(--card));
   transition: transform .15s ease;
 }
-.pick:hover .pick__tile { transform: rotate(-6deg) scale(1.06); }
 .pick.is-active .pick__tile { color: #fff; background: var(--game, var(--accent)); }
 .pick__art { width: 26px; height: 26px; }
 .pick strong { font-family: var(--display); font-size: 15px; }
 .pick span { font-size: 11.5px; color: var(--ink-soft); line-height: 1.35; }
 .pick.is-active strong { color: var(--game, var(--accent)); }
+
+/* ---------------------------------------------------------------- create sheet */
+
+/* Picking a game opens its Create card over the page: centred on a wide
+   screen, rising from the bottom edge on a phone. */
+.sheet {
+  position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 20px;
+  background: rgba(31, 34, 51, .45); backdrop-filter: blur(3px);
+  animation: sheet-fade .18s ease;
+}
+.sheet__card {
+  width: 100%; max-width: 440px; max-height: calc(100dvh - 40px); overflow-y: auto;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .25); padding: 20px;
+  animation: sheet-pop .22s cubic-bezier(.2, .9, .3, 1.2);
+}
+.sheet__head { display: flex; align-items: center; gap: 12px; }
+.sheet__head .pick__tile { margin: 0; color: #fff; background: var(--game); }
+.sheet__titles { flex: 1; min-width: 0; }
+.sheet__kicker {
+  margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--ink-soft);
+}
+.sheet__title {
+  margin: 0; font-family: var(--display); font-size: 22px; font-weight: 800;
+  line-height: 1.15; color: var(--game);
+}
+.sheet__close {
+  display: grid; place-items: center; width: 34px; height: 34px; flex: none; align-self: flex-start;
+  border: 0; border-radius: 10px; background: var(--paper); color: var(--ink-soft); cursor: pointer;
+}
+.sheet__close:hover { color: var(--ink); }
+.sheet__close svg { width: 18px; height: 18px; }
+.sheet__blurb { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+
+@keyframes sheet-fade { from { opacity: 0; } }
+@keyframes sheet-pop { from { opacity: 0; transform: translateY(12px) scale(.97); } }
+@keyframes sheet-rise { from { transform: translateY(100%); } }
+
+@media (max-width: 560px) {
+  .sheet { place-items: end stretch; padding: 0; }
+  .sheet__card {
+    max-width: none; border-radius: 22px 22px 0 0; border-bottom: 0;
+    max-height: 92dvh; padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    animation: sheet-rise .26s cubic-bezier(.2, .9, .3, 1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet, .sheet__card { animation: none; }
+}
 
 /* ---------------------------------------------------------------- chess */
 
@@ -728,15 +774,8 @@ button, input { font: inherit; color: inherit; }
 .seat__who { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0; }
 .seat__open { font-size: 13px; color: var(--ink-soft); font-style: italic; }
 
-/* Stacked: the picker moves inside the form card, below the room code, so it
-   no longer needs its own scroll box. */
 @media (max-width: 900px) {
-  .landing__cols { grid-template-columns: minmax(0, 1fr); }
-  .landing__card .picker {
-    max-height: none; overflow: visible; padding: 0; margin: 0;
-    -webkit-mask-image: none; mask-image: none;
-  }
-  .landing__card .pick { box-shadow: none; }
+  .picker { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
   .picker { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

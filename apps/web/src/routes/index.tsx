@@ -1,11 +1,11 @@
-import { useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { GAME_LABELS, PLAYABLE_KINDS, type GameKind, type JoinAck } from '@pic-game/shared';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import {
-  ChessKnight, Crosshair, Footprints, Grid3x3, PawPrint, Pencil, Rocket, Spade, Swords, Trophy, VenetianMask,
+  ChessKnight, Crosshair, Footprints, Grid3x3, PawPrint, Pencil, Rocket, Spade, Swords, Trophy, VenetianMask, X,
   type LucideIcon,
 } from 'lucide-react';
-import { JoinPanel, type Identity } from '../components/JoinPanel.js';
+import { JoinPanel, initialIdentity, type Identity } from '../components/JoinPanel.js';
 import { peekRoom } from '../api/client.js';
 import { getSocket, saveSeat } from '../net/socket.js';
 import { useGame } from '../store/game.js';
@@ -28,23 +28,33 @@ const GAME_ICONS: Record<GameKind, { icon: LucideIcon; color: string }> = {
   tourney: { icon: Trophy, color: '#ca8a04' },
 };
 
-/** Matches the breakpoint where .landing__cols stacks. */
-const NARROW = '(max-width: 900px)';
-const subscribe = (cb: () => void) => {
-  const mq = window.matchMedia(NARROW);
-  mq.addEventListener('change', cb);
-  return () => mq.removeEventListener('change', cb);
-};
-const useNarrow = () => useSyncExternalStore(subscribe, () => window.matchMedia(NARROW).matches);
-
 function Landing() {
   const navigate = useNavigate();
-  const narrow = useNarrow();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState('');
-  const [game, setGame] = useState<GameKind>('skribbl');
-  const joining = code.trim().length > 0;
+  // The game whose Create card is open, if any.
+  const [game, setGame] = useState<GameKind | null>(null);
+  // One name and avatar for both cards, so a name typed to join carries over
+  // when the player picks a game instead.
+  const [draft, setDraft] = useState(initialIdentity);
+
+  const open = (k: GameKind) => {
+    setError(null);
+    setGame(k);
+  };
+  const close = () => {
+    if (busy) return;
+    setError(null);
+    setGame(null);
+  };
+
+  useEffect(() => {
+    if (!game) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   /** Join and create both land here: take the seat and go to the room. */
   const enter = (res: JoinAck) => {
@@ -59,17 +69,21 @@ function Landing() {
     void navigate({ to: '/room/$code', params: { code: res.state.code } });
   };
 
-  const go = (id: Identity) => {
+  const create = (id: Identity) => {
+    if (!game) return;
     setBusy(true);
     setError(null);
-    const socket = getSocket();
-    const wanted = code.trim().toUpperCase();
+    getSocket().emit('room:create', { name: id.name, avatar: id.avatar, game }, enter);
+  };
 
+  const join = (id: Identity) => {
+    const wanted = code.trim().toUpperCase();
     if (!wanted) {
-      socket.emit('room:create', { name: id.name, avatar: id.avatar, game }, enter);
+      setError('Enter a room code, or pick a game below to start one.');
       return;
     }
-
+    setBusy(true);
+    setError(null);
     // Preflight over HTTP so a typo gives a clear message instead of a silent failure.
     peekRoom(wanted)
       .then((peek) => {
@@ -78,7 +92,7 @@ function Landing() {
           setError('No room with that code.');
           return;
         }
-        socket.emit('room:join', { code: wanted, name: id.name, avatar: id.avatar }, enter);
+        getSocket().emit('room:join', { code: wanted, name: id.name, avatar: id.avatar }, enter);
       })
       .catch(() => {
         setBusy(false);
@@ -86,31 +100,7 @@ function Landing() {
       });
   };
 
-  // Hidden once a code is typed: joining an existing room inherits whichever
-  // game that room was created with.
-  const picker = !joining && (
-    <div className="picker">
-      {PLAYABLE_KINDS.map((k) => {
-        const { icon: Icon, color } = GAME_ICONS[k];
-        return (
-          <button
-            key={k}
-            type="button"
-            className={`pick ${game === k ? 'is-active' : ''}`}
-            aria-pressed={game === k}
-            onClick={() => setGame(k)}
-            style={{ '--game': color } as CSSProperties}
-          >
-            <span className="pick__tile" aria-hidden="true">
-              <Icon className="pick__art" strokeWidth={2} />
-            </span>
-            <strong>{GAME_LABELS[k].name}</strong>
-            <span>{GAME_LABELS[k].blurb}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
+  const picked = game && GAME_ICONS[game];
 
   return (
     <div className="landing">
@@ -119,38 +109,87 @@ function Landing() {
         <p className="landing__sub">Grab some friends. One link, everyone's in.</p>
       </div>
 
-      <div className={`landing__cols ${joining ? 'is-single' : ''}`}>
-        {!narrow && picker}
+      <div className="card landing__card landing__join">
+        <h2 className="card__title">Join a room</h2>
+        <JoinPanel
+          submitLabel="Join room"
+          busy={busy && !game}
+          error={game ? null : error}
+          onSubmit={join}
+          draft={draft}
+          onDraft={setDraft}
+        >
+          <label className="field">
+            <span className="field__label">Room code</span>
+            <input
+              className="field__input field__input--code"
+              value={code}
+              maxLength={6}
+              placeholder="ABC123"
+              onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+            />
+          </label>
+        </JoinPanel>
+      </div>
 
-        <div className="card landing__card">
-          <JoinPanel
-            submitLabel={joining ? 'Join room' : `Create ${GAME_LABELS[game].name}`}
-            busy={busy}
-            error={error}
-            onSubmit={go}
-          >
-            <label className="field">
-              <span className="field__label">Room code <em>— leave blank to start a new one</em></span>
-              <input
-                className="field__input field__input--code"
-                value={code}
-                maxLength={6}
-                placeholder="ABC123"
-                onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-              />
-            </label>
-            {/* On a phone, joining comes first: name and code at the top, and
-                the games sit between the code and the button so a host picks
-                one right above where they tap Create. */}
-            {narrow && picker && (
-              <div className="field">
-                <span className="field__label">Or start a new game</span>
-                {picker}
-              </div>
-            )}
-          </JoinPanel>
+      <div className="card landing__games">
+        <h2 className="card__title">Or start a new game</h2>
+        <div className="picker">
+          {PLAYABLE_KINDS.map((k) => {
+            const { icon: Icon, color } = GAME_ICONS[k];
+            return (
+              <button
+                key={k}
+                type="button"
+                className={`pick ${game === k ? 'is-active' : ''}`}
+                onClick={() => open(k)}
+                style={{ '--game': color } as CSSProperties}
+              >
+                <span className="pick__tile" aria-hidden="true">
+                  <Icon className="pick__art" strokeWidth={2} />
+                </span>
+                <strong>{GAME_LABELS[k].name}</strong>
+                <span>{GAME_LABELS[k].blurb}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      {game && picked && (
+        <div className="sheet" onClick={close}>
+          <div
+            className="card landing__card sheet__card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-title"
+            style={{ '--game': picked.color } as CSSProperties}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sheet__head">
+              <span className="pick__tile" aria-hidden="true">
+                <picked.icon className="pick__art" strokeWidth={2} />
+              </span>
+              <div className="sheet__titles">
+                <p className="sheet__kicker">New room</p>
+                <h2 id="create-title" className="sheet__title">{GAME_LABELS[game].name}</h2>
+              </div>
+              <button type="button" className="sheet__close" aria-label="Close" onClick={close}>
+                <X aria-hidden="true" />
+              </button>
+            </div>
+            <p className="sheet__blurb">{GAME_LABELS[game].blurb}</p>
+            <JoinPanel
+              submitLabel={`Create ${GAME_LABELS[game].name}`}
+              busy={busy}
+              error={error}
+              onSubmit={create}
+              draft={draft}
+              onDraft={setDraft}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
