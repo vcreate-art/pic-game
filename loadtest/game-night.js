@@ -1,15 +1,14 @@
 /**
- * Load test: whole rooms of simulated players, playing the way people do.
+ * Load test for the drawing game: whole rooms of simulated players, playing
+ * the way people do.
  *
  * One k6 VU is one ROOM, not one player. It opens a socket per player, so the
  * host can create the room and hand the code to the others the way a group
  * chat does, and so drawer and guessers share a clock for measuring fan-out.
  *
- *   skribbl  4–8 players. The drawer streams strokes in 50ms batches like the
- *            canvas does, guessers type wrong guesses every few seconds and most
- *            get it right eventually, so turns end early as they do in practice.
- *   maze     4–8 players sending controls at 30Hz, the server pushing frames
- *            back at 30Hz. The heaviest thing the server does, per player.
+ * Each room has 4–8 players. The drawer streams strokes in 50ms batches like
+ * the canvas does, guessers type wrong guesses every few seconds and most get
+ * it right eventually, so turns end early as they do in practice.
  *
  * Run:  k6 run loadtest/game-night.js                          (local, load profile)
  *       k6 run -e PROFILE=smoke loadtest/game-night.js
@@ -25,14 +24,12 @@ import { SioClient } from './sio.js';
 const BASE = (__ENV.BASE_URL || 'http://localhost:3001').replace(/\/$/, '');
 const PROFILE = __ENV.PROFILE || 'load';
 const ROOMS = Number(__ENV.ROOMS || 15);
-const MAZE_ROOMS = Number(__ENV.MAZE_ROOMS || Math.ceil(ROOMS / 3));
 const MIN_PLAYERS = Number(__ENV.MIN_PLAYERS || 4);
 const MAX_PLAYERS = Number(__ENV.MAX_PLAYERS || 8);
 /** Real games default to 3 rounds; 1 cycles rooms faster, so creation and
  *  joining get exercised too. */
 const ROUNDS = Number(__ENV.ROUNDS || 1);
 const DRAW_TIME = Number(__ENV.DRAW_TIME || (PROFILE === 'smoke' ? 30 : 80));
-const MAZE_MINUTES = Number(__ENV.MAZE_MINUTES || 3);
 /** Share of guessers who get the word before time runs out. */
 const GUESS_RATE = Number(__ENV.GUESS_RATE || 0.75);
 
@@ -55,43 +52,31 @@ const steps = (peak) => [
   { duration: '1m', target: 0 },
 ];
 const PROFILES = {
-  smoke: () => ({ skribbl: [{ duration: '10s', target: 1 }, { duration: '3m', target: 1 }, { duration: '10s', target: 0 }],
-    maze: [{ duration: '10s', target: 1 }, { duration: '3m', target: 1 }, { duration: '10s', target: 0 }] }),
-  load: () => ({ skribbl: ramp(ROOMS), maze: ramp(MAZE_ROOMS) }),
+  smoke: () => [{ duration: '10s', target: 1 }, { duration: '3m', target: 1 }, { duration: '10s', target: 0 }],
+  load: () => ramp(ROOMS),
   /** Steps up to 4× the load peak, to find where it bends. */
-  stress: () => ({ skribbl: steps(ROOMS * 4), maze: steps(MAZE_ROOMS * 4) }),
+  stress: () => steps(ROOMS * 4),
   /** Everyone arrives at once, as when a link goes out to a big group. */
-  spike: () => ({
-    skribbl: [{ duration: '20s', target: ROOMS * 3 }, { duration: '3m', target: ROOMS * 3 }, { duration: '30s', target: 0 }],
-    maze: [{ duration: '20s', target: MAZE_ROOMS * 3 }, { duration: '3m', target: MAZE_ROOMS * 3 }, { duration: '30s', target: 0 }],
-  }),
+  spike: () => [{ duration: '20s', target: ROOMS * 3 }, { duration: '3m', target: ROOMS * 3 }, { duration: '30s', target: 0 }],
   /** A long evening, to catch leaks and timers that never get cleared. */
-  soak: () => ({
-    skribbl: [{ duration: '5m', target: ROOMS }, { duration: '60m', target: ROOMS }, { duration: '2m', target: 0 }],
-    maze: [{ duration: '5m', target: MAZE_ROOMS }, { duration: '60m', target: MAZE_ROOMS }, { duration: '2m', target: 0 }],
-  }),
+  soak: () => [{ duration: '5m', target: ROOMS }, { duration: '60m', target: ROOMS }, { duration: '2m', target: 0 }],
 };
 if (!PROFILES[PROFILE]) throw new Error(`Unknown PROFILE "${PROFILE}": ${Object.keys(PROFILES).join(', ')}`);
 const stages = PROFILES[PROFILE]();
 
-const scenario = (exec, s) => ({
-  executor: 'ramping-vus', exec, startVUs: 0, stages: s,
-  // A room mid-game is let finish its turn rather than cut off at once.
-  gracefulRampDown: '60s', gracefulStop: '90s',
-});
-
 export const options = {
   scenarios: {
-    ...(ROOMS > 0 ? { skribbl: scenario('skribblRoom', stages.skribbl) } : {}),
-    ...(MAZE_ROOMS > 0 ? { maze: scenario('mazeRoom', stages.maze) } : {}),
+    skribbl: {
+      executor: 'ramping-vus', exec: 'skribblRoom', startVUs: 0, stages,
+      // A room mid-game is let finish its turn rather than cut off at once.
+      gracefulRampDown: '60s', gracefulStop: '90s',
+    },
   },
   thresholds: {
     // Event-loop health: time:ping is answered straight from the handler.
     rtt_ms: ['p(95)<150', 'p(99)<400'],
     // Drawer's stroke to guessers' screens.
     stroke_fanout_ms: ['p(95)<200'],
-    // 30Hz is 33ms apart; much past that and movement stutters.
-    ...(MAZE_ROOMS > 0 ? { maze_frame_gap_ms: ['p(95)<60', 'p(99)<120'] } : {}),
     join_failed: ['rate<0.01'],
     connect_failed: ['rate<0.01'],
     socket_dropped: ['count<10'],
@@ -106,8 +91,6 @@ const connectMs = new Trend('ws_connect_ms', true);
 const joinMs = new Trend('join_ack_ms', true);
 const rttMs = new Trend('rtt_ms', true);
 const fanoutMs = new Trend('stroke_fanout_ms', true);
-const frameGapMs = new Trend('maze_frame_gap_ms', true);
-const mazeFrames = new Counter('maze_frames');
 const connectFailed = new Rate('connect_failed');
 const joinFailed = new Rate('join_failed');
 const dropped = new Counter('socket_dropped');
@@ -193,14 +176,14 @@ function syncClock(p, n) {
     .finally(() => p.later(0.25, () => syncClock(p, n - 1)));
 }
 
-async function createRoom(game) {
+async function createRoom() {
   await loadPage();
   const host = await connect(NAMES[0]);
   if (!host) return null;
   const t0 = Date.now();
   let ack;
   try {
-    ack = await host.sock.request('room:create', { name: host.name, avatar: avatar(), game });
+    ack = await host.sock.request('room:create', { name: host.name, avatar: avatar(), game: 'skribbl' });
   } catch {
     ack = { ok: false };
   }
@@ -248,7 +231,7 @@ function leaveAll(room) {
 // ----------------------------------------------------------- skribbl (drawing)
 
 export async function skribblRoom() {
-  const room = await createRoom('skribbl');
+  const room = await createRoom();
   if (!room) return;
   room.host.sock.emit('room:settings', { rounds: ROUNDS, drawTime: DRAW_TIME });
   await fillRoom(room, randInt(MIN_PLAYERS, MAX_PLAYERS));
@@ -266,7 +249,7 @@ export async function skribblRoom() {
   const cap = ROUNDS * room.players.length * (DRAW_TIME + 25) + 60;
   const finished = await Promise.race([done.then(() => true), sleep(cap).then(() => false)]);
   if (finished) {
-    gamesFinished.add(1, { game: 'skribbl' });
+    gamesFinished.add(1);
     await sleep(rand(3, 10)); // a look at the podium
   }
   leaveAll(room);
@@ -346,65 +329,3 @@ function guess(p, turn) {
   if (Math.random() < 0.3) p.later(rand(10, DRAW_TIME), () => p.sock.emit('draw:react', { vote: Math.random() < 0.85 ? 'like' : 'dislike' }));
 }
 
-// ------------------------------------------------------------------ maze wars
-
-export async function mazeRoom() {
-  const room = await createRoom('maze');
-  if (!room) return;
-  room.host.sock.emit('maze:settings', { minutes: MAZE_MINUTES });
-  await fillRoom(room, randInt(MIN_PLAYERS, Math.min(MAX_PLAYERS, 10)));
-  if (room.players.length < 2) return leaveAll(room);
-
-  let finish;
-  const done = new Promise((r) => (finish = r));
-  for (const p of room.players) {
-    p.playing = false;
-    p.sock.on('maze:state', (g) => {
-      if (g.phase === 'playing' && !p.playing) { p.playing = true; steer(p); }
-      if (g.phase !== 'playing' && p.playing) {
-        p.playing = false;
-        p.stop();
-        if (g.phase === 'ended') finish();
-      }
-    });
-  }
-  // Frame cadence, as one player sees it. Gaps over a second are a respawn
-  // screen or a pause, not the network.
-  let last = 0;
-  room.host.sock.on('maze:frame', () => {
-    const now = Date.now();
-    mazeFrames.add(1);
-    if (last && now - last < 1000) frameGapMs.add(now - last);
-    last = now;
-  });
-
-  await sleep(rand(3, 10));
-  room.host.sock.emit('game:start');
-
-  const finished = await Promise.race([done.then(() => true), sleep(MAZE_MINUTES * 60 + 60).then(() => false)]);
-  if (finished) {
-    gamesFinished.add(1, { game: 'maze' });
-    await sleep(rand(3, 8));
-  }
-  leaveAll(room);
-}
-
-/** One input a tick, as the client sends them; the controls behind it change a
- *  few times a second, as a person's hands do. */
-function steer(p) {
-  let seq = 0;
-  let keys = 0;
-  let aim = randInt(0, 4095);
-  let fire = false;
-  let alt = false;
-  let run = false;
-  p.every(1000 / 30, () => p.sock.emit('maze:input', { seq: seq++, keys, aim, fire, alt, run }));
-  p.every(randInt(250, 600), () => {
-    // Up/down and left/right never both at once.
-    keys = pick([0, 1, 2]) | pick([0, 4, 8]);
-    aim = (aim + randInt(-400, 400) + 4096) % 4096;
-    fire = Math.random() < 0.45;
-    alt = Math.random() < 0.05;
-    run = Math.random() < 0.1;
-  });
-}
