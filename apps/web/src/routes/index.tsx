@@ -6,6 +6,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { JoinPanel, initialIdentity, type Identity } from '../components/JoinPanel.js';
+import { ViewportDebug } from '../components/ViewportDebug.js';
 import { peekRoom } from '../api/client.js';
 import { getSocket, saveSeat } from '../net/socket.js';
 import { useGame } from '../store/game.js';
@@ -27,6 +28,33 @@ const GAME_ICONS: Record<GameKind, { icon: LucideIcon; color: string }> = {
   maze: { icon: Crosshair, color: '#2563eb' },
   tourney: { icon: Trophy, color: '#ca8a04' },
 };
+
+/** While a phone's on-screen keyboard is up, `top` and `bottom` that fit a
+ *  fixed overlay into the space above it. Mobile browsers don't shrink the
+ *  layout for the keyboard, so a sheet pinned to the bottom would sit under
+ *  it. With no keyboard this returns nothing and CSS's `inset: 0` does the
+ *  job, which also follows the address bar as it shows and hides. */
+function useKeyboardInset(active: boolean): CSSProperties | undefined {
+  const [inset, setInset] = useState<CSSProperties>();
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!active || !vv) return;
+    const update = () => {
+      const below = window.innerHeight - vv.offsetTop - vv.height;
+      // The address bar moves things by well under this; a keyboard by more.
+      setInset(below > 100 ? { top: vv.offsetTop, bottom: below } : undefined);
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      setInset(undefined);
+    };
+  }, [active]);
+  return inset;
+}
 
 function Landing() {
   const navigate = useNavigate();
@@ -101,42 +129,44 @@ function Landing() {
   };
 
   const picked = game && GAME_ICONS[game];
+  const inset = useKeyboardInset(!!game);
 
   return (
     <div className="landing">
+      {new URLSearchParams(location.search).has('vv') && <ViewportDebug />}
       <div className="landing__hero">
         <h1 className="landing__title">Let's play.</h1>
         <p className="landing__sub">Grab some friends. One link, everyone's in.</p>
       </div>
 
-      <section className="landing__section landing__join">
-        <h2 className="landing__heading">Join a room</h2>
-        <div className="card landing__card">
-          <JoinPanel
-            submitLabel="Join room"
-            busy={busy && !game}
-            error={game ? null : error}
-            onSubmit={join}
-            draft={draft}
-            onDraft={setDraft}
-          >
-            <label className="field">
-              <span className="field__label">Room code</span>
-              <input
-                className="field__input field__input--code"
-                value={code}
-                maxLength={6}
-                placeholder="ABC123"
-                onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-              />
-            </label>
-          </JoinPanel>
-        </div>
-      </section>
+      <div className="landing__cols">
+        <section className="landing__section landing__join">
+          <h2 className="landing__heading">Join a room</h2>
+          <div className="card landing__card">
+            <JoinPanel
+              submitLabel="Join room"
+              busy={busy && !game}
+              error={game ? null : error}
+              onSubmit={join}
+              draft={draft}
+              onDraft={setDraft}
+            >
+              <label className="field">
+                <span className="field__label">Room code</span>
+                <input
+                  className="field__input field__input--code"
+                  value={code}
+                  maxLength={6}
+                  placeholder="ABC123"
+                  onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                />
+              </label>
+            </JoinPanel>
+          </div>
+        </section>
 
-      <section className="landing__section">
-        <h2 className="landing__heading">Start a new game</h2>
-        <div className="card">
+        <section className="landing__section landing__start">
+          <h2 className="landing__heading">Start a new game</h2>
           <div className="picker">
             {PLAYABLE_KINDS.map((k) => {
               const { icon: Icon, color } = GAME_ICONS[k];
@@ -157,11 +187,11 @@ function Landing() {
               );
             })}
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       {game && picked && (
-        <div className="sheet" onClick={close}>
+        <div className="sheet" style={inset} onClick={close}>
           <div
             className="card landing__card sheet__card"
             role="dialog"
@@ -185,6 +215,9 @@ function Landing() {
             <p className="sheet__blurb">{GAME_LABELS[game].blurb}</p>
             <JoinPanel
               submitLabel={`Create ${GAME_LABELS[game].name}`}
+              // With a name already in, the keyboard popping up on open just
+              // hides the Create button.
+              autoFocus={!draft.name.trim()}
               busy={busy}
               error={error}
               onSubmit={create}
