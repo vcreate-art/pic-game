@@ -105,56 +105,60 @@ function Landing() {
   return (
     <div className="landing">
       <div className="landing__hero">
-        <h1 className="landing__title">Pick your game.</h1>
+        <h1 className="landing__title">Let's play.</h1>
         <p className="landing__sub">Grab some friends. One link, everyone's in.</p>
       </div>
 
-      <div className="card landing__card landing__join">
-        <h2 className="card__title">Join a room</h2>
-        <JoinPanel
-          submitLabel="Join room"
-          busy={busy && !game}
-          error={game ? null : error}
-          onSubmit={join}
-          draft={draft}
-          onDraft={setDraft}
-        >
-          <label className="field">
-            <span className="field__label">Room code</span>
-            <input
-              className="field__input field__input--code"
-              value={code}
-              maxLength={6}
-              placeholder="ABC123"
-              onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-            />
-          </label>
-        </JoinPanel>
-      </div>
-
-      <div className="card landing__games">
-        <h2 className="card__title">Or start a new game</h2>
-        <div className="picker">
-          {PLAYABLE_KINDS.map((k) => {
-            const { icon: Icon, color } = GAME_ICONS[k];
-            return (
-              <button
-                key={k}
-                type="button"
-                className={`pick ${game === k ? 'is-active' : ''}`}
-                onClick={() => open(k)}
-                style={{ '--game': color } as CSSProperties}
-              >
-                <span className="pick__tile" aria-hidden="true">
-                  <Icon className="pick__art" strokeWidth={2} />
-                </span>
-                <strong>{GAME_LABELS[k].name}</strong>
-                <span>{GAME_LABELS[k].blurb}</span>
-              </button>
-            );
-          })}
+      <section className="landing__section landing__join">
+        <h2 className="landing__heading">Join a room</h2>
+        <div className="card landing__card">
+          <JoinPanel
+            submitLabel="Join room"
+            busy={busy && !game}
+            error={game ? null : error}
+            onSubmit={join}
+            draft={draft}
+            onDraft={setDraft}
+          >
+            <label className="field">
+              <span className="field__label">Room code</span>
+              <input
+                className="field__input field__input--code"
+                value={code}
+                maxLength={6}
+                placeholder="ABC123"
+                onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+              />
+            </label>
+          </JoinPanel>
         </div>
-      </div>
+      </section>
+
+      <section className="landing__section">
+        <h2 className="landing__heading">Start a new game</h2>
+        <div className="card">
+          <div className="picker">
+            {PLAYABLE_KINDS.map((k) => {
+              const { icon: Icon, color } = GAME_ICONS[k];
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  className={`pick ${game === k ? 'is-active' : ''}`}
+                  onClick={() => open(k)}
+                  style={{ '--game': color } as CSSProperties}
+                >
+                  <span className="pick__tile" aria-hidden="true">
+                    <Icon className="pick__art" strokeWidth={2} />
+                  </span>
+                  <strong>{GAME_LABELS[k].name}</strong>
+                  <span>{GAME_LABELS[k].blurb}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
       {game && picked && (
         <div className="sheet" onClick={close}>

@@ -133,7 +133,11 @@ button, input { font: inherit; color: inherit; }
 }
 /* Joining comes first, in a narrow card; the games sit below at full width. */
 .landing__join { width: 100%; max-width: 460px; margin: 0 auto; }
-.landing__games { padding: 18px 18px 20px; }
+.landing__section { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.landing__heading {
+  margin: 0 0 0 4px; font-family: var(--display); font-size: 21px; font-weight: 800;
+  letter-spacing: -.01em; line-height: 1.2;
+}
 /* The join-by-link screen shares .landing but has no picker beside the form,
    so it keeps the narrow width the page had before the picker existed. */
 .landing--narrow { max-width: 440px; }
