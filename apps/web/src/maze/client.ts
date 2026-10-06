@@ -4,7 +4,7 @@ import {
   type ItemKind, type MazeEvent, type MazeFrame, type MazeFramePlayer, type MazeInput, type MazeMap, type MazeRadar,
   type MazeTheme, type PowerKind,
 } from '@pic-game/shared';
-import { serverNow } from '../net/clock.js';
+import { gameNow, isClockPaused } from '../net/clock.js';
 import { THEME_LOOK, buildFloor, buildMini, buildWalls } from './art.js';
 import { visibility, type Light } from './light.js';
 import { LOCK_KEEP, inSight, lockOrder, nextLock } from './lock.js';
@@ -442,6 +442,8 @@ export class MazeClient {
     const map = this.map;
     const me = m && this.cur?.p[m.mySeat];
     if (!m || !map || !m.live || m.mySeat < 0 || !me || !this.send) return;
+    // Paused, the server takes no input; moving ourselves would only snap back.
+    if (isClockPaused()) return;
     this.checkLock();
     const locked = this.lock === null ? null : this.cur?.p[this.lock];
     // Keyboard: the arrows win while held; then a lock-on; then the way we walk.
@@ -991,7 +993,7 @@ export class MazeClient {
     g.globalAlpha = 1;
 
     // The clock, top middle.
-    const left = Math.max(0, m.endsAt - serverNow());
+    const left = Math.max(0, m.endsAt - gameNow());
     const mm = Math.floor(left / 60000);
     const ss = Math.floor((left % 60000) / 1000);
     g.textAlign = 'center';

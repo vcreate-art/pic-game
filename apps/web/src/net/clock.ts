@@ -18,6 +18,15 @@ export function serverNow(): number {
   return Date.now() + offset;
 }
 
+/** Server time as the game sees it: standing still while paused. */
+export function gameNow(): number {
+  return pausedAt ?? serverNow();
+}
+
+export function isClockPaused(): boolean {
+  return pausedAt !== null;
+}
+
 export function msUntil(serverEpoch: number): number {
   return Math.max(0, serverEpoch - (pausedAt ?? serverNow()));
 }

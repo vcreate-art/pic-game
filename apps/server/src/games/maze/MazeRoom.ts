@@ -68,6 +68,21 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.stage === 'ended' ? 'ended' : 'playing';
   }
 
+  /** The loop stops ticking while paused; the match clock moves back by the
+   *  pause, and nobody resumes still running from before it. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  protected override onResume(pausedMs: number): void {
+    this.endsAt += pausedMs;
+    for (const s of this.seats) {
+      s.queue = [];
+      s.last = null;
+    }
+    this.broadcast();
+  }
+
   protected resetToLobby(): void {
     this.stopLoop();
     this.stage = 'lobby';
@@ -196,6 +211,12 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
       const now = performance.now();
       this.acc += now - this.last;
       this.last = now;
+      // Paused: no ticks, and the match clock waits.
+      if (this.isPaused) {
+        this.acc = 0;
+        this.loop = setTimeout(run, STEP_MS);
+        return;
+      }
       const events: MazeEvent[] = [];
       let n = 0;
       while (this.acc >= STEP_MS && n < MAX_CATCH_UP) {

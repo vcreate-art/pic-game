@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CHOOSE_SECONDS, DEFAULT_SETTINGS, type GameKind } from '@pic-game/shared';
-import { PAUSE_HOST_AWAY_MS } from '../config.js';
+import { CHOOSE_SECONDS, DEFAULT_SETTINGS, FIGHTERS, type FighterId, type GameKind } from '@pic-game/shared';
+import { FIGHT_FORFEIT_MS, PAUSE_HOST_AWAY_MS } from '../config.js';
 import { RoomManager } from '../core/RoomManager.js';
 import type { BingoRoom } from '../games/bingo/BingoRoom.js';
 import type { SpiesRoom } from '../games/spies/SpiesRoom.js';
+import type { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
+import type { FightRoom } from '../games/fight/FightRoom.js';
+import type { MazeRoom } from '../games/maze/MazeRoom.js';
 import { allowedWhilePaused } from '../socket/index.js';
 import { fakeIO } from './fakeIO.js';
 
@@ -94,7 +97,7 @@ describe('pausing a turn-based game', () => {
 });
 
 describe('games that cannot pause yet', () => {
-  it.each(['race', 'maze'] as const)('%s does not offer pause', (kind) => {
+  it.each(['race'] as const)('%s does not offer pause', (kind) => {
     const { room, host } = playing(kind, 2);
     room.pauseGame(host);
     expect(room.isPaused).toBe(false);
@@ -231,5 +234,65 @@ describe('pausing Word Spies', () => {
     expect(turn()).toBe(first);
     vi.advanceTimersByTime(2000);
     expect(turn()).not.toBe(first);
+  });
+});
+
+describe('pausing the real-time games', () => {
+  it('Maze Wars stops its clock and its ticks', () => {
+    vi.useFakeTimers();
+    const { room, host } = playing('maze', 2);
+    const maze = room as MazeRoom;
+    const endsAt = maze.gamePublic().endsAt;
+    vi.advanceTimersByTime(5000);
+    room.pauseGame(host);
+    vi.advanceTimersByTime(30 * 60_000);
+    expect(room.lifecycle()).toBe('playing');
+    room.resumeGame(host);
+    expect(maze.gamePublic().endsAt - endsAt).toBeGreaterThanOrEqual(30 * 60_000);
+    room.destroy();
+  });
+
+  it('Kung Fu Chess pushes running cooldowns back by the pause', () => {
+    vi.useFakeTimers();
+    const { io } = fakeIO();
+    const room = new RoomManager(io).create('kungfu') as KungFuRoom;
+    const a = room.addPlayer('A', av, 's1');
+    const b = room.addPlayer('B', av, 's2');
+    room.takeSeat(a.id, 'w');
+    room.takeSeat(b.id, 'b');
+    room.startGame(a.id);
+    const pawn = room.gamePublic().pieces.find((p) => p.side === 'w' && p.type === 'p')!;
+    const readyOf = () => room.gamePublic().pieces.find((p) => p.id === pawn.id)!.readyAt;
+    // Any legal move will do: try squares until the pawn starts cooling down.
+    for (let sq = 0; sq < 400 && readyOf() <= Date.now(); sq++) room.move(a.id, pawn.id, sq);
+    const ready = readyOf();
+    expect(ready).toBeGreaterThan(Date.now());
+    room.pauseGame(a.id);
+    vi.advanceTimersByTime(60_000);
+    room.resumeGame(a.id);
+    expect(room.gamePublic().pieces.find((p) => p.id === pawn.id)!.readyAt).toBe(ready + 60_000);
+  });
+
+  it('Stick Kombat holds a drop-out’s forfeit countdown while paused', () => {
+    vi.useFakeTimers();
+    const { io } = fakeIO();
+    const room = new RoomManager(io).create('fight') as FightRoom;
+    const a = room.addPlayer('A', av, 's1');
+    const b = room.addPlayer('B', av, 's2');
+    const [f1, f2] = Object.keys(FIGHTERS) as FighterId[];
+    room.takeSeat(a.id, 'a');
+    room.takeSeat(b.id, 'b');
+    room.pick(a.id, f1!);
+    room.pick(b.id, f2!);
+    room.startGame(a.id);
+    expect(room.lifecycle()).toBe('playing');
+    room.markDisconnected(b.id); // B's countdown to a forfeit starts
+    room.pauseGame(a.id);
+    vi.advanceTimersByTime(FIGHT_FORFEIT_MS * 3);
+    expect(room.lifecycle()).toBe('playing');
+    room.resumeGame(a.id);
+    vi.advanceTimersByTime(FIGHT_FORFEIT_MS + 100);
+    expect(room.lifecycle()).toBe('ended');
+    room.destroy();
   });
 });

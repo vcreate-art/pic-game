@@ -50,6 +50,19 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
   }
 
+  /** No clock of its own, only cooldowns: moves wait while paused (the
+   *  socket layer holds them), and every cooldown that was running is pushed
+   *  back by the pause, so it has as long left as it did. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  protected override onResume(pausedMs: number): void {
+    const from = Date.now() - pausedMs;
+    for (const p of this.pieces) if (p.readyAt > from) p.readyAt += pausedMs;
+    this.broadcastState();
+  }
+
   /** Seats stay taken, so a restart deals straight back in. */
   protected resetToLobby(): void {
     this.phase = 'lobby';

@@ -46,6 +46,8 @@ export class FightRoom extends BaseRoom<CorePlayer> {
 
   private loop: ReturnType<typeof setTimeout> | null = null;
   private pauseTimer: ReturnType<typeof setTimeout> | null = null;
+  /** What a fighter's countdown does when it runs out. */
+  private pauseThen: (() => void) | null = null;
   private last = 0;
   private acc = 0;
 
@@ -61,6 +63,28 @@ export class FightRoom extends BaseRoom<CorePlayer> {
 
   lifecycle(): RoomLifecycle {
     return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
+  }
+
+  /** The loop stops ticking while paused. A fighter's own countdown, for a
+   *  drop-out or the get-ready after one, stops with it and resumes with the
+   *  time it had left. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  protected override onPause(): void {
+    if (this.pauseTimer) clearTimeout(this.pauseTimer);
+    this.pauseTimer = null;
+  }
+
+  protected override onResume(pausedMs: number): void {
+    if (this.paused) {
+      this.paused.until += pausedMs;
+      this.armPause(this.paused.until - Date.now());
+    }
+    // Whatever was held when it stopped isn't held any more.
+    this.controls = { a: idle(), b: idle() };
+    this.broadcast();
   }
 
   /** Seats and picks stay, so a restart goes straight to the fight. */
@@ -281,7 +305,7 @@ export class FightRoom extends BaseRoom<CorePlayer> {
       this.acc += now - this.last;
       this.last = now;
 
-      if (this.paused) {
+      if (this.paused || this.isPaused) {
         this.acc = 0;
       } else {
         const events: FightEvent[] = [];
@@ -322,16 +346,25 @@ export class FightRoom extends BaseRoom<CorePlayer> {
   private setPause(p: NonNullable<FightPublic['paused']>, then: () => void): void {
     this.clearPause();
     this.paused = p;
+    this.pauseThen = then;
+    // The room's own pause holds a fighter's countdown too: nobody forfeits
+    // while everything is stopped.
+    if (!this.isPaused) this.armPause(p.until - Date.now());
+    this.broadcast();
+  }
+
+  private armPause(ms: number): void {
+    const then = this.pauseThen;
     this.pauseTimer = setTimeout(() => {
       this.pauseTimer = null;
-      then();
-    }, p.until - Date.now());
-    this.broadcast();
+      then?.();
+    }, ms);
   }
 
   private clearPause(): void {
     if (this.pauseTimer) clearTimeout(this.pauseTimer);
     this.pauseTimer = null;
+    this.pauseThen = null;
     this.paused = null;
   }
 

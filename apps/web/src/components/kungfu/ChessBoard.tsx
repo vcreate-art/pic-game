@@ -3,7 +3,7 @@ import {
   cooldownFor, isDarkSquare, legalDestinations, squareName, viewOrder,
   type BoardSpec, type Piece, type Side, type Square,
 } from '@pic-game/shared';
-import { serverNow } from '../../net/clock.js';
+import { gameNow } from '../../net/clock.js';
 
 /** One silhouette per piece, tinted per side in CSS. Unicode has a white set
  *  and a black set, which is no help once there are four players. */
@@ -70,7 +70,8 @@ export function ChessBoard({
     setSelected(null);
   };
 
-  const now = serverNow();
+  // Cooldowns hold still while the game is paused.
+  const now = gameNow();
 
   // Nothing else re-renders the board when a cooldown simply runs out, so the
   // piece would stay dimmed until some other move happened. Wake up once, when
@@ -81,7 +82,7 @@ export function ChessBoard({
   );
   useEffect(() => {
     if (!Number.isFinite(nextReady)) return;
-    const id = setTimeout(tick, Math.max(50, nextReady - serverNow()) + 40);
+    const id = setTimeout(tick, Math.max(50, nextReady - gameNow()) + 40);
     return () => clearTimeout(id);
   }, [nextReady]);
 
