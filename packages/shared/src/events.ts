@@ -59,6 +59,10 @@ export interface ClientToServerEvents {
   /** Host only, outside the lobby: the same game again from the start. A
    *  game in progress is abandoned with no result. */
   'game:restart': () => void;
+  /** Host only, mid-game, in games that support it: everything stops until
+   *  the host resumes. */
+  'room:pause': () => void;
+  'room:resume': () => void;
   /** Host only, outside the lobby: back to the lobby, abandoning a game in
    *  progress with no result. */
   'game:toLobby': () => void;

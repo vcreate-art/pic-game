@@ -131,7 +131,7 @@ describe('restart and back to lobby', () => {
     room.backToLobby(seats[0]!.id);
     expect(room.lifecycle()).toBe('lobby');
     expect(room.meta().games).toBe(0);
-    expect(room.meta().can).toEqual({ restart: false, toLobby: false, switch: true });
+    expect(room.meta().can).toEqual({ pause: false, restart: false, toLobby: false, switch: true });
   });
 
   it('is the host’s call alone', () => {

@@ -10,8 +10,8 @@ import { GAME_ICONS } from './gameIcons.js';
 
 /**
  * The room's own controls, in the header over every game: which game is on,
- * and for the host, restarting it, going back to the lobby, or switching to
- * another between games. Leaving is here for everyone, whatever screen the
+ * and for the host, pausing it, restarting it, going back to the lobby, or
+ * switching to another between games. Leaving is here for everyone, whatever screen the
  * game shows.
  */
 export function RoomMenu() {
@@ -31,7 +31,11 @@ export function RoomMenu() {
 
   if (!room) return null;
   const { icon: Icon, color } = GAME_ICONS[room.kind];
-  const { can } = room.meta;
+  const { can, paused } = room.meta;
+  const send = (event: 'room:pause' | 'room:resume') => {
+    getSocket().emit(event);
+    close();
+  };
   const canSwitch = can.switch;
   const here = room.players.length;
   // Mid-game is the only time these lose anything.
@@ -67,7 +71,7 @@ export function RoomMenu() {
       </button>
       {open && (
         <div className="roommenu__pop card">
-          {isHost && (can.restart || can.toLobby) && (
+          {isHost && (can.pause || paused || can.restart || can.toLobby) && (
             <section className="roommenu__section" aria-labelledby="roommenu-game">
               <h2 id="roommenu-game" className="card__title">This game</h2>
               {confirm ? (
@@ -88,6 +92,17 @@ export function RoomMenu() {
                 </>
               ) : (
                 <div className="roommenu__actions">
+                  {paused ? (
+                    <button type="button" className="btn btn--primary" onClick={() => send('room:resume')}>
+                      Resume
+                    </button>
+                  ) : (
+                    can.pause && (
+                      <button type="button" className="btn" onClick={() => send('room:pause')}>
+                        Pause
+                      </button>
+                    )
+                  )}
                   {can.restart && (
                     <button type="button" className="btn" onClick={() => act('restart')}>
                       {midGame ? 'Restart' : 'Play again'}

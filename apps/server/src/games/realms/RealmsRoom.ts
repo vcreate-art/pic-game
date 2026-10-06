@@ -37,6 +37,12 @@ export class RealmsRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
   }
 
+  /** Turn-based with no clock: pausing only has to hold moves back, which
+   *  the socket layer does for every game. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
   /** Seats stay taken, so a restart deals straight back in. */
   protected resetToLobby(): void {
     this.phase = 'lobby';

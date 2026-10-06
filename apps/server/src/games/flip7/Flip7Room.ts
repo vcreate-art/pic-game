@@ -36,6 +36,20 @@ export class Flip7Room extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.game?.stage === 'ended' ? 'ended' : 'playing';
   }
 
+  /** Turn-based with no clock. The one thing that runs on its own is the
+   *  stand-in move for an away player, which waits while paused. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  protected override onPause(): void {
+    this.clearAway();
+  }
+
+  protected override onResume(): void {
+    this.watchAway();
+  }
+
   protected resetToLobby(): void {
     this.toLobbyNow();
   }
@@ -174,7 +188,8 @@ export class Flip7Room extends BaseRoom<CorePlayer> {
 
   private watchAway(): void {
     const who = this.waitingOn();
-    if (!who || this.players.get(who)?.connected) {
+    // Paused, nobody moves for anyone; resuming watches again.
+    if (!who || this.players.get(who)?.connected || this.isPaused) {
       this.clearAway();
       return;
     }

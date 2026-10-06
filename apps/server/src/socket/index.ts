@@ -71,6 +71,17 @@ function cleanSize(raw: unknown): number {
   return (BRUSH_SIZES as readonly number[]).includes(n) ? n : BRUSH_SIZES[0];
 }
 
+/** What still goes through while a game is paused: the room itself, chat,
+ *  and the host's controls. Every game move is held back. */
+const ALLOWED_WHILE_PAUSED = new Set<string>([
+  'time:ping', 'room:create', 'room:join', 'room:leave', 'room:switch', 'room:pause', 'room:resume',
+  'game:restart', 'game:toLobby', 'chat:guess', 'player:rename', 'player:kick',
+]);
+
+export function allowedWhilePaused(event: string): boolean {
+  return ALLOWED_WHILE_PAUSED.has(event);
+}
+
 export function attachSocket(io: IO, rooms: RoomManager): void {
   io.on('connection', (socket: Sock) => {
     const s: Session = {
@@ -87,6 +98,12 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       race: new TokenBucket(RACE_POS_BUCKET.capacity, RACE_POS_BUCKET.refillPerSec),
       maze: new TokenBucket(MAZE_INPUT_BUCKET.capacity, MAZE_INPUT_BUCKET.refillPerSec),
     };
+
+    // One guard for every game, ahead of the handlers below.
+    socket.use(([event], next) => {
+      if (s.room?.isPaused && !allowedWhilePaused(event)) return;
+      next();
+    });
 
     const bind = (room: AnyRoom, playerId: string) => {
       s.code = room.code;
@@ -755,6 +772,16 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
     socket.on('game:restart', () => {
       if (!s.room || !s.playerId) return;
       s.room.restart(s.playerId);
+    });
+
+    socket.on('room:pause', () => {
+      if (!s.room || !s.playerId) return;
+      s.room.pauseGame(s.playerId);
+    });
+
+    socket.on('room:resume', () => {
+      if (!s.room || !s.playerId) return;
+      s.room.resumeGame(s.playerId);
     });
 
     socket.on('game:toLobby', () => {

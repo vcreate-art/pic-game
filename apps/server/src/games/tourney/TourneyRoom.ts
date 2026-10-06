@@ -47,6 +47,12 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.t.phase === 'ended' ? 'ended' : 'playing';
   }
 
+  /** Turn-based with no clock: pausing only has to hold moves back, which
+   *  the socket layer does for every game. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
   /** The same players, signed up afresh: the bracket and results go. */
   protected resetToLobby(): void {
     const entrants = this.t.entrants.map((e) => newEntrant(e.id, e.name, e.main, e.playerId));

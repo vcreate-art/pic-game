@@ -47,6 +47,20 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.game?.stage === 'ended' ? 'ended' : 'playing';
   }
 
+  /** Turn-based with no clock. The one thing that runs on its own is the
+   *  stand-in move for an away player, which waits while paused. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  protected override onPause(): void {
+    this.clearAway();
+  }
+
+  protected override onResume(): void {
+    this.watchTurn();
+  }
+
   protected resetToLobby(): void {
     this.toLobbyNow();
   }
@@ -213,7 +227,8 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
   private watchTurn(): void {
     const g = this.game;
     const who = g ? cryptidTurn(g) : null;
-    if (!g || g.stage === 'ended' || !who || this.players.get(who)?.connected) {
+    // Paused, nobody moves for anyone; resuming watches again.
+    if (!g || g.stage === 'ended' || !who || this.players.get(who)?.connected || this.isPaused) {
       this.clearAway();
       return;
     }

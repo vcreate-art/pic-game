@@ -244,14 +244,22 @@ export const GAME_CAPACITY: Record<GameKind, number> = {
   bingo: 16, cryptid: 12, flip7: 16, maze: 16, tourney: 64,
 };
 
+/** A paused game: who paused it, and when (server epoch ms). */
+export interface RoomPause {
+  by: string;
+  at: number;
+}
+
 /** Room-level facts that outlive any one game: the session's wins, and what
  *  the host can do right now, so the UI doesn't repeat the server's rules. */
 export interface RoomMeta {
+  /** Set while the host has the game paused. */
+  paused: RoomPause | null;
   /** Wins this session, by player id. Survives switching games. */
   wins: Record<string, number>;
   /** Games finished this session, including ones nobody won. */
   games: number;
-  can: { restart: boolean; toLobby: boolean; switch: boolean };
+  can: { pause: boolean; restart: boolean; toLobby: boolean; switch: boolean };
 }
 
 /** What every room reports, whichever game it is running. */

@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { Server } from 'socket.io';
 import type {
-  Avatar, ChatMessage, ClientToServerEvents, GameKind, Player, RoomMeta, RoomState,
+  Avatar, ChatMessage, ClientToServerEvents, GameKind, Player, RoomMeta, RoomPause, RoomState,
   RoomStateBase, ServerToClientEvents,
 } from '@pic-game/shared';
-import { EMPTY_ROOM_TTL_MS, RECONNECT_GRACE_MS } from '../config.js';
+import { EMPTY_ROOM_TTL_MS, PAUSE_HOST_AWAY_MS, RECONNECT_GRACE_MS } from '../config.js';
 import { RoomSession } from './RoomSession.js';
 
 export type IO = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -40,6 +40,11 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   readonly players = new Map<string, P>();
   /** Join order, which games may also use as turn order. */
   order: string[] = [];
+
+  /** Set while the host has the game paused. */
+  private roomPause: RoomPause | null = null;
+  /** Resumes a paused game whose host has dropped out. */
+  private pauseAwayTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Wins, kicks and history that outlive this game. Handed on when the
    *  room switches to a different game. */
@@ -99,6 +104,17 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   }
   protected onDestroy(): void {}
 
+  /** Whether this game can pause at all. Games turn it on as their pause
+   *  support lands; the rest never offer it. */
+  protected get pausable(): boolean {
+    return false;
+  }
+  /** Called once a game is paused: stop whatever runs on its own. */
+  protected onPause(): void {}
+  /** Called on resume with how long the game was paused, to restart what
+   *  onPause stopped and push its deadlines back by that much. */
+  protected onResume(_pausedMs: number): void {}
+
   // ------------------------------------------------------------------ players
 
   addPlayer(name: string, avatar: Avatar, socketId: string): P {
@@ -130,6 +146,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
       p.socketId = socketId;
       p.connected = true;
       p.disconnectedAt = null;
+      if (p.id === this.hostId) this.clearPauseAway();
       this.onPlayerReconnected(p);
       this.cancelEmptyCollection();
       return p;
@@ -146,6 +163,15 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
 
     this.onPlayerDisconnected(p);
+    // Only the host can resume, so a host who drops out mustn't leave the
+    // game stuck. The pause may already be gone if the drop ended the game.
+    if (this.roomPause && playerId === this.hostId) {
+      this.clearPauseAway();
+      this.pauseAwayTimer = setTimeout(
+        () => this.resumeNow('The host is away, so the game carries on.'),
+        PAUSE_HOST_AWAY_MS,
+      );
+    }
     if (this.activeCount() === 0) this.scheduleEmptyCollection();
   }
 
@@ -159,6 +185,8 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     if (this.hostId === playerId) {
       this.hostId = this.order[0] ?? '';
       if (this.hostId) this.io.to(this.code).emit('host:changed', { hostId: this.hostId });
+      // The new host can resume a paused game; no need to wait out the old one.
+      this.clearPauseAway();
     }
 
     this.onPlayerRemoved(playerId);
@@ -258,7 +286,9 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     return {
       wins: this.session.winsOf(this.players.keys()),
       games: this.session.games,
+      paused: this.roomPause,
       can: {
+        pause: this.canPause(),
         restart: this.lifecycle() !== 'lobby',
         toLobby: this.lifecycle() !== 'lobby',
         switch: this.canSwitch(),
@@ -266,11 +296,58 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     };
   }
 
+  get isPaused(): boolean {
+    return !!this.roomPause;
+  }
+
+  /** Only mid-game, and only in a game that supports it. */
+  canPause(): boolean {
+    return this.pausable && this.lifecycle() === 'playing';
+  }
+
+  /** Host only: stops the game where it is until the host resumes it. */
+  pauseGame(by: string): void {
+    if (by !== this.hostId || this.roomPause || !this.canPause()) return;
+    this.roomPause = { by, at: Date.now() };
+    this.onPause();
+    this.systemMessage(`${this.players.get(by)?.name ?? 'The host'} paused the game.`);
+    this.emitMeta();
+  }
+
+  /** Host only: carries on from exactly where the game stopped. */
+  resumeGame(by: string): void {
+    if (by !== this.hostId || !this.roomPause) return;
+    this.resumeNow('Back to the game.');
+  }
+
+  private resumeNow(message: string): void {
+    const paused = this.roomPause;
+    if (!paused) return;
+    this.roomPause = null;
+    this.clearPauseAway();
+    this.onResume(Date.now() - paused.at);
+    this.systemMessage(message);
+    this.emitMeta();
+  }
+
+  /** Forgets a pause without resuming the game, for when the game it paused
+   *  is over or being thrown away. */
+  private dropPause(): void {
+    this.roomPause = null;
+    this.clearPauseAway();
+  }
+
+  private clearPauseAway(): void {
+    if (this.pauseAwayTimer) clearTimeout(this.pauseAwayTimer);
+    this.pauseAwayTimer = null;
+  }
+
   /** Host only: the same game again from the start, with the same players
    *  and settings. Abandons a game in progress without recording a result. */
   restart(by: string): void {
     if (by !== this.hostId || this.lifecycle() === 'lobby') return;
     const midGame = this.lifecycle() === 'playing';
+    this.dropPause();
     this.resetToLobby();
     if (midGame) this.systemMessage('The host restarted the game.');
     this.startGame(by);
@@ -282,6 +359,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   backToLobby(by: string): void {
     if (by !== this.hostId || this.lifecycle() === 'lobby') return;
     const midGame = this.lifecycle() === 'playing';
+    this.dropPause();
     this.resetToLobby();
     if (midGame) this.systemMessage('The host ended the game.');
     this.syncMeta();
@@ -326,6 +404,8 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
    *  or ending changes what the host can do. Each game calls this whenever it
    *  broadcasts its own state. */
   protected syncMeta(): void {
+    // A game can still end while paused, when a player it needs leaves.
+    if (this.roomPause && this.lifecycle() !== 'playing') this.dropPause();
     if (JSON.stringify(this.meta()) !== this.sentMeta) this.emitMeta();
   }
 
@@ -363,6 +443,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   }
 
   destroy(): void {
+    this.dropPause();
     this.onDestroy();
     if (this.emptyTimer) clearTimeout(this.emptyTimer);
     this.emptyTimer = null;

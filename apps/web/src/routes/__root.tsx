@@ -1,6 +1,7 @@
 import { Outlet, createRootRoute } from '@tanstack/react-router';
 import { PeopleButton } from '../components/PeopleButton.js';
 import { ProfileChip } from '../components/ProfileChip.js';
+import { PausedOverlay } from '../components/PausedOverlay.js';
 import { RoomMenu } from '../components/RoomMenu.js';
 import { useGame } from '../store/game.js';
 
@@ -30,6 +31,7 @@ function RootLayout() {
       <main className="main">
         <Outlet />
       </main>
+      {inRoom && <PausedOverlay />}
       {notice && <div className="notice">{notice}</div>}
     </div>
   );

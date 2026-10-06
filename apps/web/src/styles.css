@@ -2452,3 +2452,22 @@ body:has(.landing--home) { background: #f1f2f4; }
   background: color-mix(in srgb, var(--game, var(--ink)) 11%, var(--card));
 }
 .sheet__cat { margin-right: 8px; vertical-align: 1px; }
+
+/* ---------------------------------------------------------------- paused */
+
+/* Over the game, under the header: the room menu stays reachable. */
+.topbar { position: relative; z-index: 65; }
+.paused {
+  position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; padding: 20px;
+  background: color-mix(in srgb, var(--paper) 78%, transparent); backdrop-filter: blur(4px);
+  animation: sheet-fade .18s ease;
+}
+.paused__card {
+  width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px;
+  text-align: center; padding: 24px;
+}
+.paused__title { margin: 0; font-family: var(--display); font-size: 32px; font-weight: 800; line-height: 1.05; }
+.paused__text { margin: 0; color: var(--ink-soft); }
+@media (prefers-reduced-motion: reduce) {
+  .paused { animation: none; }
+}

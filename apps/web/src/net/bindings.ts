@@ -4,7 +4,7 @@ import { disposeRaceView, getRaceView } from '../race/instance.js';
 import { disposeMazeClient, getMazeClient } from '../maze/client.js';
 import { useGame } from '../store/game.js';
 import { getSocket } from './socket.js';
-import { syncClock } from './clock.js';
+import { setPausedAt, syncClock } from './clock.js';
 
 /**
  * Wires every server event to either the store or the canvas engine.
@@ -35,6 +35,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
       disposeMazeClient();
       engine.clear();
     }
+    setPausedAt(state.meta.paused?.at ?? null);
     g().sync(state);
     // Only the drawing game has a canvas to restore.
     if (state.kind === 'skribbl') engine.replay(state.ops);
@@ -46,7 +47,10 @@ export function bindSocket(engine: CanvasEngine): () => void {
   socket.on('player:left', ({ id }) => g().dropPlayer(id));
   socket.on('room:settings', (s) => g().setSettings(s));
   socket.on('host:changed', ({ hostId }) => g().setHost(hostId));
-  socket.on('room:meta', (m) => g().setMeta(m));
+  socket.on('room:meta', (m) => {
+    setPausedAt(m.paused?.at ?? null);
+    g().setMeta(m);
+  });
   socket.on('kicked', ({ by }) => g().setKickedBy(by));
 
   socket.on('turn:choosing', (p) => {
@@ -137,6 +141,8 @@ export function bindSocket(engine: CanvasEngine): () => void {
   if (socket.connected) onConnect();
 
   return () => {
+    // Off the room page, nothing is paused.
+    setPausedAt(null);
     socket.off('connect', onConnect);
     socket.off('disconnect', onDisconnect);
     for (const ev of [
