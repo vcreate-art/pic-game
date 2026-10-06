@@ -616,49 +616,55 @@ body:has(.landing--home) { background: #f1f2f4; }
 
 /* Each game is a box cover: its own colour is the surface and its name is
    the art, with the icon as a watermark bleeding off the corner. Pointing
-   at it (or focusing it) turns it over to show the blurb on the back. */
+   at it (or focusing it) slides the blurb up under the name like a drawer,
+   shrinking the name to make room. */
 .pick {
   display: flex; flex-direction: column; gap: 10px; padding: 0;
   border: 0; background: none; text-align: left; cursor: pointer;
 }
 .pick__cover {
-  position: relative; display: block; aspect-ratio: 4 / 3;
-  border-radius: 12px; perspective: 900px;
-}
-.pick__flip {
-  position: absolute; inset: 0; transform-style: preserve-3d;
-  transition: transform .45s cubic-bezier(.3, .7, .3, 1);
-}
-.pick__face {
-  position: absolute; inset: 0; display: flex; align-items: flex-end;
-  padding: 14px 16px; border-radius: 12px; overflow: hidden;
+  position: relative; overflow: hidden; display: flex; align-items: flex-end;
+  aspect-ratio: 4 / 3; padding: 14px 16px; border-radius: 12px;
   background: var(--game, var(--ink)); color: #fff;
-  -webkit-backface-visibility: hidden; backface-visibility: hidden;
-}
-/* A shade darker than the front, so the turn reads as a change of side. */
-.pick__face--back {
-  transform: rotateY(180deg); align-items: center;
-  background: color-mix(in srgb, var(--game, var(--ink)) 78%, #000);
-  font-size: 14px; line-height: 1.4;
+  transition: background-color .3s ease;
 }
 .pick__art {
   position: absolute; top: -16px; right: -16px; width: 104px; height: 104px; opacity: .2;
 }
+.pick__text { position: relative; display: flex; flex-direction: column; }
 .pick__name {
-  position: relative; font-family: var(--display); font-weight: 800;
+  font-family: var(--display); font-weight: 800;
   font-size: 24px; line-height: 1.02; letter-spacing: -.01em;
+  transition: font-size .3s ease, margin-bottom .3s ease;
+}
+/* Rows from 0fr to 1fr animate the drawer to the blurb's own height,
+   whatever its length. */
+.pick__more {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows .35s cubic-bezier(.3, .7, .3, 1);
+}
+.pick__more > span {
+  overflow: hidden; min-height: 0; font-size: 14px; line-height: 1.4;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity .25s ease, transform .35s cubic-bezier(.3, .7, .3, 1);
 }
 .pick__blurb { padding: 0 2px; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
-.pick:focus-visible .pick__flip { transform: rotateY(180deg); }
+.pick:focus-visible .pick__cover { background: color-mix(in srgb, var(--game, var(--ink)) 80%, #000); }
+.pick:focus-visible .pick__name { font-size: 16px; margin-bottom: 6px; }
+.pick:focus-visible .pick__more { grid-template-rows: 1fr; }
+.pick:focus-visible .pick__more > span { opacity: 1; transform: none; }
 /* Only with a real pointer: on touch, :hover sticks to the last tapped card.
    There the blurb stays under the cover. */
 @media (hover: hover) {
-  .pick:hover .pick__flip { transform: rotateY(180deg); }
+  .pick:hover .pick__cover { background: color-mix(in srgb, var(--game, var(--ink)) 80%, #000); }
+  .pick:hover .pick__name { font-size: 16px; margin-bottom: 6px; }
+  .pick:hover .pick__more { grid-template-rows: 1fr; }
+  .pick:hover .pick__more > span { opacity: 1; transform: none; }
   .pick__blurb { display: none; }
   .picker { row-gap: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pick__flip { transition: none; }
+  .pick__cover, .pick__name, .pick__more, .pick__more > span { transition: none; }
 }
 .pick:active .pick__cover { transform: translateY(1px); }
 /* Focus and "this one's sheet is open" share one ring in the game's colour,
@@ -837,8 +843,8 @@ body:has(.landing--home) { background: #f1f2f4; }
 .seat__open { font-size: 13px; color: var(--ink-soft); font-style: italic; }
 
 /* Beside the join card on a narrow desktop, three across would leave a
-   cover too small to hold the longest blurb on its back. */
-@media (min-width: 901px) and (max-width: 1013px) {
+   cover too small to hold its name and the longest blurb when open. */
+@media (min-width: 901px) and (max-width: 1119px) {
   .picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {
