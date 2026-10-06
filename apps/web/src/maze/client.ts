@@ -1130,3 +1130,9 @@ export function getMazeClient(): MazeClient {
   if (!client) client = new MazeClient();
   return client;
 }
+
+/** Drops the client, so the next game of Maze Wars starts from nothing. */
+export function disposeMazeClient(): void {
+  client?.detach();
+  client = null;
+}

@@ -11,7 +11,7 @@ import {
   CHOOSE_SECONDS, GAME_END_SECONDS, MAX_CHAT_LEN, MAX_OPS_PER_TURN,
   RECONNECT_GRACE_MS, SUGGEST_SECONDS, TURN_END_SECONDS, EMPTY_ROOM_TTL_MS,
 } from '../../config.js';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 import { topScorers } from '../../core/RoomSession.js';
 import { pickWords } from './words.js';
 
@@ -80,6 +80,17 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
   isLobby(): boolean {
     return this.phase === 'lobby';
+  }
+
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.phase === 'gameEnd' ? 'ended' : 'playing';
+  }
+
+  /** A bigger group than the default can switch in; the limit rises to fit
+   *  them rather than turning anyone away. */
+  override adoptFrom(old: BaseRoom<CorePlayer>): void {
+    super.adoptFrom(old);
+    this.settings.maxPlayers = Math.max(this.settings.maxPlayers, this.players.size);
   }
 
   get maxPlayers(): number {

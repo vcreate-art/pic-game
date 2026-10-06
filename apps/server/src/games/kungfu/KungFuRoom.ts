@@ -5,7 +5,7 @@ import {
   type KungFuSeats, type KungFuSettings, type Piece, type RoomState, type Side,
   type Square, type Variant,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 /** Absorbs clock-estimate drift between a client's countdown and the server. */
 const COOLDOWN_GRACE_MS = 120;
@@ -44,6 +44,10 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
 
   isLobby(): boolean {
     return this.phase === 'lobby';
+  }
+
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
   }
 
   /** Two seats, but onlookers are welcome. */

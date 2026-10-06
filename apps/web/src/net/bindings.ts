@@ -1,7 +1,7 @@
 import type { CanvasEngine } from '../canvas/engine.js';
-import { getFightView } from '../fight/instance.js';
-import { getRaceView } from '../race/instance.js';
-import { getMazeClient } from '../maze/client.js';
+import { disposeFightView, getFightView } from '../fight/instance.js';
+import { disposeRaceView, getRaceView } from '../race/instance.js';
+import { disposeMazeClient, getMazeClient } from '../maze/client.js';
 import { useGame } from '../store/game.js';
 import { getSocket } from './socket.js';
 import { syncClock } from './clock.js';
@@ -27,6 +27,14 @@ export function bindSocket(engine: CanvasEngine): () => void {
   socket.on('disconnect', onDisconnect);
 
   socket.on('state:sync', (state) => {
+    // The host switched games: nothing the last one drew may carry over.
+    const was = g().room?.kind;
+    if (was && was !== state.kind) {
+      disposeFightView();
+      disposeRaceView();
+      disposeMazeClient();
+      engine.clear();
+    }
     g().sync(state);
     // Only the drawing game has a canvas to restore.
     if (state.kind === 'skribbl') engine.replay(state.ops);

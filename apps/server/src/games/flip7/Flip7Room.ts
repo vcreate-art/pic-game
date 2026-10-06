@@ -3,7 +3,7 @@ import {
   faceKey, flip7AutoMove, flip7Depart, flip7Turn, hit, newFlip7, nextRound, pendingChoice, stay,
   type Flip7Game, type Flip7Public, type Flip7Settings, type RoomState,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 /** How long a disconnected player's move waits for them before the app makes
  *  it: a stay, or a random target for their action card. */
@@ -30,6 +30,10 @@ export class Flip7Room extends BaseRoom<CorePlayer> {
 
   isLobby(): boolean {
     return !this.game;
+  }
+
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.game?.stage === 'ended' ? 'ended' : 'playing';
   }
 
   get maxPlayers(): number {

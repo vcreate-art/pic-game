@@ -16,6 +16,7 @@ import { Gallery } from '../components/Gallery.js';
 import { RealmsGame } from '../components/realms/RealmsGame.js';
 import { SkribblGame } from '../components/skribbl/SkribblGame.js';
 import { bindSocket } from '../net/bindings.js';
+import { useLeaveRoom } from '../net/useLeaveRoom.js';
 import { clearSeat, getSocket, loadProfile, loadSeat, saveSeat } from '../net/socket.js';
 import { useGame } from '../store/game.js';
 import { Route as rootRoute } from './__root.js';
@@ -91,12 +92,7 @@ function RoomPage() {
     });
   }
 
-  const leave = () => {
-    getSocket().emit('room:leave');
-    clearSeat();
-    useGame.getState().reset();
-    void navigate({ to: '/' });
-  };
+  const leave = useLeaveRoom();
 
 
   /** Being removed ends the session here. The seat token is deliberately kept:

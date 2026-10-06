@@ -3,7 +3,7 @@ import {
   cryptidTurn, depart, generatePuzzle, hexLabel, newCryptid, placeCube, question, search, setupLeft,
   type CryptidClue, type CryptidGame, type CryptidPublic, type CryptidSettings, type RoomState,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 /** How long a disconnected player's turn waits for them before the app moves
  *  for them. Long enough for a refresh or a phone waking up. */
@@ -41,6 +41,10 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
 
   isLobby(): boolean {
     return !this.game;
+  }
+
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.game?.stage === 'ended' ? 'ended' : 'playing';
   }
 
   get maxPlayers(): number {

@@ -6,7 +6,7 @@ import {
   type AttackTarget, type RealmsPublic, type RealmsSettings, type RealmsSide,
   type RealmsState, type Result, type RoomState,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 /**
  * Star Realms: a two-player deckbuilder, turn based.
@@ -31,6 +31,10 @@ export class RealmsRoom extends BaseRoom<CorePlayer> {
 
   isLobby(): boolean {
     return this.phase === 'lobby';
+  }
+
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
   }
 
   get maxPlayers(): number {

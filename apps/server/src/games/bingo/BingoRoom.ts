@@ -3,7 +3,7 @@ import {
   newGame, randomCallerCard, randomTurnsCard, turnOf, uncalled, validTurnsCard,
   type BingoGame, type BingoPhase, type BingoPublic, type BingoSettings, type RoomState,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 /** A wrong BINGO locks that player out of shouting again for this long. */
 const CLAIM_COOLDOWN_MS = 3000;
@@ -44,6 +44,10 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
 
   isLobby(): boolean {
     return this.stage === 'lobby';
+  }
+
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.stage === 'ended' ? 'ended' : 'playing';
   }
 
   get maxPlayers(): number {

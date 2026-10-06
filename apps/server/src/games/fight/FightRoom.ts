@@ -6,7 +6,7 @@ import {
   type FightSide, type FighterId, type Match, type RoomState,
 } from '@pic-game/shared';
 import { FIGHT_FORFEIT_MS, FIGHT_RESUME_MS } from '../../config.js';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 const STEP_MS = 1000 / TICK_HZ;
 /** Most ticks run to catch up after a stall. Past this the backlog is dropped:
@@ -57,6 +57,10 @@ export class FightRoom extends BaseRoom<CorePlayer> {
 
   isLobby(): boolean {
     return this.phase === 'lobby';
+  }
+
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
   }
 
   /** Two fighters, and room for a crowd. */

@@ -9,6 +9,10 @@ import { RoomSession } from './RoomSession.js';
 
 export type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 
+/** Where a room is in its game, in the terms every game shares: getting
+ *  ready, in the middle of one, or looking at the result. */
+export type RoomLifecycle = 'lobby' | 'playing' | 'ended';
+
 /** What every game needs to know about a seat, whatever the game is. */
 export interface CorePlayer extends Player {
   /** Secret bearer token; proves seat ownership across reconnects. */
@@ -61,6 +65,8 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   abstract publicState(): RoomState;
   /** Games that are mid-play should say so; the lobby is handled generically. */
   abstract isLobby(): boolean;
+  /** Each game's own phases, mapped onto the shared three. */
+  abstract lifecycle(): RoomLifecycle;
   /** Below this, an in-progress game gives up and returns to the lobby. */
   protected abstract get minPlayers(): number;
   /** Adds whatever per-game fields a seat needs on top of the core ones. */
@@ -247,8 +253,32 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     return {
       wins: this.session.winsOf(this.players.keys()),
       games: this.session.games,
-      can: { restart: false, toLobby: false, switch: false },
+      can: { restart: false, toLobby: false, switch: this.canSwitch() },
     };
+  }
+
+  /** Switching games is only allowed between them, never mid-game. */
+  canSwitch(): boolean {
+    return this.lifecycle() !== 'playing';
+  }
+
+  /**
+   * Takes over the table from the room this one replaces when the host
+   * switches games: the same seats, host, order and session. Each seat is
+   * rebuilt through this game's own createPlayer, and starts this game on 0.
+   */
+  adoptFrom(old: BaseRoom<CorePlayer>): void {
+    this.session = old.session;
+    this.hostId = old.hostId;
+    this.order = old.order.filter((id) => old.players.has(id));
+    for (const id of this.order) {
+      const p = old.players.get(id)!;
+      this.players.set(id, this.createPlayer({
+        id: p.id, token: p.token, name: p.name, avatar: p.avatar, score: 0,
+        connected: p.connected, socketId: p.socketId, disconnectedAt: p.disconnectedAt,
+      }));
+    }
+    if (this.activeCount() === 0) this.scheduleEmptyCollection();
   }
 
   /** Sends the room-level facts on their own. Most games broadcast only their

@@ -1,6 +1,7 @@
 import { Outlet, createRootRoute } from '@tanstack/react-router';
 import { PeopleButton } from '../components/PeopleButton.js';
 import { ProfileChip } from '../components/ProfileChip.js';
+import { RoomMenu } from '../components/RoomMenu.js';
 import { useGame } from '../store/game.js';
 
 function RootLayout() {
@@ -21,6 +22,7 @@ function RootLayout() {
               {connected ? 'connected' : 'reconnecting…'}
             </span>
           )}
+          <RoomMenu />
           <PeopleButton />
           <ProfileChip />
         </div>

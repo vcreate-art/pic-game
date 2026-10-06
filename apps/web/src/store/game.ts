@@ -8,6 +8,16 @@ import type {
 
 const MAX_MESSAGES = 200;
 
+/** Everything one game keeps for this player alone. Cleared when the room
+ *  switches to a different game, so nothing of the last one leaks into it. */
+const noGamePrivate = (): Partial<GameStore> => ({
+  secret: null, choices: null, chooseEndsAt: null,
+  suggest: null, mySuggestion: null, suggestError: null,
+  turnResult: null, final: null,
+  realmsHand: [], realmsOwed: 0, spiesKey: null, bingoCard: null, cryptidClue: null,
+  gallery: null, galleryOpen: false,
+});
+
 export interface TurnResult {
   word: string;
   deltas: Record<string, number>;
@@ -134,12 +144,13 @@ export const useGame = create<GameStore>((set) => ({
   setMe: (me) => set({ me }),
 
   sync: (room) =>
-    set({
+    set((s) => ({
+      ...(s.room && s.room.kind !== room.kind ? noGamePrivate() : {}),
       room,
       turnResult: null,
       // A podium snapshot carries the gallery; any other state keeps the one we have.
       ...(room.kind === 'skribbl' && room.gallery.length ? { gallery: room.gallery } : {}),
-    }),
+    })),
 
   patchPlayer: (p) =>
     set((s) =>
@@ -338,13 +349,7 @@ export const useGame = create<GameStore>((set) => ({
   setKickedBy: (kickedBy) => set({ kickedBy }),
 
   reset: () =>
-    set({
-      me: null, room: null, secret: null, choices: null, chooseEndsAt: null,
-      suggest: null, mySuggestion: null, suggestError: null,
-      messages: [], turnResult: null, final: null, notice: null, kickedBy: null,
-      realmsHand: [], realmsOwed: 0, spiesKey: null, bingoCard: null, cryptidClue: null,
-      gallery: null, galleryOpen: false,
-    }),
+    set({ ...noGamePrivate(), me: null, room: null, messages: [], notice: null, kickedBy: null }),
 }));
 
 // ---- selectors ----

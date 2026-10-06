@@ -6,7 +6,7 @@ import {
   type TourneyBonuses, type TourneyPublic, type TourneySettings, type TourneyState,
 } from '@pic-game/shared';
 import { TOURNEY_KEEP_MS } from '../../config.js';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 /** How many results can be taken back, newest first. */
 const UNDO_DEPTH = 50;
@@ -41,6 +41,10 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
 
   isLobby(): boolean {
     return this.t.phase === 'setup';
+  }
+
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.t.phase === 'ended' ? 'ended' : 'playing';
   }
 
   get maxPlayers(): number {

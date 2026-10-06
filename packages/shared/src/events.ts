@@ -56,6 +56,9 @@ export interface ClientToServerEvents {
     cb: (r: JoinAck) => void,
   ) => void;
   'room:leave': () => void;
+  /** Host only, between games: the room plays a different game next, with
+   *  the same code, seats and session. */
+  'room:switch': (p: { kind: GameKind }, cb?: (r: { ok: boolean; message?: string }) => void) => void;
   /** Change your own name or avatar mid-room; everyone sees it at once. */
   'player:rename': (p: { name: string; avatar: Avatar }) => void;
   /** Host only. Removes a player and blocks that seat from coming back. */

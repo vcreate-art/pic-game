@@ -3,7 +3,7 @@ import {
   type ChaserPace, type DeathCause, type Ghost, type Level, type LevelResult,
   type RaceEvent, type RacePhase, type RacePublic, type RaceSettings, type RoomState,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 import { topScorers } from '../../core/RoomSession.js';
 
 const COUNTDOWN_MS = 3500;
@@ -55,6 +55,10 @@ export class RaceRoom extends BaseRoom<CorePlayer> {
 
   isLobby(): boolean {
     return this.phase === 'lobby';
+  }
+
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.phase === 'podium' ? 'ended' : 'playing';
   }
 
   get maxPlayers(): number {

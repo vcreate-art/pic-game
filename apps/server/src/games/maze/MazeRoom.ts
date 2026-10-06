@@ -5,7 +5,7 @@ import {
   type MazeEvent, type MazeInput, type MazePhase, type MazePublic, type MazeSettings, type MazeTheme, type MazeWorld,
   type RoomState,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 const STEP_MS = 1000 / MAZE_HZ;
 /** Most ticks run in one wake-up to catch up after a stall. */
@@ -62,6 +62,10 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
 
   isLobby(): boolean {
     return this.stage === 'lobby';
+  }
+
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.stage === 'ended' ? 'ended' : 'playing';
   }
 
   get maxPlayers(): number {

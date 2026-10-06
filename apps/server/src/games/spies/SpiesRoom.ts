@@ -4,7 +4,7 @@ import {
   type SpiesPhase, type SpiesPublic, type SpiesSettings, type SpiesTeamSeats, type SpyRole,
   type SpyTeam,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 const emptyTeams = (): Record<SpyTeam, SpiesTeamSeats> => ({
   red: { spymaster: null, operatives: [] },
@@ -45,6 +45,10 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
 
   isLobby(): boolean {
     return this.phase === 'lobby';
+  }
+
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
   }
 
   get maxPlayers(): number {

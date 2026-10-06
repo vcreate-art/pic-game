@@ -2389,3 +2389,45 @@ body:has(.landing--home) { background: #f1f2f4; }
   .backstage { padding-top: 16px; }
   .backstage__title { font-size: 28px; }
 }
+
+/* ---------------------------------------------------------------- room menu */
+
+/* The header's room controls. The chip names the game being played, in its
+   colour, so it doubles as "you are here". */
+.roommenu { position: relative; }
+.roommenu__chip {
+  display: flex; align-items: center; gap: 6px; padding: 5px 10px 5px 10px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  font-weight: 700; font-size: 13.5px; cursor: pointer;
+}
+.roommenu__chip:hover, .roommenu__chip[aria-expanded="true"] { border-color: var(--game); }
+.roommenu__icon { width: 16px; height: 16px; color: var(--game); flex: none; }
+.roommenu__caret { width: 14px; height: 14px; color: var(--ink-soft); flex: none; }
+.roommenu__pop {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 300px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.roommenu__section { display: flex; flex-direction: column; gap: 8px; }
+.roommenu__section .card__title { margin: 0; }
+.roommenu__games {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px;
+  max-height: 50vh; overflow-y: auto;
+}
+.roommenu__game {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 8px;
+  border: 0; border-radius: 9px; background: none; text-align: left; cursor: pointer;
+  font-size: 13.5px; font-weight: 600;
+}
+.roommenu__game:hover:not(:disabled) { background: color-mix(in srgb, var(--game) 10%, var(--card)); }
+.roommenu__game:disabled { cursor: default; }
+.roommenu__game:disabled:not(.is-current) { opacity: .45; }
+.roommenu__game.is-current { background: color-mix(in srgb, var(--game) 10%, var(--card)); }
+.roommenu__gicon { width: 18px; height: 18px; color: var(--game); flex: none; }
+.roommenu__gname { flex: 1; min-width: 0; }
+.roommenu__why { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+.roommenu__game:focus-visible { outline: 2px solid var(--game); outline-offset: 1px; }
+
+@media (max-width: 560px) {
+  .roommenu__name { display: none; }
+  .roommenu__pop { position: fixed; left: 12px; right: 12px; top: 60px; width: auto; }
+}

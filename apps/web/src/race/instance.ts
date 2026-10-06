@@ -7,3 +7,9 @@ export function getRaceView(): RaceView {
   if (!view) view = new RaceView();
   return view;
 }
+
+/** Drops the view, so the next game of this kind starts from nothing. */
+export function disposeRaceView(): void {
+  view?.detach();
+  view = null;
+}

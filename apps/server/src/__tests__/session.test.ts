@@ -60,6 +60,9 @@ class TestRoom extends BaseRoom<CorePlayer> {
   isLobby(): boolean {
     return true;
   }
+  lifecycle(): 'lobby' {
+    return 'lobby';
+  }
   protected createPlayer(base: CorePlayer): CorePlayer {
     return base;
   }
