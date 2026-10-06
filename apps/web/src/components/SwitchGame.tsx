@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { GAME_CAPACITY, type GameKind } from '@pic-game/shared';
-import { X } from 'lucide-react';
+import { ArrowLeftRight, X } from 'lucide-react';
 import { getSocket } from '../net/socket.js';
 import { selectIsHost, useGame } from '../store/game.js';
 import { GameCovers } from './GameCovers.js';
 
 /**
- * The host's way to a different game, from the lobby only: a button by the
- * room's name that opens every game as a cover, the same as the front page.
+ * The host's way to a different game, from the lobby only: an icon in the
+ * corner of the settings card that opens every game as a cover, the same as
+ * the front page.
  */
 export function SwitchGame() {
   const room = useGame((s) => s.room);
@@ -40,8 +41,14 @@ export function SwitchGame() {
 
   return (
     <>
-      <button type="button" className="switchgame__btn" onClick={() => setOpen(true)}>
-        Change game
+      <button
+        type="button"
+        className="switchgame__btn"
+        aria-label="Change game"
+        title="Change game"
+        onClick={() => setOpen(true)}
+      >
+        <ArrowLeftRight aria-hidden="true" />
       </button>
       {open && (
         <div className="sheet" onClick={() => setOpen(false)}>

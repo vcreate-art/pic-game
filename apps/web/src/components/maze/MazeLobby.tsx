@@ -9,6 +9,7 @@ import { Avatar } from '../Avatar.js';
 import { InviteCard } from '../InviteCard.js';
 import { KickButton } from '../KickButton.js';
 import { CONTROL_HELP, ControlsPicker, useMazeControls } from './controls.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 const THEMES: { value: MazeThemeChoice; name: string }[] = [
   { value: 'random', name: 'Surprise me' },
@@ -50,7 +51,7 @@ export function MazeLobby() {
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Game settings</h2>
+          <SettingsTitle>Game settings</SettingsTitle>
 
           <label className="settings__row bingolobby__row">
             <span className="settings__label">Match length</span>

@@ -5,6 +5,7 @@ import { WinCount } from '../WinCount.js';
 import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 const LENGTHS: Record<number, string> = { 100: 'Quick', 150: 'Short', 200: 'The box', 300: 'Long' };
 
@@ -37,7 +38,7 @@ export function Flip7Lobby() {
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Game settings</h2>
+          <SettingsTitle>Game settings</SettingsTitle>
 
           <div className="settings__modes">
             <span className="settings__label">Play to</span>

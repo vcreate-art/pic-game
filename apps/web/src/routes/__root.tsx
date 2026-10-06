@@ -3,7 +3,6 @@ import { ProfileChip } from '../components/ProfileChip.js';
 import { CountdownOverlay } from '../components/CountdownOverlay.js';
 import { PausedOverlay } from '../components/PausedOverlay.js';
 import { RoomPanel } from '../components/RoomPanel.js';
-import { SwitchGame } from '../components/SwitchGame.js';
 import { useGame } from '../store/game.js';
 
 function RootLayout() {
@@ -18,7 +17,6 @@ function RootLayout() {
         {inRoom ? (
           <div className="topbar__room">
             <RoomPanel />
-            <SwitchGame />
           </div>
         ) : (
           <a className="brand" href="/">

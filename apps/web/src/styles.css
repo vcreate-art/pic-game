@@ -2478,11 +2478,15 @@ body:has(.landing--home) { background: #f1f2f4; }
 .topbar__room { display: flex; align-items: center; gap: 10px; min-width: 0; }
 
 /* The host's way to another game, by the room's name, in the lobby only. */
+/* A settings card's heading, with the host's Change game icon in its corner. */
+.card__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.card__head .card__title { margin: 0; }
 .switchgame__btn {
-  flex: none; padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px;
-  background: none; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  display: grid; place-items: center; flex: none; width: 32px; height: 32px; margin: -6px -6px -6px 0;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--card); color: var(--ink-soft); cursor: pointer;
 }
-.switchgame__btn:hover { border-color: var(--ink-soft); }
+.switchgame__btn svg { width: 16px; height: 16px; }
+.switchgame__btn:hover { color: var(--ink); border-color: var(--ink-soft); }
 .switchgame__btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .sheet__card.switchgame {
   display: flex; flex-direction: column; gap: 14px;

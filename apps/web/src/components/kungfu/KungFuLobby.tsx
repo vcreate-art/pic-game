@@ -7,6 +7,7 @@ import { selectIsHost, selectKungFu, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 /** Every piece, shortest rest first, so the slider means something concrete. */
 const PIECE_ROWS: Array<[PieceType, string]> = [
@@ -52,7 +53,7 @@ export function KungFuLobby() {
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Game settings</h2>
+          <SettingsTitle>Game settings</SettingsTitle>
 
           <div className="settings__modes">
             <span className="settings__label">Board</span>

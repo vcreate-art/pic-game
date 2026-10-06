@@ -4,6 +4,7 @@ import { getSocket } from '../../net/socket.js';
 import { selectIsHost, selectTourney, useGame } from '../../store/game.js';
 import { InviteCard } from '../InviteCard.js';
 import { MainSelect, NumberField, forgetBackup, loadBackup, pts } from './common.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 const BONUS_LABELS: { key: keyof TourneyBonuses; name: string; note: string }[] = [
   { key: 'clean', name: 'Clean 2-0', note: 'automatic' },
@@ -119,7 +120,7 @@ export function TourneyLobby() {
         </section>
 
         <section className="lobby__settings card tsettings">
-          <h2 className="card__title">The rules</h2>
+          <SettingsTitle>The rules</SettingsTitle>
 
           {showRestore && (
             <div className="trestore">

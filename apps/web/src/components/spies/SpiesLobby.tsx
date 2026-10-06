@@ -7,6 +7,7 @@ import { selectIsHost, selectSpies, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 export const TEAM_NAME: Record<SpyTeam, string> = { red: 'Red', blue: 'Blue' };
 
@@ -99,7 +100,7 @@ export function SpiesLobby() {
         </div>
 
         <section className="card spylobby__settings">
-          <h2 className="card__title">Game settings</h2>
+          <SettingsTitle>Game settings</SettingsTitle>
 
           {unassigned.length > 0 && (
             <p className="settings__note settings__note--left">

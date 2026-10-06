@@ -9,6 +9,7 @@ import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { FighterCard } from './FighterCard.js';
 import { Controls, MoveList } from './MoveList.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 export const SIDE_LABEL: Record<FightSide, string> = { a: 'Player 1', b: 'Player 2' };
 
@@ -40,7 +41,7 @@ export function FightLobby() {
         <InviteCard />
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Match settings</h2>
+          <SettingsTitle>Match settings</SettingsTitle>
 
           <div className="seats">
             {FIGHT_SIDES.map((side) => {

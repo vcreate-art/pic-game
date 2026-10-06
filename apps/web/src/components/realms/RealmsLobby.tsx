@@ -4,6 +4,7 @@ import { selectIsHost, selectRealms, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 const SEAT_LABEL: Record<RealmsSide, string> = { a: 'First player', b: 'Second player' };
 
@@ -42,7 +43,7 @@ export function RealmsLobby() {
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Game settings</h2>
+          <SettingsTitle>Game settings</SettingsTitle>
 
           <div className="seats">
             {REALMS_SIDES.map((side) => {
