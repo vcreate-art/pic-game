@@ -613,8 +613,10 @@ body:has(.landing--home) { background: #f1f2f4; }
 .pick__cover {
   position: relative; overflow: hidden; display: flex; align-items: flex-end;
   aspect-ratio: 4 / 3; padding: 14px 16px; border-radius: 12px;
-  border: 3px solid var(--game, var(--ink));
-  background: var(--paper); color: var(--ink);
+  /* No outline: like every other card the edge is quiet, and the game's
+     colour is in the surface instead, as a soft tint. */
+  border: 0;
+  background: color-mix(in srgb, var(--game, var(--ink)) 12%, var(--card)); color: var(--ink);
   transition: color .2s ease;
 }
 /* Under the icon and the text, over the paper. */
@@ -2500,7 +2502,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 /* Compact covers to fit the card: three across, no blurb drawer (the front
    page already explains each game), the ink still answers the pointer. */
 .switchgrid .picker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 2px; }
-.switchgrid .pick__cover { padding: 10px 11px; border-width: 2px; border-radius: 10px; }
+.switchgrid .pick__cover { padding: 10px 11px; border-radius: 10px; }
 .switchgrid .pick__art { top: -3px; right: -12px; width: 46px; height: 46px; }
 .switchgrid .pick__name, .switchgrid .pick:hover .pick__name, .switchgrid .pick:focus-visible .pick__name {
   font-size: 15px; margin-bottom: 0;
