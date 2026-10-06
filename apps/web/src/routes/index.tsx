@@ -6,7 +6,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { JoinPanel, initialIdentity, type Identity } from '../components/JoinPanel.js';
-import { ViewportDebug } from '../components/ViewportDebug.js';
 import { peekRoom } from '../api/client.js';
 import { getSocket, saveSeat } from '../net/socket.js';
 import { useGame } from '../store/game.js';
@@ -133,7 +132,6 @@ function Landing() {
 
   return (
     <div className="landing">
-      {new URLSearchParams(location.search).has('vv') && <ViewportDebug />}
       <div className="landing__hero">
         <h1 className="landing__title">Let's play.</h1>
         <p className="landing__sub">Grab some friends. One link, everyone's in.</p>
