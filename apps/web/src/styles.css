@@ -635,11 +635,11 @@ body:has(.landing--home) { background: #f1f2f4; }
   background: radial-gradient(circle at 0% 100%,
     color-mix(in srgb, var(--game, var(--ink)) 5%, transparent), transparent 70%);
 }
-/* What kind of game, pinned to the cover's top-left. It steps aside when
-   the blurb slides up, which can reach the top on a small cover. */
+/* What kind of game, under the name. It folds away as the blurb slides up,
+   so the name and blurb have the cover to themselves. */
 .pick__cat {
-  position: absolute; top: 14px; left: 16px;
-  transition: opacity .2s ease;
+  display: block; max-height: 18px; margin-top: 3px; overflow: hidden;
+  transition: opacity .2s ease, max-height .3s ease, margin-top .3s ease;
 }
 .pick__text { position: relative; display: flex; flex-direction: column; }
 .pick__name {
@@ -663,7 +663,7 @@ body:has(.landing--home) { background: #f1f2f4; }
    point on the edge. */
 .pick:focus-visible .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
 .pick:focus-visible .pick__cover { color: #fff; }
-.pick:focus-visible .pick__cat { opacity: 0; }
+.pick:focus-visible .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
 .pick:focus-visible .pick__name { font-size: 17px; margin-bottom: 5px; }
 .pick:focus-visible .pick__more { grid-template-rows: 1fr; }
 .pick:focus-visible .pick__more > span { opacity: 1; transform: none; }
@@ -672,7 +672,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 @media (hover: hover) {
   .pick:hover .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
   .pick:hover .pick__cover { color: #fff; }
-  .pick:hover .pick__cat { opacity: 0; }
+  .pick:hover .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
   .pick:hover .pick__name { font-size: 17px; margin-bottom: 5px; }
   .pick:hover .pick__more { grid-template-rows: 1fr; }
   .pick:hover .pick__more > span { opacity: 1; transform: none; }
@@ -717,8 +717,9 @@ body:has(.landing--home) { background: #f1f2f4; }
   border-radius: 12px; color: #fff; background: var(--game);
 }
 .sheet__tile svg { width: 26px; height: 26px; }
+.sheet__titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .sheet__title {
-  flex: 1; min-width: 0; margin: 0; font-family: var(--display); font-size: 24px;
+  margin: 0; font-family: var(--display); font-size: 24px;
   font-weight: 800; line-height: 1.1; color: var(--game);
 }
 .sheet__close {
@@ -2391,15 +2392,13 @@ body:has(.landing--home) { background: #f1f2f4; }
   .backstage__title { font-size: 28px; }
 }
 
-/* ---------------------------------------------------------------- category pill */
+/* ---------------------------------------------------------------- game category */
 
-.catpill {
-  display: inline-flex; align-items: center; flex: none; padding: 2px 9px;
-  border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.5; white-space: nowrap;
-  color: var(--game, var(--ink));
-  background: color-mix(in srgb, var(--game, var(--ink)) 11%, var(--card));
+.gamecat {
+  font-size: 12.5px; font-weight: 700; line-height: 1.35; white-space: nowrap;
+  color: var(--game, var(--ink-soft));
 }
-.sheet__cat { margin-right: 8px; vertical-align: 1px; }
+.sheet__cat { font-size: 13px; }
 
 /* ---------------------------------------------------------------- room panel */
 
