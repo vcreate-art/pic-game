@@ -29,7 +29,12 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
   private finished = new Map<string, number[]>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private endsAt = 0;
+  /** The caller-mode "hold the draw": balls stop, but daubing and claims go
+   *  on. Different from pausing the room, which stops everything. */
   private paused = false;
+  /** Which clock `timer` is, and what was left of it when the room paused. */
+  private timerKind: 'turn' | 'ball' | null = null;
+  private held: { kind: 'turn' | 'ball'; ms: number } | null = null;
   private claimLock = new Map<string, number>();
 
   constructor(code: string, io: IO) {
@@ -52,6 +57,29 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
 
   protected resetToLobby(): void {
     this.toLobbyNow();
+  }
+
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  /** Stops the turn timer or the ball draw. The deadline stays put, so every
+   *  countdown holds at the time that was left. */
+  protected override onPause(): void {
+    if (!this.timer || !this.timerKind) return;
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.held = { kind: this.timerKind, ms: Math.max(0, this.endsAt - Date.now()) };
+    this.timerKind = null;
+  }
+
+  protected override onResume(): void {
+    const held = this.held;
+    this.held = null;
+    if (!held) return;
+    if (held.kind === 'turn') this.startTurnTimer(held.ms);
+    else this.scheduleBall(held.ms);
+    this.broadcast();
   }
 
   get maxPlayers(): number {
@@ -238,11 +266,16 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
 
   /** Running out of time calls a number at random, rather than skipping: a
    *  skipped turn would let a slow player stall everyone else's grids. */
-  private startTurnTimer(): void {
+  private startTurnTimer(ms = this.settings.turnSeconds * 1000): void {
     this.clearTimer();
     const secs = this.settings.turnSeconds;
     if (!secs) return;
-    this.endsAt = Date.now() + secs * 1000;
+    this.endsAt = Date.now() + ms;
+    if (this.isPaused) {
+      this.held = { kind: 'turn', ms };
+      return;
+    }
+    this.timerKind = 'turn';
     this.timer = setTimeout(() => {
       this.timer = null;
       const g = this.game;
@@ -251,7 +284,7 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
       const who = turnOf(g);
       if (!who || !left.length) return;
       this.applyCall(left[Math.floor(Math.random() * left.length)]!, who);
-    }, secs * 1000);
+    }, ms);
   }
 
   // ----------------------------------------------------------- caller play
@@ -278,16 +311,21 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
     this.broadcast();
   }
 
-  private scheduleBall(): void {
+  private scheduleBall(ms = this.settings.callSeconds * 1000): void {
     this.clearTimer();
     const g = this.caller();
     const secs = this.settings.callSeconds;
     if (!g || !secs || this.paused || !uncalled(g).length) return;
-    this.endsAt = Date.now() + secs * 1000;
+    this.endsAt = Date.now() + ms;
+    if (this.isPaused) {
+      this.held = { kind: 'ball', ms };
+      return;
+    }
+    this.timerKind = 'ball';
     this.timer = setTimeout(() => {
       this.timer = null;
       this.drawBall();
-    }, secs * 1000);
+    }, ms);
   }
 
   /** Host: the next ball now, whether the draw is on a clock or by hand. */
@@ -361,6 +399,8 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
   private clearTimer(): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    this.timerKind = null;
+    this.held = null;
     this.endsAt = 0;
   }
 
