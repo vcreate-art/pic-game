@@ -857,7 +857,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   }
 
   broadcastState(): void {
-    this.io.to(this.code).emit('state:sync', this.publicState());
+    this.broadcastSnapshot();
   }
 
   /** Re-sends the secret to a drawer who reconnected mid-turn. */

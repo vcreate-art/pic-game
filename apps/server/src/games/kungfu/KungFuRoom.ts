@@ -295,7 +295,7 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
   }
 
   broadcastState(): void {
-    this.io.to(this.code).emit('state:sync', this.publicState());
+    this.broadcastSnapshot();
   }
 
   handleChat(playerId: string, raw: string): void {

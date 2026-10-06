@@ -61,7 +61,7 @@ export class RoomManager {
     old.onEmpty = undefined;
     old.destroy();
 
-    this.io.to(next.code).emit('state:sync', next.publicState());
+    next.broadcastSnapshot();
     next.systemMessage(`Switched to ${GAME_LABELS[kind].name}.`);
     return { ok: true };
   }

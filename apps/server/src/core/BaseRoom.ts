@@ -400,6 +400,14 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     this.io.to(this.code).emit('room:meta', meta);
   }
 
+  /** Sends the whole room to everyone. The meta rides along, so it counts as
+   *  sent: otherwise a change straight after it would look like no change. */
+  broadcastSnapshot(): void {
+    const state = this.publicState();
+    this.sentMeta = JSON.stringify(state.meta);
+    this.io.to(this.code).emit('state:sync', state);
+  }
+
   /** Sends the meta if it differs from what clients last had: a game starting
    *  or ending changes what the host can do. Each game calls this whenever it
    *  broadcasts its own state. */

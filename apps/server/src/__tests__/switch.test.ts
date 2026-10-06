@@ -163,3 +163,19 @@ describe('restart and back to lobby', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+describe('meta after a full snapshot', () => {
+  it('reaches clients when Draw & Guess restarts mid-game', () => {
+    const { rooms, sent } = table();
+    const room = rooms.create('skribbl');
+    const a = room.addPlayer('A', av, 'k1');
+    room.addPlayer('B', av, 'k2');
+    room.startGame(a.id);
+    const from = sent.length;
+    room.restart(a.id);
+    // Whatever clients heard last, snapshot or meta, must say a game is on.
+    const last = sent.slice(from).filter((m) => m.event === 'room:meta' || m.event === 'state:sync').at(-1)!;
+    const meta = last.event === 'room:meta' ? last.args[0] : (last.args[0] as { meta: unknown }).meta;
+    expect(meta).toMatchObject({ can: { restart: true, toLobby: true, switch: false } });
+  });
+});
