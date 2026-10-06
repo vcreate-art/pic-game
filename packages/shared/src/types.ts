@@ -191,6 +191,36 @@ export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
   maze: { name: 'Maze Wars', blurb: 'Top-down deathmatch in a fresh maze. Hunt with the mini map, shoot first.' },
 };
 
+/** One seat in a live room, as the backstage dashboard sees it. */
+export interface BackstagePlayer {
+  name: string;
+  avatar: Avatar;
+  score: number;
+  connected: boolean;
+  host: boolean;
+}
+
+/** One live room, as the backstage dashboard sees it. The room code is left
+ *  out on purpose: it is what lets someone join, and the dashboard's endpoint
+ *  is open, so listing codes would let anyone walk into any game. */
+export interface BackstageRoom {
+  /** Unique while the room lives, but not a code anyone can join with. */
+  id: string;
+  kind: GameKind;
+  /** The game's own phase name, e.g. 'lobby' or 'drawing'. */
+  phase: string;
+  inLobby: boolean;
+  createdAt: number;
+  maxPlayers: number;
+  players: BackstagePlayer[];
+}
+
+export interface BackstageSnapshot {
+  /** Server epoch ms when the snapshot was taken. */
+  at: number;
+  rooms: BackstageRoom[];
+}
+
 /** What every room reports, whichever game it is running. */
 export interface RoomStateBase {
   code: string;

@@ -2327,3 +2327,65 @@ body:has(.landing--home) { background: #f1f2f4; }
 .mzcontrols__opt:hover { border-color: var(--accent); }
 .mzcontrols__opt.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .mzside__controls { display: flex; flex-direction: column; gap: 8px; }
+
+/* ---------------------------------------------------------------- backstage */
+
+/* The unlisted admin view: a quiet, dense read-out. Each room and game takes
+   its colour from GAME_ICONS, the same as its cover on the front page. */
+.backstage {
+  margin: 0 auto; width: 100%; max-width: 960px;
+  display: flex; flex-direction: column; gap: 24px; padding: 28px 0 40px;
+}
+.backstage__head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.backstage__title { margin: 0; font-family: var(--display); font-size: 40px; font-weight: 800; line-height: 1.05; }
+.backstage__status { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.backstage__status.is-off { color: var(--warn); font-weight: 600; }
+.backstage__summary { margin: 0; font-size: 18px; }
+.backstage__summary strong { font-family: var(--display); font-weight: 800; }
+.backstage__empty {
+  margin: 0; padding: 28px; text-align: center; color: var(--ink-soft);
+  border: 1px dashed var(--line); border-radius: 12px;
+}
+.backstage__section { display: flex; flex-direction: column; gap: 12px; }
+.backstage__heading { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 800; }
+
+.bs-games { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.bs-game {
+  display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 10px;
+  border: 2px solid var(--game); border-radius: 999px; background: var(--card);
+}
+.bs-game__icon { width: 18px; height: 18px; color: var(--game); flex: none; }
+.bs-game__name { font-weight: 700; }
+.bs-game__count { font-size: 13px; color: var(--ink-soft); }
+
+.bs-rooms { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.bs-room {
+  display: flex; flex-direction: column; gap: 12px; padding: 14px 16px;
+  background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--game);
+  border-radius: 12px;
+}
+.bs-room__game { display: flex; align-items: center; gap: 12px; }
+.bs-room__game > div { flex: 1; min-width: 0; }
+.bs-room__icon { width: 26px; height: 26px; color: var(--game); flex: none; }
+.bs-room__name { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 800; line-height: 1.2; }
+.bs-room__meta { margin: 2px 0 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--ink-soft); }
+.bs-room__seats { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+.bs-room__away { margin: 0; font-size: 13px; color: var(--warn); }
+.bs-phase { font-weight: 600; }
+.bs-phase.is-live { color: var(--game); }
+
+.bs-players { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.bs-player {
+  display: flex; align-items: center; gap: 7px; padding: 3px 10px 3px 3px;
+  border-radius: 999px; background: var(--paper); font-size: 13px;
+}
+.bs-player__name { font-weight: 600; }
+.bs-player__score { color: var(--ink-soft); }
+.bs-player__away { color: var(--ink-soft); font-style: italic; }
+.bs-player.is-away .avatar { opacity: .4; }
+.bs-player.is-away .bs-player__name { color: var(--ink-soft); }
+
+@media (max-width: 560px) {
+  .backstage { padding-top: 16px; }
+  .backstage__title { font-size: 28px; }
+}
