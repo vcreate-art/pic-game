@@ -56,6 +56,16 @@ function useKeyboardInset(active: boolean): CSSProperties | undefined {
   return inset;
 }
 
+/** Where the pointer crossed a cover's edge, so the ink spreads from the
+ *  point it came in and drains toward the point it left. Sliding from one
+ *  cover to the next, it reads as one stroke passing between them. */
+function inkFrom(e: React.PointerEvent<HTMLButtonElement>) {
+  const cover = e.currentTarget.firstElementChild as HTMLElement;
+  const box = e.currentTarget.getBoundingClientRect();
+  cover.style.setProperty('--ex', `${((e.clientX - box.left) / cover.offsetWidth) * 100}%`);
+  cover.style.setProperty('--ey', `${((e.clientY - box.top) / cover.offsetHeight) * 100}%`);
+}
+
 function Landing() {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -179,9 +189,12 @@ function Landing() {
                   type="button"
                   className={`pick ${game === k ? 'is-active' : ''}`}
                   onClick={() => open(k)}
+                  onPointerEnter={inkFrom}
+                  onPointerLeave={inkFrom}
                   style={{ '--game': color } as CSSProperties}
                 >
                   <span className="pick__cover">
+                    <span className="pick__ink" aria-hidden="true" />
                     <Icon className="pick__art" strokeWidth={1.75} aria-hidden="true" />
                     <span className="pick__text">
                       <strong className="pick__name">{GAME_LABELS[k].name}</strong>

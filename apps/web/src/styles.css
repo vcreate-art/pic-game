@@ -617,7 +617,9 @@ body:has(.landing--home) { background: #f1f2f4; }
 /* Each game is a box cover: its own colour is the surface and its name is
    the art, with the icon as a watermark bleeding off the corner. Pointing
    at it (or focusing it) slides the blurb up under the name like a drawer,
-   shrinking the name to make room. */
+   shrinking the name to make room, while a darker shade of the colour
+   spreads from where the pointer came in; --ex/--ey come from inkFrom() in
+   the landing route. Focus spreads it from the centre. */
 .pick {
   display: flex; flex-direction: column; gap: 10px; padding: 0;
   border: 0; background: none; text-align: left; cursor: pointer;
@@ -626,7 +628,13 @@ body:has(.landing--home) { background: #f1f2f4; }
   position: relative; overflow: hidden; display: flex; align-items: flex-end;
   aspect-ratio: 4 / 3; padding: 14px 16px; border-radius: 12px;
   background: var(--game, var(--ink)); color: #fff;
-  transition: background-color .3s ease;
+}
+/* Under the icon and the text, over the cover's own colour. */
+.pick__ink {
+  position: absolute; inset: 0;
+  background: color-mix(in srgb, var(--game, var(--ink)) 72%, #000);
+  clip-path: circle(0% at var(--ex, 50%) var(--ey, 50%));
+  transition: clip-path .5s cubic-bezier(.3, .7, .3, 1);
 }
 .pick__art {
   position: absolute; top: -16px; right: -16px; width: 104px; height: 104px; opacity: .2;
@@ -649,14 +657,16 @@ body:has(.landing--home) { background: #f1f2f4; }
   transition: opacity .25s ease, transform .35s cubic-bezier(.3, .7, .3, 1);
 }
 .pick__blurb { padding: 0 2px; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
-.pick:focus-visible .pick__cover { background: color-mix(in srgb, var(--game, var(--ink)) 80%, #000); }
+/* 150% of the circle's reference length reaches the far corner from any
+   point on the edge. */
+.pick:focus-visible .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
 .pick:focus-visible .pick__name { font-size: 16px; margin-bottom: 6px; }
 .pick:focus-visible .pick__more { grid-template-rows: 1fr; }
 .pick:focus-visible .pick__more > span { opacity: 1; transform: none; }
 /* Only with a real pointer: on touch, :hover sticks to the last tapped card.
    There the blurb stays under the cover. */
 @media (hover: hover) {
-  .pick:hover .pick__cover { background: color-mix(in srgb, var(--game, var(--ink)) 80%, #000); }
+  .pick:hover .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
   .pick:hover .pick__name { font-size: 16px; margin-bottom: 6px; }
   .pick:hover .pick__more { grid-template-rows: 1fr; }
   .pick:hover .pick__more > span { opacity: 1; transform: none; }
@@ -664,7 +674,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   .picker { row-gap: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pick__cover, .pick__name, .pick__more, .pick__more > span { transition: none; }
+  .pick__ink, .pick__name, .pick__more, .pick__more > span { transition: none; }
 }
 .pick:active .pick__cover { transform: translateY(1px); }
 /* Focus and "this one's sheet is open" share one ring in the game's colour,
