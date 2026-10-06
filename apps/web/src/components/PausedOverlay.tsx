@@ -16,7 +16,8 @@ function elapsed(ms: number): string {
  * tonight is going while everyone waits. The header stays usable above it.
  */
 export function PausedOverlay() {
-  const paused = useGame((s) => s.room?.meta.paused ?? null);
+  // The countdown has the screen to itself while it runs.
+  const paused = useGame((s) => (s.room?.meta.countdown ? null : s.room?.meta.paused ?? null));
   const meta = useGame((s) => s.room?.meta);
   const kind = useGame((s) => s.room?.kind);
   const players = useGame((s) => s.room?.players);

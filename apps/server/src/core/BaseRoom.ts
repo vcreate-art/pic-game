@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { Server } from 'socket.io';
 import type {
-  Avatar, ChatMessage, ClientToServerEvents, GameKind, Player, RoomMeta, RoomPause, RoomState,
+  Avatar, ChatMessage, ClientToServerEvents, GameKind, Player, RoomCountdown, RoomMeta, RoomPause, RoomState,
   RoomStage, RoomStateBase, ServerToClientEvents,
 } from '@pic-game/shared';
-import { EMPTY_ROOM_TTL_MS, PAUSE_HOST_AWAY_MS, RECONNECT_GRACE_MS } from '../config.js';
+import { EMPTY_ROOM_TTL_MS, GAME_COUNTDOWN_MS, PAUSE_HOST_AWAY_MS, RECONNECT_GRACE_MS } from '../config.js';
 import { RoomSession } from './RoomSession.js';
 
 export type IO = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -45,6 +45,12 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   private roomPause: RoomPause | null = null;
   /** Resumes a paused game whose host has dropped out. */
   private pauseAwayTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The 3-2-1 under way, if any. A countdown holds the game the same way a
+   *  pause does, so every game that can pause gets one for free. */
+  private countdown: RoomCountdown | null = null;
+  private countdownTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The stage as last broadcast, to notice a game going into play. */
+  private lastStage: RoomStage = 'lobby';
 
   /** Wins, kicks and history that outlive this game. Handed on when the
    *  room switches to a different game. */
@@ -288,6 +294,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
       games: this.session.games,
       stage: this.lifecycle(),
       paused: this.roomPause,
+      countdown: this.countdown,
       can: {
         pause: this.canPause(),
         restart: this.lifecycle() !== 'lobby',
@@ -315,19 +322,44 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     this.emitMeta();
   }
 
-  /** Host only: carries on from exactly where the game stopped. */
+  /** Host only: counts everyone back in, then carries on from exactly where
+   *  the game stopped. */
   resumeGame(by: string): void {
-    if (by !== this.hostId || !this.roomPause) return;
-    this.resumeNow('Back to the game.');
+    if (by !== this.hostId || !this.roomPause || this.countdown) return;
+    this.countIn('resume');
+    this.emitMeta();
   }
 
-  private resumeNow(message: string): void {
+  /** Holds the game for the 3-2-1, then lets it run. A start holds a game
+   *  that has just been set up; a resume holds one that's already paused. */
+  private countIn(kind: RoomCountdown['kind']): void {
+    if (!this.roomPause) {
+      this.roomPause = { by: this.hostId, at: Date.now() };
+      this.onPause();
+    }
+    this.countdown = { kind, until: Date.now() + GAME_COUNTDOWN_MS };
+    this.clearCountdown();
+    this.countdownTimer = setTimeout(() => {
+      this.countdownTimer = null;
+      this.countdown = null;
+      this.resumeNow(kind === 'resume' ? 'Back to the game.' : null);
+    }, GAME_COUNTDOWN_MS);
+  }
+
+  private clearCountdown(): void {
+    if (this.countdownTimer) clearTimeout(this.countdownTimer);
+    this.countdownTimer = null;
+  }
+
+  private resumeNow(message: string | null): void {
     const paused = this.roomPause;
     if (!paused) return;
     this.roomPause = null;
+    this.countdown = null;
+    this.clearCountdown();
     this.clearPauseAway();
     this.onResume(Date.now() - paused.at);
-    this.systemMessage(message);
+    if (message) this.systemMessage(message);
     this.emitMeta();
   }
 
@@ -335,6 +367,8 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
    *  is over or being thrown away. */
   private dropPause(): void {
     this.roomPause = null;
+    this.countdown = null;
+    this.clearCountdown();
     this.clearPauseAway();
   }
 
@@ -407,6 +441,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   broadcastSnapshot(): void {
     const state = this.publicState();
     this.sentMeta = JSON.stringify(state.meta);
+    this.lastStage = state.meta.stage;
     this.io.to(this.code).emit('state:sync', state);
   }
 
@@ -414,8 +449,14 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
    *  or ending changes what the host can do. Each game calls this whenever it
    *  broadcasts its own state. */
   protected syncMeta(): void {
+    const stage = this.lifecycle();
     // A game can still end while paused, when a player it needs leaves.
-    if (this.roomPause && this.lifecycle() !== 'playing') this.dropPause();
+    if (this.roomPause && stage !== 'playing') this.dropPause();
+    // Every way into play, start or rematch or restart, gets the 3-2-1.
+    if (stage === 'playing' && this.lastStage !== 'playing' && this.pausable && !this.roomPause) {
+      this.countIn('start');
+    }
+    this.lastStage = stage;
     if (JSON.stringify(this.meta()) !== this.sentMeta) this.emitMeta();
   }
 

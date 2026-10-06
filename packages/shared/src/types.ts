@@ -253,12 +253,21 @@ export interface RoomPause {
   at: number;
 }
 
+/** The big count before a game starts, or before a paused one carries on. */
+export interface RoomCountdown {
+  kind: 'start' | 'resume';
+  /** Server epoch ms when play begins. */
+  until: number;
+}
+
 /** Room-level facts that outlive any one game: the session's wins, and what
  *  the host can do right now, so the UI doesn't repeat the server's rules. */
 export interface RoomMeta {
   stage: RoomStage;
-  /** Set while the host has the game paused. */
+  /** Set while the host has the game paused, and during a countdown. */
   paused: RoomPause | null;
+  /** Set while counting down to play: the game holds still until then. */
+  countdown: RoomCountdown | null;
   /** Wins this session, by player id. Survives switching games. */
   wins: Record<string, number>;
   /** Games finished this session, including ones nobody won. */

@@ -60,6 +60,8 @@ export const EMPTY_ROOM_TTL_MS = envMs('EMPTY_ROOM_TTL_MS', 120_000);
 /** A paused game carries on by itself once its host has been away this long,
  *  so a host who drops out can't leave everyone else stuck. */
 export const PAUSE_HOST_AWAY_MS = envMs('PAUSE_HOST_AWAY_MS', 60_000);
+/** The 3-2-1 before a game starts and before a paused one carries on. */
+export const GAME_COUNTDOWN_MS = envMs('GAME_COUNTDOWN_MS', 3_000);
 export const TOURNEY_KEEP_MS = envMs('TOURNEY_KEEP_MS', 8 * 60 * 60_000);
 
 export const MAX_NAME_LEN = 20;

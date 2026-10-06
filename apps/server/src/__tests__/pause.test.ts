@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CHOOSE_SECONDS, DEFAULT_SETTINGS, FIGHTERS, type FighterId, type GameKind } from '@pic-game/shared';
-import { FIGHT_FORFEIT_MS, PAUSE_HOST_AWAY_MS } from '../config.js';
+import { FIGHT_FORFEIT_MS, GAME_COUNTDOWN_MS, PAUSE_HOST_AWAY_MS } from '../config.js';
 import { RoomManager } from '../core/RoomManager.js';
 import type { BingoRoom } from '../games/bingo/BingoRoom.js';
 import type { SpiesRoom } from '../games/spies/SpiesRoom.js';
@@ -12,13 +12,22 @@ import { fakeIO } from './fakeIO.js';
 
 const av = { color: 0, face: 0 };
 
+/** A game under way, past its 3-2-1. Uses fake timers. */
 function playing(kind: GameKind, n = 3) {
+  vi.useFakeTimers();
   const { io, sent } = fakeIO();
   const rooms = new RoomManager(io);
   const room = rooms.create(kind);
   const seats = Array.from({ length: n }, (_, i) => room.addPlayer(`P${i}`, av, `sock${i}`));
   room.startGame(seats[0]!.id);
+  vi.advanceTimersByTime(GAME_COUNTDOWN_MS);
   return { rooms, room, seats, sent, host: seats[0]!.id };
+}
+
+/** Resumes, and lets the 3-2-1 run out. */
+function resume(room: { resumeGame(by: string): void }, by: string) {
+  room.resumeGame(by);
+  vi.advanceTimersByTime(GAME_COUNTDOWN_MS);
 }
 
 afterEach(() => {
@@ -33,7 +42,7 @@ describe('pausing a turn-based game', () => {
     room.pauseGame(host);
     expect(room.isPaused).toBe(true);
     expect(room.meta().paused).toMatchObject({ by: host });
-    room.resumeGame(host);
+    resume(room, host);
     expect(room.isPaused).toBe(false);
     expect(room.meta().paused).toBeNull();
   });
@@ -43,7 +52,7 @@ describe('pausing a turn-based game', () => {
     room.pauseGame(seats[1]!.id);
     expect(room.isPaused).toBe(false);
     room.pauseGame(host);
-    room.resumeGame(seats[1]!.id);
+    resume(room, seats[1]!.id);
     expect(room.isPaused).toBe(true);
   });
 
@@ -87,10 +96,12 @@ describe('pausing a turn-based game', () => {
     expect(room.isPaused).toBe(true);
   });
 
-  it('is dropped by a restart', () => {
+  it('is dropped by a restart, which counts in afresh', () => {
     const { room, host } = playing('flip7');
     room.pauseGame(host);
     room.restart(host);
+    expect(room.meta().countdown?.kind).toBe('start');
+    vi.advanceTimersByTime(GAME_COUNTDOWN_MS);
     expect(room.isPaused).toBe(false);
     expect(room.lifecycle()).toBe('playing');
   });
@@ -146,7 +157,7 @@ describe('pausing Draw & Guess', () => {
     vi.advanceTimersByTime(10_000);
     room.pauseGame(host);
     vi.advanceTimersByTime(60_000);
-    room.resumeGame(host);
+    resume(room, host);
     const clock = sent.filter((m) => m.event === 'turn:clock').at(-1)?.args[0] as { endsAt: number };
     expect(Math.abs(clock.endsAt - Date.now() - (drawMs - 10_000))).toBeLessThan(200);
     vi.advanceTimersByTime(drawMs - 10_000 - 1000);
@@ -161,7 +172,7 @@ describe('pausing Draw & Guess', () => {
     room.handleChat(guesser.id, word);
     expect(sent.some((m) => m.event === 'guess:correct')).toBe(false);
     expect(sent.some((m) => m.event === 'chat:message' && JSON.stringify(m.args).includes(word))).toBe(false);
-    room.resumeGame(host);
+    resume(room, host);
     room.handleChat(guesser.id, word);
     expect(sent.some((m) => m.event === 'guess:correct')).toBe(true);
   });
@@ -184,6 +195,7 @@ describe('pausing Bingo', () => {
     room.addPlayer('B', av, 's2');
     room.updateSettings(a.id, { mode: 'caller', callSeconds: 5 });
     room.startGame(a.id);
+    vi.advanceTimersByTime(GAME_COUNTDOWN_MS);
     const called = () => room.gamePublic().called?.length ?? 0;
     return { room, host: a.id, sent, called };
   }
@@ -195,7 +207,7 @@ describe('pausing Bingo', () => {
     const before = called();
     vi.advanceTimersByTime(60_000);
     expect(called()).toBe(before);
-    room.resumeGame(host);
+    resume(room, host);
     vi.advanceTimersByTime(2900);
     expect(called()).toBe(before);
     vi.advanceTimersByTime(200);
@@ -223,13 +235,14 @@ describe('pausing Word Spies', () => {
     room.join(ids[2]!, 'blue', 'spymaster');
     room.join(ids[3]!, 'blue', 'operative');
     room.startGame(ids[0]!);
+    vi.advanceTimersByTime(GAME_COUNTDOWN_MS);
     const turn = () => room.gamePublic().turn;
     const first = turn();
     vi.advanceTimersByTime(10_000);
     room.pauseGame(ids[0]!);
     vi.advanceTimersByTime(5 * 60_000);
     expect(turn()).toBe(first);
-    room.resumeGame(ids[0]!);
+    resume(room, ids[0]!);
     vi.advanceTimersByTime(19_000);
     expect(turn()).toBe(first);
     vi.advanceTimersByTime(2000);
@@ -247,7 +260,7 @@ describe('pausing the real-time games', () => {
     room.pauseGame(host);
     vi.advanceTimersByTime(30 * 60_000);
     expect(room.lifecycle()).toBe('playing');
-    room.resumeGame(host);
+    resume(room, host);
     expect(maze.gamePublic().endsAt - endsAt).toBeGreaterThanOrEqual(30 * 60_000);
     room.destroy();
   });
@@ -261,6 +274,7 @@ describe('pausing the real-time games', () => {
     room.takeSeat(a.id, 'w');
     room.takeSeat(b.id, 'b');
     room.startGame(a.id);
+    vi.advanceTimersByTime(GAME_COUNTDOWN_MS);
     const pawn = room.gamePublic().pieces.find((p) => p.side === 'w' && p.type === 'p')!;
     const readyOf = () => room.gamePublic().pieces.find((p) => p.id === pawn.id)!.readyAt;
     // Any legal move will do: try squares until the pawn starts cooling down.
@@ -269,8 +283,9 @@ describe('pausing the real-time games', () => {
     expect(ready).toBeGreaterThan(Date.now());
     room.pauseGame(a.id);
     vi.advanceTimersByTime(60_000);
-    room.resumeGame(a.id);
-    expect(room.gamePublic().pieces.find((p) => p.id === pawn.id)!.readyAt).toBe(ready + 60_000);
+    resume(room, a.id);
+    // The count back in is part of the pause too.
+    expect(room.gamePublic().pieces.find((p) => p.id === pawn.id)!.readyAt).toBe(ready + 60_000 + GAME_COUNTDOWN_MS);
   });
 
   it('Stick Kombat holds a drop-out’s forfeit countdown while paused', () => {
@@ -285,14 +300,49 @@ describe('pausing the real-time games', () => {
     room.pick(a.id, f1!);
     room.pick(b.id, f2!);
     room.startGame(a.id);
+    vi.advanceTimersByTime(GAME_COUNTDOWN_MS);
     expect(room.lifecycle()).toBe('playing');
     room.markDisconnected(b.id); // B's countdown to a forfeit starts
     room.pauseGame(a.id);
     vi.advanceTimersByTime(FIGHT_FORFEIT_MS * 3);
     expect(room.lifecycle()).toBe('playing');
-    room.resumeGame(a.id);
+    resume(room, a.id);
     vi.advanceTimersByTime(FIGHT_FORFEIT_MS + 100);
     expect(room.lifecycle()).toBe('ended');
+    room.destroy();
+  });
+});
+
+describe('the 3-2-1', () => {
+  it('holds a new game still until it runs out', () => {
+    vi.useFakeTimers();
+    const { io, sent } = fakeIO();
+    const room = new RoomManager(io).create('flip7');
+    const a = room.addPlayer('A', av, 's1');
+    room.addPlayer('B', av, 's2');
+    room.startGame(a.id);
+    expect(room.lifecycle()).toBe('playing');
+    expect(room.meta().countdown?.kind).toBe('start');
+    expect(room.isPaused).toBe(true);
+    vi.advanceTimersByTime(GAME_COUNTDOWN_MS);
+    expect(room.meta().countdown).toBeNull();
+    expect(room.isPaused).toBe(false);
+    expect(sent.some((m) => m.event === 'room:meta' && (m.args[0] as { countdown: unknown }).countdown)).toBe(true);
+  });
+
+  it('counts back in on resume', () => {
+    const { room, host } = playing('flip7');
+    room.pauseGame(host);
+    room.resumeGame(host);
+    expect(room.meta().countdown?.kind).toBe('resume');
+    expect(room.isPaused).toBe(true);
+    vi.advanceTimersByTime(GAME_COUNTDOWN_MS);
+    expect(room.isPaused).toBe(false);
+  });
+
+  it('leaves Meat Race to its own countdown', () => {
+    const { room } = playing('race', 2);
+    expect(room.meta().countdown).toBeNull();
     room.destroy();
   });
 });

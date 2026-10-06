@@ -1,5 +1,6 @@
 import { Outlet, createRootRoute } from '@tanstack/react-router';
 import { ProfileChip } from '../components/ProfileChip.js';
+import { CountdownOverlay } from '../components/CountdownOverlay.js';
 import { PausedOverlay } from '../components/PausedOverlay.js';
 import { RoomPanel } from '../components/RoomPanel.js';
 import { SwitchGame } from '../components/SwitchGame.js';
@@ -35,6 +36,7 @@ function RootLayout() {
         <Outlet />
       </main>
       {inRoom && <PausedOverlay />}
+      {inRoom && <CountdownOverlay />}
       {notice && <div className="notice">{notice}</div>}
     </div>
   );
