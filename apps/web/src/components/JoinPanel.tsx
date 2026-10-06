@@ -9,44 +9,64 @@ export interface Identity {
   avatar: { color: number; face: number };
 }
 
-/** Name + avatar picker, shared by the landing page and the direct-invite flow. */
+/** The saved profile, or a blank name with a random avatar. */
+export function initialIdentity(): Identity {
+  const saved = loadProfile();
+  return {
+    name: saved?.name ?? '',
+    avatar: {
+      color: saved?.avatar.color ?? Math.floor(Math.random() * AVATAR_COLORS.length),
+      face: saved?.avatar.face ?? Math.floor(Math.random() * AVATAR_FACES.length),
+    },
+  };
+}
+
+/** Name + avatar picker, shared by the landing page and the direct-invite flow.
+ *  Pass `draft` and `onDraft` to hold the name and avatar outside, so two
+ *  panels on one page stay in step; otherwise it keeps its own. */
 export function JoinPanel({
   submitLabel,
   busy,
   error,
   onSubmit,
+  draft,
+  onDraft,
   children,
 }: {
   submitLabel: string;
   busy?: boolean;
   error?: string | null;
   onSubmit: (id: Identity) => void;
+  draft?: Identity;
+  onDraft?: (id: Identity) => void;
   children?: React.ReactNode;
 }) {
-  const saved = loadProfile();
-  const [name, setName] = useState(saved?.name ?? '');
-  const [color, setColor] = useState(saved?.avatar.color ?? Math.floor(Math.random() * AVATAR_COLORS.length));
-  const [face, setFace] = useState(saved?.avatar.face ?? Math.floor(Math.random() * AVATAR_FACES.length));
+  const [own, setOwn] = useState(initialIdentity);
+  const id = draft ?? own;
+  const set = onDraft ?? setOwn;
+  const { name } = id;
+  const { color, face } = id.avatar;
+  const setName = (n: string) => set({ ...id, name: n });
+  const setColor = (c: number) => set({ ...id, avatar: { color: c, face } });
+  const setFace = (f: number) => set({ ...id, avatar: { color, face: f } });
 
   // Edited from the header while this form is open: take the new values.
   useEffect(() => {
     const on = (e: Event) => {
       const p = (e as CustomEvent<Profile>).detail;
-      setName(p.name);
-      setColor(p.avatar.color);
-      setFace(p.avatar.face);
+      set({ name: p.name, avatar: { color: p.avatar.color, face: p.avatar.face } });
     };
     window.addEventListener(PROFILE_EVENT, on);
     return () => window.removeEventListener(PROFILE_EVENT, on);
-  }, []);
+  }, [set]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const n = name.trim();
     if (!n) return;
-    const id: Identity = { name: n, avatar: { color, face } };
-    saveProfile(id);
-    onSubmit(id);
+    const out: Identity = { name: n, avatar: { color, face } };
+    saveProfile(out);
+    onSubmit(out);
   };
 
   return (
@@ -54,11 +74,11 @@ export function JoinPanel({
       <div className="join__avatar">
         <Avatar data={{ color, face }} size={76} />
         <div className="join__cycle">
-          <button type="button" onClick={() => setColor((c) => (c + 1) % AVATAR_COLORS.length)}>
-            Colour
+          <button type="button" onClick={() => setColor((color + 1) % AVATAR_COLORS.length)}>
+            Next colour
           </button>
-          <button type="button" onClick={() => setFace((f) => (f + 1) % AVATAR_FACES.length)}>
-            Face
+          <button type="button" onClick={() => setFace((face + 1) % AVATAR_FACES.length)}>
+            Next face
           </button>
         </div>
       </div>
