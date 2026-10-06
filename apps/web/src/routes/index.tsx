@@ -135,8 +135,14 @@ function Landing() {
     <div className="landing landing--home">
 
       <div className="landing__cols">
-        <section className="landing__section landing__join">
-          <h2 className="landing__heading">Got a code?</h2>
+        {/* Its own row, so the join card's top edge lines up with the first
+            row of covers rather than with this heading. */}
+        <div className="landing__intro">
+          <h1 className="landing__title">Pick a game</h1>
+          <p className="landing__sub">Start a room, then send friends the code.</p>
+        </div>
+
+        <section className="landing__section landing__join" aria-label="Join a room">
           <div className="card landing__card">
             <JoinPanel
               submitLabel="Join room"
@@ -148,36 +154,22 @@ function Landing() {
             >
               <label className="field">
                 <span className="field__label">Room code</span>
-                {/* One real input does the typing, pasting and reading aloud;
-                    the six cells over it are only how it looks. */}
-                <span className="code">
-                  <input
-                    className="code__input"
-                    value={code}
-                    maxLength={6}
-                    autoComplete="off"
-                    autoCapitalize="characters"
-                    spellCheck={false}
-                    onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-                  />
-                  <span className="code__cells" aria-hidden="true">
-                    {Array.from({ length: 6 }, (_, i) => (
-                      <span key={i} className={`code__cell ${i === Math.min(code.length, 5) ? 'is-next' : ''}`}>
-                        {code[i]}
-                      </span>
-                    ))}
-                  </span>
-                </span>
+                <input
+                  className="field__input field__input--code"
+                  value={code}
+                  maxLength={6}
+                  placeholder="ABC123"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                />
               </label>
             </JoinPanel>
           </div>
         </section>
 
         <section className="landing__section landing__start">
-          <div className="landing__intro">
-            <h1 className="landing__title">Pick a game</h1>
-            <p className="landing__sub">Start a room, then send friends the code.</p>
-          </div>
           <div className="picker">
             {PLAYABLE_KINDS.map((k) => {
               const { icon: Icon, color } = GAME_ICONS[k];
