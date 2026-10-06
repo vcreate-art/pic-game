@@ -628,7 +628,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 .pick__cover {
   position: relative; overflow: hidden; display: flex; align-items: flex-end;
   aspect-ratio: 4 / 3; padding: 14px 16px; border-radius: 12px;
-  border: 2px solid var(--game, var(--ink));
+  border: 3px solid var(--game, var(--ink));
   background: var(--paper); color: var(--ink);
   transition: color .3s ease;
 }
@@ -641,7 +641,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 }
 .pick__art {
   position: absolute; top: -16px; right: -16px; width: 104px; height: 104px;
-  color: var(--game, var(--ink));
+  color: var(--game, var(--ink)); opacity: .6;
 }
 .pick__text { position: relative; display: flex; flex-direction: column; }
 .pick__name {
