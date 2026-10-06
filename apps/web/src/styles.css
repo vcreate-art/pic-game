@@ -45,6 +45,10 @@ button, input { font: inherit; color: inherit; }
    wordmark; mirrored it leans into it. */
 .is-flipped { display: inline-block; transform: scaleX(-1); }
 .brand__name { font-family: var(--display); font-weight: 800; font-size: 20px; letter-spacing: -.01em; }
+/* A narrow header keeps the dice and gives the room its space. */
+@media (max-width: 430px) {
+  .brand__name { display: none; }
+}
 
 .topbar__right { display: flex; align-items: center; gap: 12px; }
 
@@ -64,25 +68,6 @@ button, input { font: inherit; color: inherit; }
 .profile__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .profile__note { margin: 0; font-size: 12px; color: var(--ink-soft); }
 
-.people { position: relative; }
-.people__chip {
-  display: flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--line);
-  border-radius: 999px; background: var(--card); font-weight: 700; font-size: 13.5px; cursor: pointer;
-  font-variant-numeric: tabular-nums;
-}
-.people__chip:hover, .people__chip[aria-expanded="true"] { border-color: var(--accent); }
-.people__pop {
-  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 280px;
-  display: flex; flex-direction: column; gap: 10px;
-}
-.people__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow-y: auto; }
-.people__list li { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 9px; font-size: 13.5px; font-weight: 600; }
-.people__list li:hover { background: var(--paper); }
-.people__list li.is-away { opacity: .55; }
-.people__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.people__name em { font-weight: 500; color: var(--ink-soft); }
-.people__tag { font-size: 11px; color: var(--ink-soft); }
-
 .conn { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
 .conn.is-on { color: var(--ok); background: #dcfce7; }
 .conn.is-off { color: var(--warn); background: #fee2e2; }
@@ -92,7 +77,7 @@ button, input { font: inherit; color: inherit; }
 .notice {
   position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
   background: var(--ink); color: #fff; padding: 10px 18px;
-  border-radius: 999px; font-weight: 500; box-shadow: var(--shadow); z-index: 50;
+  border-radius: 999px; font-weight: 500; box-shadow: var(--shadow); z-index: 70;
 }
 
 /* ---------------------------------------------------------------- cards */
@@ -2398,51 +2383,6 @@ body:has(.landing--home) { background: #f1f2f4; }
   .backstage__title { font-size: 28px; }
 }
 
-/* ---------------------------------------------------------------- room menu */
-
-/* The header's room controls. The chip names the game being played, in its
-   colour, so it doubles as "you are here". */
-.roommenu { position: relative; }
-.roommenu__chip {
-  display: flex; align-items: center; gap: 6px; padding: 5px 10px 5px 10px;
-  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
-  font-weight: 700; font-size: 13.5px; cursor: pointer;
-}
-.roommenu__chip:hover, .roommenu__chip[aria-expanded="true"] { border-color: var(--game); }
-.roommenu__icon { width: 16px; height: 16px; color: var(--game); flex: none; }
-.roommenu__caret { width: 14px; height: 14px; color: var(--ink-soft); flex: none; }
-.roommenu__pop {
-  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 300px;
-  display: flex; flex-direction: column; gap: 12px;
-}
-.roommenu__section { display: flex; flex-direction: column; gap: 8px; }
-.roommenu__section .card__title { margin: 0; }
-.roommenu__games {
-  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px;
-  max-height: 50vh; overflow-y: auto;
-}
-.roommenu__game {
-  width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 8px;
-  border: 0; border-radius: 9px; background: none; text-align: left; cursor: pointer;
-  font-size: 13.5px; font-weight: 600;
-}
-.roommenu__game:hover:not(:disabled) { background: color-mix(in srgb, var(--game) 10%, var(--card)); }
-.roommenu__game:disabled { cursor: default; }
-.roommenu__game:disabled:not(.is-current) { opacity: .45; }
-.roommenu__game.is-current { background: color-mix(in srgb, var(--game) 10%, var(--card)); }
-.roommenu__gicon { width: 18px; height: 18px; color: var(--game); flex: none; }
-.roommenu__gname { flex: 1; min-width: 0; }
-.roommenu__why { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
-.roommenu__game:focus-visible { outline: 2px solid var(--game); outline-offset: 1px; }
-
-@media (max-width: 560px) {
-  .roommenu__name { display: none; }
-  .roommenu__pop { position: fixed; left: 12px; right: 12px; top: 60px; width: auto; }
-}
-.roommenu__actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.roommenu__actions .btn { flex: 1; padding: 9px 12px; }
-.roommenu__confirm { margin: 0; font-size: 13.5px; }
-
 /* ---------------------------------------------------------------- category pill */
 
 .catpill {
@@ -2453,21 +2393,145 @@ body:has(.landing--home) { background: #f1f2f4; }
 }
 .sheet__cat { margin-right: 8px; vertical-align: 1px; }
 
+/* ---------------------------------------------------------------- room panel */
+
+/* The room's controls, from the header. It wears the current game's colour
+   (--game): the chip's icon, the panel's tile and its active control. */
+.room { position: relative; }
+.room__chip {
+  display: flex; align-items: center; gap: 7px; padding: 5px 8px 5px 11px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  font-weight: 700; font-size: 13.5px; cursor: pointer; max-width: 260px;
+}
+.room__chip:hover, .room__chip[aria-expanded="true"] { border-color: var(--game); }
+.room__chip:focus-visible { outline: 2px solid var(--game); outline-offset: 2px; }
+.room__chipicon { width: 16px; height: 16px; color: var(--game); flex: none; }
+.room__chipname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room__count {
+  display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px;
+  background: color-mix(in srgb, var(--game) 12%, var(--card)); color: var(--game);
+  font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.room__caret { width: 14px; height: 14px; color: var(--ink-soft); flex: none; }
+
+.room__scrim { display: none; }
+.room__panel {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 340px;
+  max-height: calc(100vh - 90px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 16px; padding: 16px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 18px 40px -18px rgba(31, 34, 51, .35);
+}
+
+.room__head { display: flex; align-items: center; gap: 12px; }
+.room__tile {
+  display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 11px;
+  background: var(--game); color: #fff;
+}
+.room__tile svg { width: 24px; height: 24px; }
+.room__titles { min-width: 0; }
+.room__game { margin: 0; font-family: var(--display); font-size: 20px; font-weight: 800; line-height: 1.1; }
+.room__status { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); }
+.room__status.is-paused { color: var(--game); font-weight: 600; }
+
+/* The host's three controls as one strip: icon over label, equal widths. */
+.room__controls { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.room__ctl {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 9px 4px 8px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--paper);
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.room__ctl svg { width: 18px; height: 18px; }
+.room__ctl:hover { border-color: var(--game); color: var(--game); }
+.room__ctl.is-on { background: var(--game); border-color: var(--game); color: #fff; }
+.room__ctl:focus-visible { outline: 2px solid var(--game); outline-offset: 2px; }
+.room__confirm { display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; }
+.room__confirm p { margin: 0; }
+.room__confirmrow { display: flex; gap: 8px; }
+.room__confirmrow .btn { flex: 1; padding: 9px 12px; }
+.room__go { background: var(--game); border-color: var(--game); }
+.room__go:hover:not(:disabled) { background: color-mix(in srgb, var(--game) 85%, #000); }
+
+.room__section { display: flex; flex-direction: column; gap: 8px; }
+.room__h {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0;
+  font-family: var(--display); font-size: 17px; font-weight: 800;
+}
+.room__hnote { font-family: var(--ui); font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+.room__people { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.room__people li { display: flex; align-items: center; gap: 9px; padding: 5px 4px; border-radius: 9px; }
+.room__people li.is-away { opacity: .55; }
+.room__name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 14px; font-weight: 600;
+}
+.room__name em { font-style: normal; font-weight: 500; color: var(--ink-soft); }
+.room__away { margin-left: 6px; font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+.room__wins { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.room__toggle {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: none; cursor: pointer;
+  font-family: var(--display); font-size: 15px; font-weight: 800;
+}
+.room__toggle:hover { border-color: var(--ink-soft); }
+.room__togglecaret { width: 16px; height: 16px; transition: transform .15s ease; }
+.room__toggle[aria-expanded="true"] .room__togglecaret { transform: rotate(180deg); }
+.room__games { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.room__pick {
+  width: 100%; display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 8px;
+  padding: 8px 9px; border: 1px solid var(--line); border-radius: 10px; background: var(--card);
+  text-align: left; cursor: pointer;
+}
+.room__pick:hover:not(:disabled) { border-color: var(--game); background: color-mix(in srgb, var(--game) 7%, var(--card)); }
+.room__pick:disabled { cursor: default; opacity: .45; }
+.room__pick:focus-visible { outline: 2px solid var(--game); outline-offset: 1px; }
+.room__pickicon { grid-row: span 2; width: 20px; height: 20px; color: var(--game); }
+.room__pickname { font-size: 13px; font-weight: 700; line-height: 1.2; }
+.room__pickmeta { font-size: 11.5px; color: var(--ink-soft); line-height: 1.3; }
+.room__note { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.room__leave {
+  align-self: flex-start; padding: 2px 0; border: 0; background: none; cursor: pointer;
+  font-size: 13.5px; font-weight: 600; color: var(--warn);
+}
+.room__leave:hover { text-decoration: underline; }
+
+/* On a phone the panel is a sheet up from the bottom, over a scrim. */
+@media (max-width: 560px) {
+  .room__chip { max-width: 170px; }
+  .room__scrim { display: block; position: fixed; inset: 0; z-index: 59; background: rgba(31, 34, 51, .4); }
+  .room__panel {
+    position: fixed; left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 85vh;
+    border-radius: 20px 20px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    animation: sheet-rise .24s cubic-bezier(.2, .9, .3, 1);
+  }
+}
+
 /* ---------------------------------------------------------------- paused */
 
-/* Over the game, under the header: the room menu stays reachable. */
+/* Over the game, under the header, so the room panel stays reachable. The
+   game shows through, tinted in its own colour. */
 .topbar { position: relative; z-index: 65; }
 .paused {
   position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; padding: 20px;
-  background: color-mix(in srgb, var(--paper) 78%, transparent); backdrop-filter: blur(4px);
+  background: color-mix(in srgb, color-mix(in srgb, var(--game) 16%, var(--paper)) 84%, transparent);
+  backdrop-filter: blur(5px);
   animation: sheet-fade .18s ease;
 }
-.paused__card {
-  width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px;
-  text-align: center; padding: 24px;
+.paused__inner { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.paused__word {
+  margin: 0; font-family: var(--display); font-weight: 800; line-height: .9;
+  font-size: clamp(64px, 14vw, 128px); letter-spacing: -.03em; color: var(--game);
 }
-.paused__title { margin: 0; font-family: var(--display); font-size: 32px; font-weight: 800; line-height: 1.05; }
-.paused__text { margin: 0; color: var(--ink-soft); }
+.paused__line { margin: 0; font-size: 16px; }
+.paused__time { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.paused__wait { margin: 0; font-size: 15px; color: var(--ink-soft); }
+.paused__resume {
+  margin-top: 8px; padding: 13px 34px; border: 0; border-radius: 12px; cursor: pointer;
+  background: var(--game); color: #fff; font-size: 16px; font-weight: 700;
+}
+.paused__resume:hover { background: color-mix(in srgb, var(--game) 85%, #000); }
+.paused__resume:focus-visible { outline: 3px solid var(--game); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
-  .paused { animation: none; }
+  .paused, .room__panel { animation: none; }
 }
