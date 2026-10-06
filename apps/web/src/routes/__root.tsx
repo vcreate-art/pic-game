@@ -1,8 +1,10 @@
 import { Outlet, createRootRoute } from '@tanstack/react-router';
+import { Bug } from 'lucide-react';
 import { ProfileChip } from '../components/ProfileChip.js';
 import { CountdownOverlay } from '../components/CountdownOverlay.js';
 import { PausedOverlay } from '../components/PausedOverlay.js';
 import { RoomPanel } from '../components/RoomPanel.js';
+import { isPostHogEnabled } from '../lib/posthog.js';
 import { useGame } from '../store/game.js';
 
 function RootLayout() {
@@ -27,6 +29,14 @@ function RootLayout() {
         <div className="topbar__right">
           {/* Only worth a word when something is wrong. */}
           {inRoom && !connected && <span className="conn is-off">Reconnecting…</span>}
+          {/* PostHog opens the bug-report survey on a click here, matched by
+              this id in the survey's settings. Without PostHog, nothing would. */}
+          {isPostHogEnabled && (
+            <button type="button" id="report-bug" className="bugbtn" title="Report a bug">
+              <Bug aria-hidden="true" />
+              <span className="bugbtn__label">Report a bug</span>
+            </button>
+          )}
           <ProfileChip />
         </div>
       </header>

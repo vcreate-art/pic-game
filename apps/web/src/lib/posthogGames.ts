@@ -80,3 +80,25 @@ if (isPostHogEnabled) {
   });
   window.addEventListener('pagehide', () => endLobby('closed_page', true));
 }
+
+/** The room each event happens in, kept on every event so a bug report says
+ *  which game and stage the player was in. Updated only when it changes,
+ *  since the store changes many times a second during play. */
+let roomKey = '';
+if (isPostHogEnabled) {
+  useGame.subscribe((s) => {
+    const room = s.room;
+    const key = room ? `${room.kind}|${room.meta.stage}|${room.players.length}` : '';
+    if (key === roomKey) return;
+    roomKey = key;
+    if (room) {
+      posthog.register({
+        room_game_kind: room.kind,
+        room_stage: room.meta.stage,
+        room_player_count: room.players.length,
+      });
+    } else {
+      ['room_game_kind', 'room_stage', 'room_player_count'].forEach((p) => posthog.unregister(p));
+    }
+  });
+}

@@ -4,8 +4,10 @@ const posthogKey = import.meta.env.VITE_POSTHOG_KEY;
 const posthogHost = import.meta.env.VITE_POSTHOG_HOST;
 
 // Only the live site reports: a dev server's clicks would muddy the numbers
-// and count toward the plan.
-export const isPostHogEnabled = Boolean(import.meta.env.PROD && posthogKey && posthogHost);
+// and count toward the plan. VITE_POSTHOG_DEV=true opts a dev server in, for
+// trying out tracking or a survey before it ships.
+const reports = import.meta.env.PROD || import.meta.env.VITE_POSTHOG_DEV === 'true';
+export const isPostHogEnabled = Boolean(reports && posthogKey && posthogHost);
 
 if (isPostHogEnabled) {
   posthog.init(posthogKey, {
