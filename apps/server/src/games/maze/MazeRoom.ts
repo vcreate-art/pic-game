@@ -293,6 +293,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
 
   broadcast(): void {
     this.io.to(this.code).emit('maze:state', this.gamePublic());
+    this.syncMeta();
   }
 
   handleChat(playerId: string, raw: string): void {

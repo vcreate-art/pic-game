@@ -352,6 +352,7 @@ export class FightRoom extends BaseRoom<CorePlayer> {
 
   broadcast(): void {
     this.io.to(this.code).emit('fight:state', this.gamePublic());
+    this.syncMeta();
   }
 
   handleChat(playerId: string, raw: string): void {

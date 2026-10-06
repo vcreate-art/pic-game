@@ -377,6 +377,7 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
 
   broadcast(): void {
     this.io.to(this.code).emit('spies:state', this.gamePublic());
+    this.syncMeta();
   }
 
   handleChat(playerId: string, raw: string): void {

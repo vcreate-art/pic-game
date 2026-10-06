@@ -247,6 +247,7 @@ export class RealmsRoom extends BaseRoom<CorePlayer> {
 
   broadcast(): void {
     this.io.to(this.code).emit('realms:state', this.gamePublic());
+    this.syncMeta();
     for (const side of REALMS_SIDES) {
       const holder = this.seats[side];
       if (holder) this.sendHand(holder);

@@ -103,3 +103,12 @@ describe('RoomManager.switchKind', () => {
     expect(next.destroyed).toBe(true);
   });
 });
+
+describe('room meta', () => {
+  it('tells clients when switching stops being allowed', () => {
+    const { room, seats, sent } = table('flip7');
+    room.startGame(seats[0]!.id);
+    const last = sent.filter((m) => m.event === 'room:meta').at(-1);
+    expect(last?.args[0]).toMatchObject({ can: { switch: false } });
+  });
+});

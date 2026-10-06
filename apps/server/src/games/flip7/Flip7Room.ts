@@ -258,6 +258,7 @@ export class Flip7Room extends BaseRoom<CorePlayer> {
 
   broadcast(): void {
     this.io.to(this.code).emit('flip7:state', this.gamePublic());
+    this.syncMeta();
   }
 
   handleChat(playerId: string, raw: string): void {

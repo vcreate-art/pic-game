@@ -207,6 +207,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.turnIndex = 0;
     this.order = [...this.players.keys()];
     this.beginTurn();
+    this.syncMeta();
   }
 
   private beginTurn(): void {

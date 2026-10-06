@@ -281,10 +281,22 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     if (this.activeCount() === 0) this.scheduleEmptyCollection();
   }
 
+  /** The meta as last sent, to tell when it has changed. */
+  private sentMeta = '';
+
   /** Sends the room-level facts on their own. Most games broadcast only their
    *  own state, which doesn't carry them. */
   protected emitMeta(): void {
-    this.io.to(this.code).emit('room:meta', this.meta());
+    const meta = this.meta();
+    this.sentMeta = JSON.stringify(meta);
+    this.io.to(this.code).emit('room:meta', meta);
+  }
+
+  /** Sends the meta if it differs from what clients last had: a game starting
+   *  or ending changes what the host can do. Each game calls this whenever it
+   *  broadcasts its own state. */
+  protected syncMeta(): void {
+    if (JSON.stringify(this.meta()) !== this.sentMeta) this.emitMeta();
   }
 
   /** Every game reports its result here, from wherever it ends. Ties give each

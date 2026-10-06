@@ -282,6 +282,7 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
 
   broadcast(): void {
     this.io.to(this.code).emit('chess:state', this.gamePublic());
+    this.syncMeta();
   }
 
   broadcastState(): void {
