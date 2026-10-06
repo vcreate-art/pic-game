@@ -149,8 +149,9 @@ button, input { font: inherit; color: inherit; }
 .landing__section { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 
 /* The front page. Colour belongs to the games, so the page around them is a
-   cool neutral and the join button is plain ink; the app purple stays in the
-   rooms. Overriding the tokens here reaches the Create sheet too. */
+   cool neutral and the join button is plain ink, purple only as it inks; the
+   app purple stays in the rooms. Overriding the tokens here reaches the
+   Create sheet too. */
 .landing--home {
   --paper: #f1f2f4; --line: #e0e2e8; --ink: #1c1d26; --ink-soft: #5e6275;
   max-width: 1000px; padding-top: 36px;
@@ -172,10 +173,12 @@ body:has(.landing--home) { background: #f1f2f4; }
 .landing__intro .landing__sub { margin-top: 6px; font-size: 15px; }
 /* One class deeper than `.landing__card .btn--primary`, which comes later. */
 .landing__join .landing__card .btn--primary {
-  /* Darker ink wouldn't show on ink, so this one lightens. */
-  --btn-ink: rgba(255, 255, 255, .16);
+  /* Near black already, so darker ink wouldn't show: it inks in the app's
+     accent instead, the join card's one bit of colour, and only on hover. */
+  --btn-ink: var(--accent);
   background: var(--ink); border-color: var(--ink);
 }
+.landing__join .landing__card .btn--primary:hover:not(:disabled) { border-color: var(--accent); }
 
 .landing__heading {
   margin: 0 0 0 4px; font-family: var(--display); font-size: 21px; font-weight: 800;
