@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
-  EXPLORER_SUPPLY, REALMS_BOUNDS, REALMS_DEFAULTS, REALMS_SIDES, attack,
+  GAME_CAPACITY, EXPLORER_SUPPLY, REALMS_BOUNDS, REALMS_DEFAULTS, REALMS_SIDES, attack,
   buyCard, createGame,
   discardForced, endTurn, playCard, publicView, scrapCard, useCard,
   type AttackTarget, type RealmsPublic, type RealmsSettings, type RealmsSide,
@@ -35,7 +35,7 @@ export class RealmsRoom extends BaseRoom<CorePlayer> {
 
   get maxPlayers(): number {
     // Two seats, but onlookers are welcome.
-    return 8;
+    return GAME_CAPACITY.realms;
   }
 
   protected get minPlayers(): number {
@@ -224,10 +224,7 @@ export class RealmsRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'realms',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }

@@ -1,5 +1,5 @@
 import {
-  SPIES_BOUNDS, SPIES_DEFAULTS, SPY_TEAMS, SPY_WORDS, clueProblem, deal, giveClue,
+  GAME_CAPACITY, SPIES_BOUNDS, SPIES_DEFAULTS, SPY_TEAMS, SPY_WORDS, clueProblem, deal, giveClue,
   parseCustomWords, passTurn, remaining, reveal, validCount, type RoomState, type SpiesGame,
   type SpiesPhase, type SpiesPublic, type SpiesSettings, type SpiesTeamSeats, type SpyRole,
   type SpyTeam,
@@ -48,7 +48,7 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
   }
 
   get maxPlayers(): number {
-    return 16;
+    return GAME_CAPACITY.spies;
   }
 
   protected get minPlayers(): number {
@@ -364,10 +364,7 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'spies',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }

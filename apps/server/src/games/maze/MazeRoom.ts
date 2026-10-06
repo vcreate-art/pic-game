@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks';
 import {
-  AIM_STEPS, MAZE_DEFAULTS, MAZE_HZ, MAZE_THEMES, MAZE_KILL_LIMITS, MAZE_MAX_PLAYERS, MAZE_MIN_PLAYERS, MAZE_MINUTES,
+  GAME_CAPACITY, AIM_STEPS, MAZE_DEFAULTS, MAZE_HZ, MAZE_THEMES, MAZE_KILL_LIMITS, MAZE_MAX_PLAYERS, MAZE_MIN_PLAYERS, MAZE_MINUTES,
   createWorld, generateMaze, mazeSize, setAway, stepWorld, toMazeFrame,
   type MazeEvent, type MazeInput, type MazePhase, type MazePublic, type MazeSettings, type MazeTheme, type MazeWorld,
   type RoomState,
@@ -65,7 +65,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
   }
 
   get maxPlayers(): number {
-    return 16;
+    return GAME_CAPACITY.maze;
   }
 
   protected get minPlayers(): number {
@@ -287,10 +287,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'maze',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }

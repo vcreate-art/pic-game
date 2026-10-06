@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Server } from 'socket.io';
 import type {
-  Avatar, ChatMessage, ClientToServerEvents, GameKind, Player, RoomState,
-  ServerToClientEvents,
+  Avatar, ChatMessage, ClientToServerEvents, GameKind, Player, RoomMeta, RoomState,
+  RoomStateBase, ServerToClientEvents,
 } from '@pic-game/shared';
 import { EMPTY_ROOM_TTL_MS, RECONNECT_GRACE_MS } from '../config.js';
 
@@ -246,6 +246,22 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
 
   protected publicPlayer(p: P): Player {
     return { id: p.id, name: p.name, avatar: p.avatar, score: p.score, connected: p.connected };
+  }
+
+  /** Room-level facts every game's state carries. */
+  meta(): RoomMeta {
+    return { wins: {}, games: 0, can: { restart: false, toLobby: false, switch: false } };
+  }
+
+  /** The fields every game's `publicState()` starts from. */
+  protected baseState(): Omit<RoomStateBase, 'kind'> {
+    return {
+      code: this.code,
+      players: this.publicPlayers(),
+      hostId: this.hostId,
+      serverTime: Date.now(),
+      meta: this.meta(),
+    };
   }
 
   publicPlayers(): Player[] {

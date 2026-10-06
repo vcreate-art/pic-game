@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks';
 import {
-  BTN_ALL, FIGHTER_IDS, FIGHT_BOUNDS, FIGHT_DEFAULTS, FIGHT_SIDES, TICK_HZ, createMatch,
+  GAME_CAPACITY, BTN_ALL, FIGHTER_IDS, FIGHT_BOUNDS, FIGHT_DEFAULTS, FIGHT_SIDES, TICK_HZ, createMatch,
   otherSide, step, toFrame, type FightEnding, type FightEvent, type FightPicks,
   type FightPublic, type FightRoomPhase, type FightSeats, type FightSettings,
   type FightSide, type FighterId, type Match, type RoomState,
@@ -61,7 +61,7 @@ export class FightRoom extends BaseRoom<CorePlayer> {
 
   /** Two fighters, and room for a crowd. */
   get maxPlayers(): number {
-    return 12;
+    return GAME_CAPACITY.fight;
   }
 
   protected get minPlayers(): number {
@@ -339,10 +339,7 @@ export class FightRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'fight',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
       frame: this.match ? toFrame(this.match) : null,
     };

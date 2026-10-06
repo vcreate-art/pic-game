@@ -221,6 +221,23 @@ export interface BackstageSnapshot {
   rooms: BackstageRoom[];
 }
 
+/** Most seats each game can take. A room switching games has to fit the
+ *  new game's number; Draw & Guess's is the ceiling of its own setting. */
+export const GAME_CAPACITY: Record<GameKind, number> = {
+  skribbl: 16, kungfu: 12, realms: 8, fight: 12, race: 8, spies: 16,
+  bingo: 16, cryptid: 12, flip7: 16, maze: 16, tourney: 64,
+};
+
+/** Room-level facts that outlive any one game: the session's wins, and what
+ *  the host can do right now, so the UI doesn't repeat the server's rules. */
+export interface RoomMeta {
+  /** Wins this session, by player id. Survives switching games. */
+  wins: Record<string, number>;
+  /** Games finished this session, including ones nobody won. */
+  games: number;
+  can: { restart: boolean; toLobby: boolean; switch: boolean };
+}
+
 /** What every room reports, whichever game it is running. */
 export interface RoomStateBase {
   code: string;
@@ -229,6 +246,7 @@ export interface RoomStateBase {
   hostId: string;
   /** server epoch ms at send time, for clock-offset estimation */
   serverTime: number;
+  meta: RoomMeta;
 }
 
 export interface SkribblRoomState extends RoomStateBase {

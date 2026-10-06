@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
-  MANUAL_BONUSES, TOURNEY_BOUNDS, cancelMatch, endNow, isMain, newEntrant, newTourney, report,
+  GAME_CAPACITY, MANUAL_BONUSES, TOURNEY_BOUNDS, cancelMatch, endNow, isMain, newEntrant, newTourney, report,
   startMatch, startTourney, swapNext, validateTourney,
   type Avatar, type BonusKind, type ManualBonus, type MatchScore, type RoomState,
   type TourneyBonuses, type TourneyPublic, type TourneySettings, type TourneyState,
@@ -44,7 +44,7 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
   }
 
   get maxPlayers(): number {
-    return 64;
+    return GAME_CAPACITY.tourney;
   }
 
   /** Nothing is played in the app, so nobody leaving can stop it. */
@@ -304,10 +304,7 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'tourney',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
-  KUNGFU_BOUNDS, KUNGFU_DEFAULTS, PROMOTES_TO, SPECS, VARIANTS, cooldownFor,
+  GAME_CAPACITY, KUNGFU_BOUNDS, KUNGFU_DEFAULTS, PROMOTES_TO, SPECS, VARIANTS, cooldownFor,
   isLegalMove, isPromotion, type BoardSpec, type KungFuEnding, type KungFuPublic,
   type KungFuSeats, type KungFuSettings, type Piece, type RoomState, type Side,
   type Square, type Variant,
@@ -48,7 +48,7 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
 
   /** Two seats, but onlookers are welcome. */
   get maxPlayers(): number {
-    return 12;
+    return GAME_CAPACITY.kungfu;
   }
 
   protected get minPlayers(): number {
@@ -270,10 +270,7 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'kungfu',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }

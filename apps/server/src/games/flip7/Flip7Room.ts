@@ -1,5 +1,5 @@
 import {
-  FLIP7_DEFAULTS, FLIP7_MAX_PLAYERS, FLIP7_MIN_PLAYERS, FLIP7_TARGETS, Flip7Error, buildDeck, choose,
+  GAME_CAPACITY, FLIP7_DEFAULTS, FLIP7_MAX_PLAYERS, FLIP7_MIN_PLAYERS, FLIP7_TARGETS, Flip7Error, buildDeck, choose,
   faceKey, flip7AutoMove, flip7Depart, flip7Turn, hit, newFlip7, nextRound, pendingChoice, stay,
   type Flip7Game, type Flip7Public, type Flip7Settings, type RoomState,
 } from '@pic-game/shared';
@@ -33,7 +33,7 @@ export class Flip7Room extends BaseRoom<CorePlayer> {
   }
 
   get maxPlayers(): number {
-    return 16;
+    return GAME_CAPACITY.flip7;
   }
 
   protected get minPlayers(): number {
@@ -252,10 +252,7 @@ export class Flip7Room extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'flip7',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }

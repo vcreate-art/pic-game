@@ -1,5 +1,5 @@
 import {
-  BINGO_BOUNDS, BINGO_DEFAULTS, CELLS, advanceTurn, callNumber, claim, daub, lines,
+  GAME_CAPACITY, BINGO_BOUNDS, BINGO_DEFAULTS, CELLS, advanceTurn, callNumber, claim, daub, lines,
   newGame, randomCallerCard, randomTurnsCard, turnOf, uncalled, validTurnsCard,
   type BingoGame, type BingoPhase, type BingoPublic, type BingoSettings, type RoomState,
 } from '@pic-game/shared';
@@ -47,7 +47,7 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
   }
 
   get maxPlayers(): number {
-    return 16;
+    return GAME_CAPACITY.bingo;
   }
 
   /** A turns game needs someone to take turns with; a caller game does not. */
@@ -401,10 +401,7 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'bingo',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }

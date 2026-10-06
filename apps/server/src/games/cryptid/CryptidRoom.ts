@@ -1,5 +1,5 @@
 import {
-  CRYPTID_DEFAULTS, CRYPTID_MAX_PLAYERS, CRYPTID_MIN_PLAYERS, CryptidError, SETUP_CUBES, autoMove, clueText,
+  GAME_CAPACITY, CRYPTID_DEFAULTS, CRYPTID_MAX_PLAYERS, CRYPTID_MIN_PLAYERS, CryptidError, SETUP_CUBES, autoMove, clueText,
   cryptidTurn, depart, generatePuzzle, hexLabel, newCryptid, placeCube, question, search, setupLeft,
   type CryptidClue, type CryptidGame, type CryptidPublic, type CryptidSettings, type RoomState,
 } from '@pic-game/shared';
@@ -42,7 +42,7 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
 
   get maxPlayers(): number {
     // Five play; the rest can watch.
-    return 12;
+    return GAME_CAPACITY.cryptid;
   }
 
   /** Below this mid-game, there is nobody left to find it against. */
@@ -289,10 +289,7 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'cryptid',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }

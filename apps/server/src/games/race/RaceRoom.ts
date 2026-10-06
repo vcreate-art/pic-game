@@ -1,5 +1,5 @@
 import {
-  CHASER_PACES, GF, LEVELS, PHYS, RACE_DEFAULTS, TILE, chaserDoneAt, pointsFor,
+  GAME_CAPACITY, CHASER_PACES, GF, LEVELS, PHYS, RACE_DEFAULTS, TILE, chaserDoneAt, pointsFor,
   type ChaserPace, type DeathCause, type Ghost, type Level, type LevelResult,
   type RaceEvent, type RacePhase, type RacePublic, type RaceSettings, type RoomState,
 } from '@pic-game/shared';
@@ -57,7 +57,7 @@ export class RaceRoom extends BaseRoom<CorePlayer> {
   }
 
   get maxPlayers(): number {
-    return 8;
+    return GAME_CAPACITY.race;
   }
 
   /** A solo run is still a race against the clock and the wall. */
@@ -302,10 +302,7 @@ export class RaceRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'race',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }

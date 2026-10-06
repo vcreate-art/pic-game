@@ -757,18 +757,15 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   publicState(): RoomState {
     return {
       kind: 'skribbl',
-      code: this.code,
+      ...this.baseState(),
       phase: this.phase,
       settings: this.settings,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
       round: this.round,
       turn: this.turnPublic(),
       ops: this.ops,
       // Only at the podium: sent to everyone in `game:end` already, and heavy
       // enough that every join in the lobby should not carry it.
       gallery: this.phase === 'gameEnd' ? this.galleryPublic() : [],
-      serverTime: Date.now(),
     };
   }
 
