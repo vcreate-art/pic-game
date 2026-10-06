@@ -14,6 +14,16 @@ if (posthogKey && posthogHost) {
       capture_unhandled_rejections: true,
       capture_console_errors: false,
     },
+    // Replays show the page as each player saw it, at their screen size.
+    // Whether sessions get recorded at all is the project's replay setting.
+    session_recording: {
+      // Chat is between friends; inputs are already masked by default.
+      maskTextSelector: '.msg__text',
+      // The games draw on canvas, which replays blank without this. A few
+      // frames a second shows the layout without weighing on play.
+      captureCanvas: { recordCanvas: true, canvasFps: 2, canvasQuality: '0.4' },
+    },
+    enable_heatmaps: true,
     logs: {
       serviceName: 'pic-game-web',
       environment: import.meta.env.PROD ? 'production' : 'development',
