@@ -10,16 +10,10 @@ if (existsSync('.env')) loadEnvFile();
 
 const posthogKey = process.env.VITE_POSTHOG_KEY;
 const posthogHost = process.env.VITE_POSTHOG_HOST;
-const isPostHogLogsEnabled = Boolean(posthogKey && posthogHost);
+// Only production reports, so local runs don't show up among the live logs.
+const isPostHogLogsEnabled = Boolean(process.env.NODE_ENV === 'production' && posthogKey && posthogHost);
 
-if (!isPostHogLogsEnabled && process.env.NODE_ENV !== 'production') {
-  const missingVariable = posthogKey ? 'VITE_POSTHOG_HOST' : 'VITE_POSTHOG_KEY';
-  throw new Error(
-    `${missingVariable} variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once ${missingVariable} is configured`,
-  );
-}
-
-const sdk = posthogKey && posthogHost
+const sdk = isPostHogLogsEnabled && posthogKey && posthogHost
   ? new NodeSDK({
       resource: resourceFromAttributes({
         'service.name': 'pic-game-server',
