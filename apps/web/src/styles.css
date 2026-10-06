@@ -625,7 +625,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   transition: clip-path .35s cubic-bezier(.3, .7, .3, 1);
 }
 .pick__art {
-  position: absolute; top: -10px; right: -10px; width: 90px; height: 90px;
+  position: absolute; top: -4px; right: -18px; width: 72px; height: 72px;
   color: var(--game, var(--ink)); opacity: .6;
 }
 /* A soft glow of the game's colour rising from the bottom-left corner,
@@ -883,7 +883,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 @media (max-width: 560px) {
   .picker { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; }
   .pick__name { font-size: 18px; }
-  .pick__art { width: 64px; height: 64px; }
+  .pick__art { width: 60px; height: 60px; }
 }
 
 .chess__side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
