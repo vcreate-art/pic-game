@@ -5,6 +5,7 @@ import { useDismiss } from '../lib/useDismiss.js';
 import { getSocket } from '../net/socket.js';
 import { useLeaveRoom } from '../net/useLeaveRoom.js';
 import { selectIsHost, useGame } from '../store/game.js';
+import { CategoryPill } from './CategoryPill.js';
 import { GAME_ICONS } from './gameIcons.js';
 
 /**
@@ -126,7 +127,7 @@ export function RoomMenu() {
                       >
                         <GameIcon className="roommenu__gicon" aria-hidden="true" />
                         <span className="roommenu__gname">{GAME_LABELS[k].name}</span>
-                        {why && <span className="roommenu__why">{why}</span>}
+                        {why ? <span className="roommenu__why">{why}</span> : <CategoryPill kind={k} />}
                       </button>
                     </li>
                   );

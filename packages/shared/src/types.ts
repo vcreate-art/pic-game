@@ -221,6 +221,22 @@ export interface BackstageSnapshot {
   rooms: BackstageRoom[];
 }
 
+/** What kind of game it is, by what keeps going while players wait:
+ *  nothing (turn-based), a countdown (timed turns), or live action. */
+export type GameCategory = 'turns' | 'timed' | 'live';
+
+export const GAME_CATEGORY: Record<GameKind, GameCategory> = {
+  realms: 'turns', cryptid: 'turns', flip7: 'turns', tourney: 'turns',
+  skribbl: 'timed', bingo: 'timed', spies: 'timed',
+  fight: 'live', maze: 'live', kungfu: 'live', race: 'live',
+};
+
+export const CATEGORY_LABELS: Record<GameCategory, string> = {
+  turns: 'Turn-based',
+  timed: 'Timed turns',
+  live: 'Real-time',
+};
+
 /** Most seats each game can take. A room switching games has to fit the
  *  new game's number; Draw & Guess's is the ceiling of its own setting. */
 export const GAME_CAPACITY: Record<GameKind, number> = {

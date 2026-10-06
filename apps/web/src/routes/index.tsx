@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { GAME_LABELS, PLAYABLE_KINDS, type GameKind, type JoinAck } from '@pic-game/shared';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { X } from 'lucide-react';
+import { CategoryPill } from '../components/CategoryPill.js';
 import { GAME_ICONS } from '../components/gameIcons.js';
 import { JoinPanel, initialIdentity, type Identity } from '../components/JoinPanel.js';
 import { peekRoom } from '../api/client.js';
@@ -176,6 +177,7 @@ function Landing() {
                   <span className="pick__cover">
                     <span className="pick__ink" aria-hidden="true" />
                     <Icon className="pick__art" strokeWidth={1.75} aria-hidden="true" />
+                    <CategoryPill kind={k} className="pick__cat" />
                     <span className="pick__text">
                       <strong className="pick__name">{GAME_LABELS[k].name}</strong>
                       <span className="pick__more">
@@ -212,7 +214,10 @@ function Landing() {
                 <X aria-hidden="true" />
               </button>
             </div>
-            <p className="sheet__blurb">{GAME_LABELS[game].blurb}</p>
+            <p className="sheet__blurb">
+              <CategoryPill kind={game} className="sheet__cat" />
+              {GAME_LABELS[game].blurb}
+            </p>
             <JoinPanel
               submitLabel={`Create ${GAME_LABELS[game].name}`}
               busy={busy}
