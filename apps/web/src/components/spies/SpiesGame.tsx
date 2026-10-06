@@ -22,7 +22,7 @@ function useTick(on: boolean): void {
   }, [on]);
 }
 
-export function SpiesGame({ onLeave }: { onLeave: () => void }) {
+export function SpiesGame() {
   const room = useGame(selectSpies);
   const me = useGame((s) => s.me);
   const key = useGame((s) => s.spiesKey);
@@ -44,7 +44,7 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
 
   if (!room || !me) return null;
   const { game } = room;
-  if (game.phase === 'lobby') return <SpiesLobby onLeave={onLeave} />;
+  if (game.phase === 'lobby') return <SpiesLobby />;
 
   const player = (id: string) => room.players.find((p) => p.id === id);
   const myTeam = SPY_TEAMS.find((t) => game.teams[t].spymaster === me || game.teams[t].operatives.includes(me)) ?? null;
@@ -150,7 +150,6 @@ export function SpiesGame({ onLeave }: { onLeave: () => void }) {
               )}
             </div>
           )}
-          <button className="btn btn--danger" type="button" onClick={onLeave}>Leave room</button>
         </aside>
 
         <main className="spies__main">

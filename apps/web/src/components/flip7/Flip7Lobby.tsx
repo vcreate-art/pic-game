@@ -1,13 +1,15 @@
 import { FLIP7_BONUS, FLIP7_MAX_PLAYERS, FLIP7_MIN_PLAYERS, FLIP7_TARGETS } from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectFlip7, selectIsHost, useGame } from '../../store/game.js';
+import { WinCount } from '../WinCount.js';
 import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 const LENGTHS: Record<number, string> = { 100: 'Quick', 150: 'Short', 200: 'The box', 300: 'Long' };
 
-export function Flip7Lobby({ onLeave }: { onLeave: () => void }) {
+export function Flip7Lobby() {
   const room = useGame(selectFlip7);
   const isHost = useGame(selectIsHost);
   const socket = getSocket();
@@ -29,14 +31,14 @@ export function Flip7Lobby({ onLeave }: { onLeave: () => void }) {
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
                 {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
-                {p.score > 0 && <span className="bingolobby__wins">{p.score} win{p.score === 1 ? '' : 's'}</span>}
+                <WinCount n={room.meta.wins[p.id]} />
               </li>
             ))}
           </ul>
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Flip 7</h2>
+          <SettingsTitle>Game settings</SettingsTitle>
 
           <div className="settings__modes">
             <span className="settings__label">Play to</span>
@@ -83,11 +85,6 @@ export function Flip7Lobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

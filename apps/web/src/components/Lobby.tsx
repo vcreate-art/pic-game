@@ -6,6 +6,7 @@ import { GalleryButton } from './Gallery.js';
 import { InviteCard } from './InviteCard.js';
 import { KickButton } from './KickButton.js';
 import { Settings, fewWords } from './Settings.js';
+import { SettingsTitle } from './SettingsTitle.js';
 
 export function Lobby() {
   const room = useGame((s) => s.room);
@@ -42,7 +43,7 @@ export function Lobby() {
       </div>
 
       <div className="lobby__settings card">
-        <h2 className="card__title">Game settings</h2>
+        <SettingsTitle>Game settings</SettingsTitle>
         <Settings />
         {isHost ? (
           <button

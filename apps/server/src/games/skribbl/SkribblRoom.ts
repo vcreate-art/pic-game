@@ -11,7 +11,8 @@ import {
   CHOOSE_SECONDS, GAME_END_SECONDS, MAX_CHAT_LEN, MAX_OPS_PER_TURN,
   RECONNECT_GRACE_MS, SUGGEST_SECONDS, TURN_END_SECONDS, EMPTY_ROOM_TTL_MS,
 } from '../../config.js';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
+import { topScorers } from '../../core/RoomSession.js';
 import { pickWords } from './words.js';
 
 export interface ServerPlayer extends CorePlayer {
@@ -70,6 +71,11 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
   private phaseTimer: ReturnType<typeof setTimeout> | null = null;
   private hintTimer: ReturnType<typeof setInterval> | null = null;
+  /** The step the phase timer will run, and when, for pausing. */
+  private phaseFn: (() => void) | null = null;
+  private phaseDue = 0;
+  /** What was left of the phase timer when the game was paused. */
+  private heldPhase: { fn: () => void; ms: number } | null = null;
 
   constructor(code: string, io: IO) {
     super(code, io);
@@ -79,6 +85,46 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
   isLobby(): boolean {
     return this.phase === 'lobby';
+  }
+
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.phase === 'gameEnd' ? 'ended' : 'playing';
+  }
+
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  /** Stops the turn clock and the hints where they are. */
+  protected override onPause(): void {
+    this.heldPhase = this.phaseFn ? { fn: this.phaseFn, ms: Math.max(0, this.phaseDue - Date.now()) } : null;
+    this.clearTimers();
+  }
+
+  /** Carries on with the time that was left. While choosing or drawing the
+   *  deadline is that step's, so it moves to match, which keeps hint timing
+   *  and guess points as they would have been. */
+  protected override onResume(): void {
+    const held = this.heldPhase;
+    this.heldPhase = null;
+    if (held) {
+      if (this.phase === 'choosing' || this.phase === 'drawing') this.endsAt = Date.now() + held.ms;
+      this.schedule(held.ms, held.fn);
+    }
+    if (this.phase === 'drawing') this.startHints();
+    this.io.to(this.code).emit('turn:clock', { endsAt: this.endsAt });
+    if (this.phase === 'choosing' && this.playerWords) this.broadcastSuggestState();
+  }
+
+  protected resetToLobby(): void {
+    this.abortToLobby();
+  }
+
+  /** A bigger group than the default can switch in; the limit rises to fit
+   *  them rather than turning anyone away. */
+  override adoptFrom(old: BaseRoom<CorePlayer>): void {
+    super.adoptFrom(old);
+    this.settings.maxPlayers = Math.max(this.settings.maxPlayers, this.players.size);
   }
 
   get maxPlayers(): number {
@@ -195,6 +241,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.turnIndex = 0;
     this.order = [...this.players.keys()];
     this.beginTurn();
+    this.syncMeta();
   }
 
   private beginTurn(): void {
@@ -237,7 +284,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.broadcastSuggestState();
 
     // Backstop only: the window normally closes early, as soon as everyone is in.
-    this.phaseTimer = setTimeout(() => this.openPicking(), SUGGEST_SECONDS * 1000);
+    this.schedule(SUGGEST_SECONDS * 1000, () => this.openPicking());
 
     // A room where the drawer is the only one connected has nobody to wait for.
     this.maybeOpenPicking();
@@ -276,7 +323,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.sendOptions();
     if (this.playerWords) this.broadcastSuggestState();
 
-    this.phaseTimer = setTimeout(() => this.autoChoose(), CHOOSE_SECONDS * 1000);
+    this.schedule(CHOOSE_SECONDS * 1000, () => this.autoChoose());
   }
 
   /** The drawer's visible list: suggestions first, topped up with padding. */
@@ -406,8 +453,8 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     const turn = this.turnPublic();
     if (turn) this.io.to(this.code).emit('turn:drawing', turn);
 
-    this.phaseTimer = setTimeout(() => this.endTurn('timeout'), this.settings.drawTime * 1000);
-    this.hintTimer = setInterval(() => this.maybeReveal(), 1000);
+    this.schedule(this.settings.drawTime * 1000, () => this.endTurn('timeout'));
+    this.startHints();
   }
 
   private maybeReveal(): void {
@@ -479,7 +526,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
       ...(authorId ? { authorId } : {}),
     });
     this.word = null;
-    this.phaseTimer = setTimeout(() => this.nextTurn(), TURN_END_SECONDS * 1000);
+    this.schedule(TURN_END_SECONDS * 1000, () => this.nextTurn());
   }
 
   private nextTurn(): void {
@@ -502,8 +549,9 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   private endGame(): void {
     this.clearTimers();
     this.phase = 'gameEnd';
+    this.recordWin(topScorers(Object.fromEntries([...this.players.values()].map((p) => [p.id, p.score]))));
     this.io.to(this.code).emit('game:end', { players: this.publicPlayers(), gallery: this.galleryPublic() });
-    this.phaseTimer = setTimeout(() => this.abortToLobby(), GAME_END_SECONDS * 1000);
+    this.schedule(GAME_END_SECONDS * 1000, () => this.abortToLobby());
   }
 
   private abortToLobby(): void {
@@ -539,11 +587,38 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
   /** Every timer the room owns dies here. Miss one and an abandoned room keeps
    *  firing turn transitions forever and never gets collected. */
+  /** Runs the phase's next step after `ms`, remembering what is due and when
+   *  so a pause can stop it and pick it up again with the time that was left. */
+  private schedule(ms: number, fn: () => void): void {
+    if (this.phaseTimer) clearTimeout(this.phaseTimer);
+    // Someone leaving can move the game on mid-pause; the next step waits.
+    if (this.isPaused) {
+      this.phaseTimer = null;
+      this.phaseFn = null;
+      this.heldPhase = { fn, ms };
+      return;
+    }
+    this.phaseFn = fn;
+    this.phaseDue = Date.now() + ms;
+    this.phaseTimer = setTimeout(() => {
+      this.phaseTimer = null;
+      this.phaseFn = null;
+      fn();
+    }, ms);
+  }
+
+  private startHints(): void {
+    if (this.hintTimer) clearInterval(this.hintTimer);
+    if (this.isPaused) return;
+    this.hintTimer = setInterval(() => this.maybeReveal(), 1000);
+  }
+
   private clearTimers(): void {
     if (this.phaseTimer) clearTimeout(this.phaseTimer);
     if (this.hintTimer) clearInterval(this.hintTimer);
     this.phaseTimer = null;
     this.hintTimer = null;
+    this.phaseFn = null;
   }
 
   // ------------------------------------------------------------------ drawing
@@ -657,6 +732,18 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
       return;
     }
 
+    // Paused, a guess must wait: scoring it would race the clock that's
+    // stopped, and showing it would hand the word to everyone.
+    if (this.isPaused && judge(text, this.word) !== 'wrong') {
+      this.emitTo(playerId, 'chat:message', {
+        id: randomUUID(),
+        kind: 'close',
+        text: 'The game is paused. Hold that guess until it carries on.',
+        at: Date.now(),
+      });
+      return;
+    }
+
     // The author wrote this word, so typing it is not a guess. It is swallowed
     // rather than rejected: falling through would broadcast it as ordinary chat
     // and print the answer to everyone still guessing.
@@ -757,23 +844,20 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   publicState(): RoomState {
     return {
       kind: 'skribbl',
-      code: this.code,
+      ...this.baseState(),
       phase: this.phase,
       settings: this.settings,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
       round: this.round,
       turn: this.turnPublic(),
       ops: this.ops,
       // Only at the podium: sent to everyone in `game:end` already, and heavy
       // enough that every join in the lobby should not carry it.
       gallery: this.phase === 'gameEnd' ? this.galleryPublic() : [],
-      serverTime: Date.now(),
     };
   }
 
   broadcastState(): void {
-    this.io.to(this.code).emit('state:sync', this.publicState());
+    this.broadcastSnapshot();
   }
 
   /** Re-sends the secret to a drawer who reconnected mid-turn. */

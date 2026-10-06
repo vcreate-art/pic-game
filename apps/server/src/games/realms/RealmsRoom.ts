@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import {
-  EXPLORER_SUPPLY, REALMS_BOUNDS, REALMS_DEFAULTS, REALMS_SIDES, attack,
+  GAME_CAPACITY, EXPLORER_SUPPLY, REALMS_BOUNDS, REALMS_DEFAULTS, REALMS_SIDES, attack,
   buyCard, createGame,
   discardForced, endTurn, playCard, publicView, scrapCard, useCard,
   type AttackTarget, type RealmsPublic, type RealmsSettings, type RealmsSide,
   type RealmsState, type Result, type RoomState,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 /**
  * Star Realms: a two-player deckbuilder, turn based.
@@ -33,9 +33,25 @@ export class RealmsRoom extends BaseRoom<CorePlayer> {
     return this.phase === 'lobby';
   }
 
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
+  }
+
+  /** Turn-based with no clock: pausing only has to hold moves back, which
+   *  the socket layer does for every game. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  /** Seats stay taken, so a restart deals straight back in. */
+  protected resetToLobby(): void {
+    this.phase = 'lobby';
+    this.broadcast();
+  }
+
   get maxPlayers(): number {
     // Two seats, but onlookers are welcome.
-    return 8;
+    return GAME_CAPACITY.realms;
   }
 
   protected get minPlayers(): number {
@@ -189,6 +205,7 @@ export class RealmsRoom extends BaseRoom<CorePlayer> {
       this.game.phase = 'ended';
       this.game.winner = winner;
     }
+    this.recordWin([winner && this.seats[winner]]);
     this.io.to(this.code).emit('realms:over', { winner });
     this.broadcast();
   }
@@ -224,10 +241,7 @@ export class RealmsRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'realms',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }
@@ -245,6 +259,7 @@ export class RealmsRoom extends BaseRoom<CorePlayer> {
 
   broadcast(): void {
     this.io.to(this.code).emit('realms:state', this.gamePublic());
+    this.syncMeta();
     for (const side of REALMS_SIDES) {
       const holder = this.seats[side];
       if (holder) this.sendHand(holder);

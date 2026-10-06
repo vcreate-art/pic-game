@@ -1,9 +1,9 @@
 import {
-  FLIP7_DEFAULTS, FLIP7_MAX_PLAYERS, FLIP7_MIN_PLAYERS, FLIP7_TARGETS, Flip7Error, buildDeck, choose,
+  GAME_CAPACITY, FLIP7_DEFAULTS, FLIP7_MAX_PLAYERS, FLIP7_MIN_PLAYERS, FLIP7_TARGETS, Flip7Error, buildDeck, choose,
   faceKey, flip7AutoMove, flip7Depart, flip7Turn, hit, newFlip7, nextRound, pendingChoice, stay,
   type Flip7Game, type Flip7Public, type Flip7Settings, type RoomState,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 /** How long a disconnected player's move waits for them before the app makes
  *  it: a stay, or a random target for their action card. */
@@ -32,8 +32,30 @@ export class Flip7Room extends BaseRoom<CorePlayer> {
     return !this.game;
   }
 
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.game?.stage === 'ended' ? 'ended' : 'playing';
+  }
+
+  /** Turn-based with no clock. The one thing that runs on its own is the
+   *  stand-in move for an away player, which waits while paused. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  protected override onPause(): void {
+    this.clearAway();
+  }
+
+  protected override onResume(): void {
+    this.watchAway();
+  }
+
+  protected resetToLobby(): void {
+    this.toLobbyNow();
+  }
+
   get maxPlayers(): number {
-    return 16;
+    return GAME_CAPACITY.flip7;
   }
 
   protected get minPlayers(): number {
@@ -147,12 +169,7 @@ export class Flip7Room extends BaseRoom<CorePlayer> {
         this.systemMessage(`Round ${done.round}: ${line}.`);
       }
       if (g.stage === 'ended' && done) {
-        for (const w of g.winners) {
-          const p = this.players.get(w);
-          if (!p) continue;
-          p.score += 1;
-          this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
-        }
+        this.recordWin(g.winners);
         this.systemMessage(`${g.winners.map((w) => this.nameOf(w)).join(' and ')} wins with ${g.totals[g.winners[0]!]}!`);
       }
     }
@@ -171,7 +188,8 @@ export class Flip7Room extends BaseRoom<CorePlayer> {
 
   private watchAway(): void {
     const who = this.waitingOn();
-    if (!who || this.players.get(who)?.connected) {
+    // Paused, nobody moves for anyone; resuming watches again.
+    if (!who || this.players.get(who)?.connected || this.isPaused) {
       this.clearAway();
       return;
     }
@@ -252,16 +270,14 @@ export class Flip7Room extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'flip7',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }
 
   broadcast(): void {
     this.io.to(this.code).emit('flip7:state', this.gamePublic());
+    this.syncMeta();
   }
 
   handleChat(playerId: string, raw: string): void {

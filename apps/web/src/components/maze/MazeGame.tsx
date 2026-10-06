@@ -10,7 +10,7 @@ import { CONTROL_HELP, ControlsPicker, useMazeControls } from './controls.js';
 const touchOnly = () =>
   typeof window !== 'undefined' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
-export function MazeGame({ onLeave }: { onLeave: () => void }) {
+export function MazeGame() {
   const room = useGame(selectMaze);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -49,7 +49,7 @@ export function MazeGame({ onLeave }: { onLeave: () => void }) {
   }, [game?.seed, game?.cols, game?.rows, game?.theme, game?.settings.fog, mySeat, names.join('|'), game?.settings.radar, game?.endsAt, game?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!room || !me || !game) return null;
-  if (game.phase === 'lobby') return <MazeLobby onLeave={onLeave} />;
+  if (game.phase === 'lobby') return <MazeLobby />;
 
   const ranked = game.players
     .map((id, seat) => ({ id, seat, ...(game.scores[id] ?? { kills: 0, deaths: 0 }) }))
@@ -107,7 +107,6 @@ export function MazeGame({ onLeave }: { onLeave: () => void }) {
             </section>
           )}
           <Chat />
-          <button className="btn btn--danger" type="button" onClick={onLeave}>Leave room</button>
         </aside>
       </div>
     </div>

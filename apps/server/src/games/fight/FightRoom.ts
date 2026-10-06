@@ -1,12 +1,12 @@
 import { performance } from 'node:perf_hooks';
 import {
-  BTN_ALL, FIGHTER_IDS, FIGHT_BOUNDS, FIGHT_DEFAULTS, FIGHT_SIDES, TICK_HZ, createMatch,
+  GAME_CAPACITY, BTN_ALL, FIGHTER_IDS, FIGHT_BOUNDS, FIGHT_DEFAULTS, FIGHT_SIDES, TICK_HZ, createMatch,
   otherSide, step, toFrame, type FightEnding, type FightEvent, type FightPicks,
   type FightPublic, type FightRoomPhase, type FightSeats, type FightSettings,
   type FightSide, type FighterId, type Match, type RoomState,
 } from '@pic-game/shared';
 import { FIGHT_FORFEIT_MS, FIGHT_RESUME_MS } from '../../config.js';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 const STEP_MS = 1000 / TICK_HZ;
 /** Most ticks run to catch up after a stall. Past this the backlog is dropped:
@@ -46,6 +46,8 @@ export class FightRoom extends BaseRoom<CorePlayer> {
 
   private loop: ReturnType<typeof setTimeout> | null = null;
   private pauseTimer: ReturnType<typeof setTimeout> | null = null;
+  /** What a fighter's countdown does when it runs out. */
+  private pauseThen: (() => void) | null = null;
   private last = 0;
   private acc = 0;
 
@@ -59,9 +61,44 @@ export class FightRoom extends BaseRoom<CorePlayer> {
     return this.phase === 'lobby';
   }
 
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
+  }
+
+  /** The loop stops ticking while paused. A fighter's own countdown, for a
+   *  drop-out or the get-ready after one, stops with it and resumes with the
+   *  time it had left. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  protected override onPause(): void {
+    if (this.pauseTimer) clearTimeout(this.pauseTimer);
+    this.pauseTimer = null;
+  }
+
+  protected override onResume(pausedMs: number): void {
+    if (this.paused) {
+      this.paused.until += pausedMs;
+      this.armPause(this.paused.until - Date.now());
+    }
+    // Whatever was held when it stopped isn't held any more.
+    this.controls = { a: idle(), b: idle() };
+    this.broadcast();
+  }
+
+  /** Seats and picks stay, so a restart goes straight to the fight. */
+  protected resetToLobby(): void {
+    this.stopLoop();
+    this.clearPause();
+    this.phase = 'lobby';
+    this.match = null;
+    this.broadcast();
+  }
+
   /** Two fighters, and room for a crowd. */
   get maxPlayers(): number {
-    return 12;
+    return GAME_CAPACITY.fight;
   }
 
   protected get minPlayers(): number {
@@ -244,6 +281,7 @@ export class FightRoom extends BaseRoom<CorePlayer> {
     this.phase = 'ended';
     this.winner = winner;
     this.reason = reason;
+    this.recordWin([winner && this.seats[winner]]);
     this.broadcast();
   }
 
@@ -267,7 +305,7 @@ export class FightRoom extends BaseRoom<CorePlayer> {
       this.acc += now - this.last;
       this.last = now;
 
-      if (this.paused) {
+      if (this.paused || this.isPaused) {
         this.acc = 0;
       } else {
         const events: FightEvent[] = [];
@@ -308,16 +346,25 @@ export class FightRoom extends BaseRoom<CorePlayer> {
   private setPause(p: NonNullable<FightPublic['paused']>, then: () => void): void {
     this.clearPause();
     this.paused = p;
+    this.pauseThen = then;
+    // The room's own pause holds a fighter's countdown too: nobody forfeits
+    // while everything is stopped.
+    if (!this.isPaused) this.armPause(p.until - Date.now());
+    this.broadcast();
+  }
+
+  private armPause(ms: number): void {
+    const then = this.pauseThen;
     this.pauseTimer = setTimeout(() => {
       this.pauseTimer = null;
-      then();
-    }, p.until - Date.now());
-    this.broadcast();
+      then?.();
+    }, ms);
   }
 
   private clearPause(): void {
     if (this.pauseTimer) clearTimeout(this.pauseTimer);
     this.pauseTimer = null;
+    this.pauseThen = null;
     this.paused = null;
   }
 
@@ -339,10 +386,7 @@ export class FightRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'fight',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
       frame: this.match ? toFrame(this.match) : null,
     };
@@ -350,6 +394,7 @@ export class FightRoom extends BaseRoom<CorePlayer> {
 
   broadcast(): void {
     this.io.to(this.code).emit('fight:state', this.gamePublic());
+    this.syncMeta();
   }
 
   handleChat(playerId: string, raw: string): void {

@@ -4,10 +4,11 @@ import { selectIsHost, selectRealms, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 const SEAT_LABEL: Record<RealmsSide, string> = { a: 'First player', b: 'Second player' };
 
-export function RealmsLobby({ onLeave }: { onLeave: () => void }) {
+export function RealmsLobby() {
   const room = useGame(selectRealms);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -42,7 +43,7 @@ export function RealmsLobby({ onLeave }: { onLeave: () => void }) {
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Game settings</h2>
+          <SettingsTitle>Game settings</SettingsTitle>
 
           <div className="seats">
             {REALMS_SIDES.map((side) => {
@@ -106,11 +107,6 @@ export function RealmsLobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

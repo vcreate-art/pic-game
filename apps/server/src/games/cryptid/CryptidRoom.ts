@@ -1,9 +1,9 @@
 import {
-  CRYPTID_DEFAULTS, CRYPTID_MAX_PLAYERS, CRYPTID_MIN_PLAYERS, CryptidError, SETUP_CUBES, autoMove, clueText,
+  GAME_CAPACITY, CRYPTID_DEFAULTS, CRYPTID_MAX_PLAYERS, CRYPTID_MIN_PLAYERS, CryptidError, SETUP_CUBES, autoMove, clueText,
   cryptidTurn, depart, generatePuzzle, hexLabel, newCryptid, placeCube, question, search, setupLeft,
   type CryptidClue, type CryptidGame, type CryptidPublic, type CryptidSettings, type RoomState,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 /** How long a disconnected player's turn waits for them before the app moves
  *  for them. Long enough for a refresh or a phone waking up. */
@@ -24,6 +24,9 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
   readonly kind = 'cryptid' as const;
   settings: CryptidSettings = { ...CRYPTID_DEFAULTS };
   private game: CryptidGame | null = null;
+  /** Whether this game's result has gone to the session; several paths
+   *  pass through afterMove once a game has ended. */
+  private recorded = false;
   /** Names of players who left mid-game, for the history. */
   private departed: Record<string, string> = {};
   private awayTimer: ReturnType<typeof setTimeout> | null = null;
@@ -40,9 +43,31 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
     return !this.game;
   }
 
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.game?.stage === 'ended' ? 'ended' : 'playing';
+  }
+
+  /** Turn-based with no clock. The one thing that runs on its own is the
+   *  stand-in move for an away player, which waits while paused. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  protected override onPause(): void {
+    this.clearAway();
+  }
+
+  protected override onResume(): void {
+    this.watchTurn();
+  }
+
+  protected resetToLobby(): void {
+    this.toLobbyNow();
+  }
+
   get maxPlayers(): number {
     // Five play; the rest can watch.
-    return 12;
+    return GAME_CAPACITY.cryptid;
   }
 
   /** Below this mid-game, there is nobody left to find it against. */
@@ -130,6 +155,7 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
     const puzzle = generatePuzzle(seats.length, this.settings.advanced, Math.random);
     const cubes = this.settings.setupCubes ? SETUP_CUBES : 0;
     this.game = newCryptid(puzzle.board, seats, puzzle.clues, puzzle.answer, cubes);
+    this.recorded = false;
     this.departed = {};
     for (const id of this.players.keys()) this.sendClue(id);
     this.systemMessage(
@@ -183,12 +209,9 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
    *  and tell everyone. */
   private afterMove(): void {
     const g = this.game;
-    if (g?.stage === 'ended' && g.winner) {
-      const p = this.players.get(g.winner);
-      if (p) {
-        p.score += 1;
-        this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
-      }
+    if (g?.stage === 'ended' && !this.recorded) {
+      this.recorded = true;
+      this.recordWin([g.winner]);
     }
     this.watchTurn();
     this.broadcast();
@@ -204,7 +227,8 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
   private watchTurn(): void {
     const g = this.game;
     const who = g ? cryptidTurn(g) : null;
-    if (!g || g.stage === 'ended' || !who || this.players.get(who)?.connected) {
+    // Paused, nobody moves for anyone; resuming watches again.
+    if (!g || g.stage === 'ended' || !who || this.players.get(who)?.connected || this.isPaused) {
       this.clearAway();
       return;
     }
@@ -289,16 +313,14 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'cryptid',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }
 
   broadcast(): void {
     this.io.to(this.code).emit('cryptid:state', this.gamePublic());
+    this.syncMeta();
   }
 
   handleChat(playerId: string, raw: string): void {

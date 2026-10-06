@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
-  CUSTOM_WORDS, SETTINGS_BOUNDS, WORDS_EN, type WordMode, type WordSource,
+  CUSTOM_WORDS, SETTINGS_BOUNDS, WORDS_EN, type RoomSettings, type WordMode, type WordSource,
 } from '@pic-game/shared';
+import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { getSocket } from '../net/socket.js';
 import { selectIsHost, selectSkribbl, useGame } from '../store/game.js';
 
@@ -29,6 +30,11 @@ export function Settings() {
   useEffect(() => setDraft(saved.join(', ')), [saved.join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!settings) return null;
 
+  const updateSettings = (change: Partial<Omit<RoomSettings, 'customWords'>>, setting: string) => {
+    socket.emit('room:settings', change);
+    if (isPostHogEnabled) posthog.capture('room_settings_changed', { setting });
+  };
+
   return (
     <div className="settings">
       {FIELDS.map(({ key, label, step }) => {
@@ -43,7 +49,7 @@ export function Settings() {
               step={step}
               value={settings[key]}
               disabled={!isHost}
-              onChange={(e) => socket.emit('room:settings', { [key]: Number(e.target.value) })}
+              onChange={(e) => updateSettings({ [key]: Number(e.target.value) }, key)}
             />
             <span className="settings__value">{settings[key]}</span>
           </label>
@@ -64,7 +70,7 @@ export function Settings() {
               className={`mode ${settings.wordMode === mode ? 'is-active' : ''}`}
               disabled={!isHost}
               aria-pressed={settings.wordMode === mode}
-              onClick={() => socket.emit('room:settings', { wordMode: mode })}
+              onClick={() => updateSettings({ wordMode: mode }, 'word_mode')}
             >
               <strong>{label}</strong>
               <span>{blurb}</span>
@@ -90,7 +96,7 @@ export function Settings() {
               className={`mode ${settings.wordSource === source ? 'is-active' : ''}`}
               disabled={!isHost}
               aria-pressed={settings.wordSource === source}
-              onClick={() => socket.emit('room:settings', { wordSource: source })}
+              onClick={() => updateSettings({ wordSource: source }, 'word_source')}
             >
               <strong>{label}</strong>
               <span>{blurb}</span>

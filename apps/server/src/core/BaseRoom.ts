@@ -1,12 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import type { Server } from 'socket.io';
 import type {
-  Avatar, ChatMessage, ClientToServerEvents, GameKind, Player, RoomState,
-  ServerToClientEvents,
+  Avatar, ChatMessage, ClientToServerEvents, GameKind, Player, RoomCountdown, RoomMeta, RoomPause, RoomState,
+  RoomStage, RoomStateBase, ServerToClientEvents,
 } from '@pic-game/shared';
-import { EMPTY_ROOM_TTL_MS, RECONNECT_GRACE_MS } from '../config.js';
+import { EMPTY_ROOM_TTL_MS, GAME_COUNTDOWN_MS, PAUSE_HOST_AWAY_MS, RECONNECT_GRACE_MS } from '../config.js';
+import { RoomSession } from './RoomSession.js';
 
 export type IO = Server<ClientToServerEvents, ServerToClientEvents>;
+
+/** Where a room is in its game, in the terms every game shares: getting
+ *  ready, in the middle of one, or looking at the result. */
+export type RoomLifecycle = RoomStage;
 
 /** What every game needs to know about a seat, whatever the game is. */
 export interface CorePlayer extends Player {
@@ -36,16 +41,20 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   /** Join order, which games may also use as turn order. */
   order: string[] = [];
 
-  /**
-   * Seat tokens the host has removed.
-   *
-   * With no accounts a kick is a soft block: it stops the client reconnecting
-   * and stops a return through the invite link on the same seat, which covers
-   * ordinary nuisance. Someone determined can clear their session and come back
-   * as a new player. Keying on IP would be stronger but would eject everyone
-   * behind the same router, which is how this gets played over home Wi-Fi.
-   */
-  private readonly banned = new Set<string>();
+  /** Set while the host has the game paused. */
+  private roomPause: RoomPause | null = null;
+  /** Resumes a paused game whose host has dropped out. */
+  private pauseAwayTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The 3-2-1 under way, if any. A countdown holds the game the same way a
+   *  pause does, so every game that can pause gets one for free. */
+  private countdown: RoomCountdown | null = null;
+  private countdownTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The stage as last broadcast, to notice a game going into play. */
+  private lastStage: RoomStage = 'lobby';
+
+  /** Wins, kicks and history that outlive this game. Handed on when the
+   *  room switches to a different game. */
+  session = new RoomSession();
 
   /** Set when the room empties; cancelled the moment someone joins. */
   emptyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -67,6 +76,13 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   abstract publicState(): RoomState;
   /** Games that are mid-play should say so; the lobby is handled generically. */
   abstract isLobby(): boolean;
+  /** Each game's own phases, mapped onto the shared three. */
+  abstract lifecycle(): RoomLifecycle;
+  /** Starts a game from the lobby (host only), or explains why it can't. */
+  abstract startGame(by: string): void;
+  /** Drops whatever game is on and goes back to the lobby, keeping the
+   *  seats and settings. Stops every timer the game had running. */
+  protected abstract resetToLobby(): void;
   /** Below this, an in-progress game gives up and returns to the lobby. */
   protected abstract get minPlayers(): number;
   /** Adds whatever per-game fields a seat needs on top of the core ones. */
@@ -93,6 +109,17 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     return RECONNECT_GRACE_MS;
   }
   protected onDestroy(): void {}
+
+  /** Whether this game can pause at all. Games turn it on as their pause
+   *  support lands; the rest never offer it. */
+  protected get pausable(): boolean {
+    return false;
+  }
+  /** Called once a game is paused: stop whatever runs on its own. */
+  protected onPause(): void {}
+  /** Called on resume with how long the game was paused, to restart what
+   *  onPause stopped and push its deadlines back by that much. */
+  protected onResume(_pausedMs: number): void {}
 
   // ------------------------------------------------------------------ players
 
@@ -125,6 +152,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
       p.socketId = socketId;
       p.connected = true;
       p.disconnectedAt = null;
+      if (p.id === this.hostId) this.clearPauseAway();
       this.onPlayerReconnected(p);
       this.cancelEmptyCollection();
       return p;
@@ -141,6 +169,15 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
 
     this.onPlayerDisconnected(p);
+    // Only the host can resume, so a host who drops out mustn't leave the
+    // game stuck. The pause may already be gone if the drop ended the game.
+    if (this.roomPause && playerId === this.hostId) {
+      this.clearPauseAway();
+      this.pauseAwayTimer = setTimeout(
+        () => this.resumeNow('The host is away, so the game carries on.'),
+        PAUSE_HOST_AWAY_MS,
+      );
+    }
     if (this.activeCount() === 0) this.scheduleEmptyCollection();
   }
 
@@ -154,6 +191,8 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     if (this.hostId === playerId) {
       this.hostId = this.order[0] ?? '';
       if (this.hostId) this.io.to(this.code).emit('host:changed', { hostId: this.hostId });
+      // The new host can resume a paused game; no need to wait out the old one.
+      this.clearPauseAway();
     }
 
     this.onPlayerRemoved(playerId);
@@ -173,7 +212,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     if (!target) return;
 
     const host = this.players.get(byPlayerId);
-    this.banned.add(target.token);
+    this.session.banned.add(target.token);
     // Told before removal, while the socket is still in the room.
     this.emitTo(targetId, 'kicked', { by: host?.name ?? 'the host' });
     this.systemMessage(`${target.name} was removed by ${host?.name ?? 'the host'}.`);
@@ -193,7 +232,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   }
 
   isBanned(token: string | undefined): boolean {
-    return !!token && this.banned.has(token);
+    return !!token && this.session.banned.has(token);
   }
 
   activeCount(): number {
@@ -248,6 +287,205 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     return { id: p.id, name: p.name, avatar: p.avatar, score: p.score, connected: p.connected };
   }
 
+  /** Room-level facts every game's state carries. */
+  meta(): RoomMeta {
+    return {
+      wins: this.session.winsOf(this.players.keys()),
+      games: this.session.games,
+      stage: this.lifecycle(),
+      paused: this.roomPause,
+      countdown: this.countdown,
+      can: {
+        pause: this.canPause(),
+        restart: this.lifecycle() !== 'lobby',
+        toLobby: this.lifecycle() !== 'lobby',
+        switch: this.canSwitch(),
+      },
+    };
+  }
+
+  get isPaused(): boolean {
+    return !!this.roomPause;
+  }
+
+  /** Only mid-game, and only in a game that supports it. */
+  canPause(): boolean {
+    return this.pausable && this.lifecycle() === 'playing';
+  }
+
+  /** Host only: stops the game where it is until the host resumes it. */
+  pauseGame(by: string): void {
+    if (by !== this.hostId || this.roomPause || !this.canPause()) return;
+    this.roomPause = { by, at: Date.now() };
+    this.onPause();
+    this.systemMessage(`${this.players.get(by)?.name ?? 'The host'} paused the game.`);
+    this.emitMeta();
+  }
+
+  /** Host only: counts everyone back in, then carries on from exactly where
+   *  the game stopped. */
+  resumeGame(by: string): void {
+    if (by !== this.hostId || !this.roomPause || this.countdown) return;
+    this.countIn('resume');
+    this.emitMeta();
+  }
+
+  /** Holds the game for the 3-2-1, then lets it run. A start holds a game
+   *  that has just been set up; a resume holds one that's already paused. */
+  private countIn(kind: RoomCountdown['kind']): void {
+    if (!this.roomPause) {
+      this.roomPause = { by: this.hostId, at: Date.now() };
+      this.onPause();
+    }
+    this.countdown = { kind, until: Date.now() + GAME_COUNTDOWN_MS };
+    this.clearCountdown();
+    this.countdownTimer = setTimeout(() => {
+      this.countdownTimer = null;
+      this.countdown = null;
+      this.resumeNow(kind === 'resume' ? 'Back to the game.' : null);
+    }, GAME_COUNTDOWN_MS);
+  }
+
+  private clearCountdown(): void {
+    if (this.countdownTimer) clearTimeout(this.countdownTimer);
+    this.countdownTimer = null;
+  }
+
+  private resumeNow(message: string | null): void {
+    const paused = this.roomPause;
+    if (!paused) return;
+    this.roomPause = null;
+    this.countdown = null;
+    this.clearCountdown();
+    this.clearPauseAway();
+    this.onResume(Date.now() - paused.at);
+    if (message) this.systemMessage(message);
+    this.emitMeta();
+  }
+
+  /** Forgets a pause without resuming the game, for when the game it paused
+   *  is over or being thrown away. */
+  private dropPause(): void {
+    this.roomPause = null;
+    this.countdown = null;
+    this.clearCountdown();
+    this.clearPauseAway();
+  }
+
+  private clearPauseAway(): void {
+    if (this.pauseAwayTimer) clearTimeout(this.pauseAwayTimer);
+    this.pauseAwayTimer = null;
+  }
+
+  /** Host only: the same game again from the start, with the same players
+   *  and settings. Abandons a game in progress without recording a result. */
+  restart(by: string): void {
+    if (by !== this.hostId || this.lifecycle() === 'lobby') return;
+    const midGame = this.lifecycle() === 'playing';
+    this.dropPause();
+    this.resetToLobby();
+    if (midGame) this.systemMessage('The host restarted the game.');
+    this.startGame(by);
+    this.syncMeta();
+  }
+
+  /** Host only: back to the lobby, abandoning a game in progress without
+   *  recording a result. */
+  backToLobby(by: string): void {
+    if (by !== this.hostId || this.lifecycle() === 'lobby') return;
+    const midGame = this.lifecycle() === 'playing';
+    this.dropPause();
+    this.resetToLobby();
+    if (midGame) this.systemMessage('The host ended the game.');
+    this.syncMeta();
+  }
+
+  /** Switching games happens from the lobby: from an end screen the host
+   *  goes back to the lobby first. */
+  canSwitch(): boolean {
+    return this.lifecycle() === 'lobby';
+  }
+
+  /**
+   * Takes over the table from the room this one replaces when the host
+   * switches games: the same seats, host, order and session. Each seat is
+   * rebuilt through this game's own createPlayer, and starts this game on 0.
+   */
+  adoptFrom(old: BaseRoom<CorePlayer>): void {
+    this.session = old.session;
+    this.hostId = old.hostId;
+    this.order = old.order.filter((id) => old.players.has(id));
+    for (const id of this.order) {
+      const p = old.players.get(id)!;
+      this.players.set(id, this.createPlayer({
+        id: p.id, token: p.token, name: p.name, avatar: p.avatar, score: 0,
+        connected: p.connected, socketId: p.socketId, disconnectedAt: p.disconnectedAt,
+      }));
+    }
+    if (this.activeCount() === 0) this.scheduleEmptyCollection();
+  }
+
+  /** The meta as last sent, to tell when it has changed. */
+  private sentMeta = '';
+
+  /** Sends the room-level facts on their own. Most games broadcast only their
+   *  own state, which doesn't carry them. */
+  protected emitMeta(): void {
+    const meta = this.meta();
+    this.sentMeta = JSON.stringify(meta);
+    this.io.to(this.code).emit('room:meta', meta);
+  }
+
+  /** Sends the whole room to everyone. The meta rides along, so it counts as
+   *  sent: otherwise a change straight after it would look like no change. */
+  broadcastSnapshot(): void {
+    const state = this.publicState();
+    this.sentMeta = JSON.stringify(state.meta);
+    this.lastStage = state.meta.stage;
+    this.io.to(this.code).emit('state:sync', state);
+  }
+
+  /** Sends the meta if it differs from what clients last had: a game starting
+   *  or ending changes what the host can do. Each game calls this whenever it
+   *  broadcasts its own state. */
+  protected syncMeta(): void {
+    const stage = this.lifecycle();
+    // A game can still end while paused, when a player it needs leaves.
+    if (this.roomPause && stage !== 'playing') this.dropPause();
+    // Every way into play, start or rematch or restart, gets the 3-2-1.
+    if (stage === 'playing' && this.lastStage !== 'playing' && this.pausable && !this.roomPause) {
+      this.countIn('start');
+    }
+    this.lastStage = stage;
+    if (JSON.stringify(this.meta()) !== this.sentMeta) this.emitMeta();
+  }
+
+  /** Every game reports its result here, from wherever it ends. Ties give each
+   *  winner a win; an empty list is a game nobody won. Players who have left
+   *  the room by now don't score. */
+  protected recordWin(ids: readonly (string | null | undefined)[]): void {
+    const winners = ids.filter((id): id is string => !!id && this.players.has(id));
+    this.session.record(this.kind, winners);
+    this.emitMeta();
+  }
+
+  /** Takes back the last recorded result, for a host undoing a game's end. */
+  protected revokeLastWin(): void {
+    this.session.revokeLast();
+    this.emitMeta();
+  }
+
+  /** The fields every game's `publicState()` starts from. */
+  protected baseState(): Omit<RoomStateBase, 'kind'> {
+    return {
+      code: this.code,
+      players: this.publicPlayers(),
+      hostId: this.hostId,
+      serverTime: Date.now(),
+      meta: this.meta(),
+    };
+  }
+
   publicPlayers(): Player[] {
     return this.order
       .map((id) => this.players.get(id))
@@ -256,6 +494,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   }
 
   destroy(): void {
+    this.dropPause();
     this.onDestroy();
     if (this.emptyTimer) clearTimeout(this.emptyTimer);
     this.emptyTimer = null;

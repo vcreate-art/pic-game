@@ -184,7 +184,7 @@ export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
   fight: { name: 'Stick Kombat', blurb: 'Best of three. Then finish them.' },
   race: { name: 'Meat Race', blurb: 'Run, jump, glide and climb. Beat the saws and each other.' },
   spies: { name: 'Word Spies', blurb: 'One-word clues, two teams, and an assassin to avoid.' },
-  tourney: { name: 'MK11 Tournament', blurb: 'Best-of-3 MK11 matches and rising entry fees. Last one standing wins.' },
+  tourney: { name: 'MK11 Tournament', blurb: 'Best-of-3 MK11 matches. Last one standing wins.' },
   bingo: { name: 'Bingo', blurb: 'Fill your grid, call numbers in turn, or play the 75-ball hall game.' },
   cryptid: { name: 'Cryptid', blurb: 'One clue each, one creature on the map. Ask, search, and find it first.' },
   flip7: { name: 'Flip 7', blurb: 'Flip cards, dodge duplicates, bank before you bust. Seven different numbers wins big.' },
@@ -221,6 +221,60 @@ export interface BackstageSnapshot {
   rooms: BackstageRoom[];
 }
 
+/** What kind of game it is, by what keeps going while players wait:
+ *  nothing (turn-based), a countdown (timed turns), or live action. */
+export type GameCategory = 'turns' | 'timed' | 'live';
+
+export const GAME_CATEGORY: Record<GameKind, GameCategory> = {
+  realms: 'turns', cryptid: 'turns', flip7: 'turns', tourney: 'turns',
+  skribbl: 'timed', bingo: 'timed', spies: 'timed',
+  fight: 'live', maze: 'live', kungfu: 'live', race: 'live',
+};
+
+export const CATEGORY_LABELS: Record<GameCategory, string> = {
+  turns: 'Turn-based',
+  timed: 'Timed turns',
+  live: 'Real-time',
+};
+
+/** Most seats each game can take. A room switching games has to fit the
+ *  new game's number; Draw & Guess's is the ceiling of its own setting. */
+export const GAME_CAPACITY: Record<GameKind, number> = {
+  skribbl: 16, kungfu: 12, realms: 8, fight: 12, race: 8, spies: 16,
+  bingo: 16, cryptid: 12, flip7: 16, maze: 16, tourney: 64,
+};
+
+/** Where a room is in its game, in the terms every game shares. */
+export type RoomStage = 'lobby' | 'playing' | 'ended';
+
+/** A paused game: who paused it, and when (server epoch ms). */
+export interface RoomPause {
+  by: string;
+  at: number;
+}
+
+/** The big count before a game starts, or before a paused one carries on. */
+export interface RoomCountdown {
+  kind: 'start' | 'resume';
+  /** Server epoch ms when play begins. */
+  until: number;
+}
+
+/** Room-level facts that outlive any one game: the session's wins, and what
+ *  the host can do right now, so the UI doesn't repeat the server's rules. */
+export interface RoomMeta {
+  stage: RoomStage;
+  /** Set while the host has the game paused, and during a countdown. */
+  paused: RoomPause | null;
+  /** Set while counting down to play: the game holds still until then. */
+  countdown: RoomCountdown | null;
+  /** Wins this session, by player id. Survives switching games. */
+  wins: Record<string, number>;
+  /** Games finished this session, including ones nobody won. */
+  games: number;
+  can: { pause: boolean; restart: boolean; toLobby: boolean; switch: boolean };
+}
+
 /** What every room reports, whichever game it is running. */
 export interface RoomStateBase {
   code: string;
@@ -229,6 +283,7 @@ export interface RoomStateBase {
   hostId: string;
   /** server epoch ms at send time, for clock-offset estimation */
   serverTime: number;
+  meta: RoomMeta;
 }
 
 export interface SkribblRoomState extends RoomStateBase {

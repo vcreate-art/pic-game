@@ -7,6 +7,7 @@ import { selectIsHost, selectKungFu, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 /** Every piece, shortest rest first, so the slider means something concrete. */
 const PIECE_ROWS: Array<[PieceType, string]> = [
@@ -14,7 +15,7 @@ const PIECE_ROWS: Array<[PieceType, string]> = [
   ['b', 'Bishop'], ['r', 'Rook'], ['q', 'Queen'],
 ];
 
-export function KungFuLobby({ onLeave }: { onLeave: () => void }) {
+export function KungFuLobby() {
   const room = useGame(selectKungFu);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -52,7 +53,7 @@ export function KungFuLobby({ onLeave }: { onLeave: () => void }) {
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Game settings</h2>
+          <SettingsTitle>Game settings</SettingsTitle>
 
           <div className="settings__modes">
             <span className="settings__label">Board</span>
@@ -143,11 +144,6 @@ export function KungFuLobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

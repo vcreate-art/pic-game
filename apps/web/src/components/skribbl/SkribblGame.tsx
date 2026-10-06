@@ -13,7 +13,7 @@ import { WordMask } from '../WordMask.js';
 
 /** The draw-and-guess play surface. The room route picks this or the chess
  *  board off `room.kind`; neither knows the other exists. */
-export function SkribblGame({ onLeave }: { onLeave: () => void }) {
+export function SkribblGame() {
   const room = useGame(selectSkribbl);
   const isDrawer = useGame(selectIsDrawer);
   if (!room) return null;
@@ -35,9 +35,6 @@ export function SkribblGame({ onLeave }: { onLeave: () => void }) {
           {phase === 'drawing' && room.turn && (
             <Timer endsAt={room.turn.endsAt} total={room.settings.drawTime} />
           )}
-          <button className="tool tool--leave" type="button" onClick={onLeave}>
-            Leave
-          </button>
         </div>
       </div>
 

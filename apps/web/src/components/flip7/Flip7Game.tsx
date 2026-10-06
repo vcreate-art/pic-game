@@ -68,7 +68,7 @@ const STATUS_LABEL: Record<Flip7Hand['status'], string> = {
   active: '', stayed: 'Stayed', frozen: 'Frozen', bust: 'Bust', flip7: 'Flip 7!',
 };
 
-export function Flip7Game({ onLeave }: { onLeave: () => void }) {
+export function Flip7Game() {
   const room = useGame(selectFlip7);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -85,7 +85,7 @@ export function Flip7Game({ onLeave }: { onLeave: () => void }) {
 
   if (!room || !me) return null;
   const game = room.game;
-  if (game.phase === 'lobby') return <Flip7Lobby onLeave={onLeave} />;
+  if (game.phase === 'lobby') return <Flip7Lobby />;
 
   const name = (id: string | null) => (id && room.players.find((p) => p.id === id)?.name) || 'Someone';
   const you = (id: string) => (id === me ? 'You' : name(id));
@@ -186,7 +186,6 @@ export function Flip7Game({ onLeave }: { onLeave: () => void }) {
         <aside className="f7__side">
           <DeckTracker game={game} odds={odds} setOdds={setOdds} />
           <Chat />
-          <button className="btn btn--danger" type="button" onClick={onLeave}>Leave room</button>
         </aside>
       </div>
     </div>

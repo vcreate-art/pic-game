@@ -31,7 +31,7 @@ function Fighter({ e, side }: { e: Entrant; side: 'a' | 'b' }) {
   );
 }
 
-export function TourneyGame({ onLeave }: { onLeave: () => void }) {
+export function TourneyGame() {
   const room = useGame(selectTourney);
   const isHost = useGame(selectIsHost);
   const socket = getSocket();
@@ -50,7 +50,7 @@ export function TourneyGame({ onLeave }: { onLeave: () => void }) {
   }, [t?.phase, t?.turn]);
 
   if (!room || !t) return null;
-  if (t.phase === 'setup') return <TourneyLobby onLeave={onLeave} />;
+  if (t.phase === 'setup') return <TourneyLobby />;
 
   const byId = (id: string) => t.entrants.find((e) => e.id === id)!;
   const ended = t.phase === 'ended';
@@ -73,7 +73,6 @@ export function TourneyGame({ onLeave }: { onLeave: () => void }) {
             {rising && <span className="tbar__rise">goes up after this turn</span>}
           </span>
         )}
-        <button className="tool tool--leave" type="button" onClick={onLeave}>Leave</button>
       </header>
 
       <div className="tourney">

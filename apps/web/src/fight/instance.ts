@@ -8,3 +8,9 @@ export function getFightView(): FightView {
   if (!view) view = new FightView();
   return view;
 }
+
+/** Drops the view, so the next game of this kind starts from nothing. */
+export function disposeFightView(): void {
+  view?.detach();
+  view = null;
+}

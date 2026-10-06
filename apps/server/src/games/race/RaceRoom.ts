@@ -1,9 +1,10 @@
 import {
-  CHASER_PACES, GF, LEVELS, PHYS, RACE_DEFAULTS, TILE, chaserDoneAt, pointsFor,
+  GAME_CAPACITY, CHASER_PACES, GF, LEVELS, PHYS, RACE_DEFAULTS, TILE, chaserDoneAt, pointsFor,
   type ChaserPace, type DeathCause, type Ghost, type Level, type LevelResult,
   type RaceEvent, type RacePhase, type RacePublic, type RaceSettings, type RoomState,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
+import { topScorers } from '../../core/RoomSession.js';
 
 const COUNTDOWN_MS = 3500;
 const RESULTS_MS = 7000;
@@ -56,8 +57,19 @@ export class RaceRoom extends BaseRoom<CorePlayer> {
     return this.phase === 'lobby';
   }
 
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.phase === 'podium' ? 'ended' : 'playing';
+  }
+
+  protected resetToLobby(): void {
+    this.clearTimers();
+    this.phase = 'lobby';
+    this.nextAt = 0;
+    this.broadcast();
+  }
+
   get maxPlayers(): number {
-    return 8;
+    return GAME_CAPACITY.race;
   }
 
   /** A solo run is still a race against the clock and the wall. */
@@ -185,6 +197,7 @@ export class RaceRoom extends BaseRoom<CorePlayer> {
       if (last) {
         this.phase = 'podium';
         this.nextAt = 0;
+        this.recordWin(topScorers(this.points));
         this.broadcast();
       } else {
         this.beginLevel(this.level + 1);
@@ -302,16 +315,14 @@ export class RaceRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'race',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }
 
   broadcast(): void {
     this.io.to(this.code).emit('race:state', this.gamePublic());
+    this.syncMeta();
   }
 
   handleChat(playerId: string, raw: string): void {

@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import {
-  MANUAL_BONUSES, TOURNEY_BOUNDS, cancelMatch, endNow, isMain, newEntrant, newTourney, report,
+  GAME_CAPACITY, MANUAL_BONUSES, TOURNEY_BOUNDS, cancelMatch, endNow, isMain, newEntrant, newTourney, report,
   startMatch, startTourney, swapNext, validateTourney,
   type Avatar, type BonusKind, type ManualBonus, type MatchScore, type RoomState,
   type TourneyBonuses, type TourneyPublic, type TourneySettings, type TourneyState,
 } from '@pic-game/shared';
 import { TOURNEY_KEEP_MS } from '../../config.js';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 /** How many results can be taken back, newest first. */
 const UNDO_DEPTH = 50;
@@ -43,8 +43,26 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
     return this.t.phase === 'setup';
   }
 
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.t.phase === 'ended' ? 'ended' : 'playing';
+  }
+
+  /** Turn-based with no clock: pausing only has to hold moves back, which
+   *  the socket layer does for every game. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  /** The same players, signed up afresh: the bracket and results go. */
+  protected resetToLobby(): void {
+    const entrants = this.t.entrants.map((e) => newEntrant(e.id, e.name, e.main, e.playerId));
+    this.t = { ...newTourney(this.t.settings), entrants };
+    this.undoStack = [];
+    this.broadcast();
+  }
+
   get maxPlayers(): number {
-    return 64;
+    return GAME_CAPACITY.tourney;
   }
 
   /** Nothing is played in the app, so nobody leaving can stop it. */
@@ -252,6 +270,8 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
     const prev = this.undoStack.at(-1);
     if (!prev) return;
     this.undoStack = this.undoStack.slice(0, -1);
+    // Undoing the result that ended it takes the win back as well.
+    if (this.t.phase === 'ended' && prev.phase !== 'ended') this.revokeLastWin();
     this.t = prev;
     this.systemMessage('The host took back the last result.');
     this.broadcast();
@@ -264,10 +284,7 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
   /** Same players, fresh tournament. */
   toSetup(by: string): void {
     if (!this.isHost(by) || this.t.phase !== 'ended') return;
-    const entrants = this.t.entrants.map((e) => newEntrant(e.id, e.name, e.main, e.playerId));
-    this.t = { ...newTourney(this.t.settings), entrants };
-    this.undoStack = [];
-    this.broadcast();
+    this.resetToLobby();
   }
 
   /** A tournament saved in the host's browser, brought back after a restart.
@@ -287,6 +304,7 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
   }
 
   private announceWinners(): void {
+    this.recordWin(this.t.winners.map((id) => this.t.entrants.find((e) => e.id === id)?.playerId));
     const names = this.t.winners.map((id) => this.nameOf(id));
     this.systemMessage(names.length > 1 ? `It's a tie: ${names.join(' and ')} share the win!` : `${names[0]} wins the tournament!`);
   }
@@ -304,16 +322,14 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'tourney',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }
 
   broadcast(): void {
     this.io.to(this.code).emit('tourney:state', this.gamePublic());
+    this.syncMeta();
   }
 
   handleChat(playerId: string, raw: string): void {

@@ -6,7 +6,7 @@ import { Chat } from '../Chat.js';
 import { ChessBoard } from './ChessBoard.js';
 import { KungFuLobby } from './KungFuLobby.js';
 
-export function KungFuGame({ onLeave }: { onLeave: () => void }) {
+export function KungFuGame() {
   const room = useGame(selectKungFu);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -16,7 +16,7 @@ export function KungFuGame({ onLeave }: { onLeave: () => void }) {
   const { game } = room;
   // Setting up is its own screen. An empty board behind an overlay was
   // decoration standing where the settings should be.
-  if (game.phase === 'lobby') return <KungFuLobby onLeave={onLeave} />;
+  if (game.phase === 'lobby') return <KungFuLobby />;
 
   const spec = SPECS[game.settings.variant];
   const mySide: Side | null = spec.sides.find((s) => game.seats[s] === me) ?? null;
@@ -77,9 +77,6 @@ export function KungFuGame({ onLeave }: { onLeave: () => void }) {
               No turns. Move whenever you like — each piece rests after it moves.
               Take a king to knock that player out.
             </p>
-            <button className="btn btn--danger" type="button" onClick={onLeave}>
-              Leave room
-            </button>
           </section>
         </div>
 

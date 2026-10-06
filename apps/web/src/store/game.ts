@@ -2,11 +2,21 @@ import { create } from 'zustand';
 import type {
   BingoCard, BingoPublic, BingoRoomState, CardColor, CryptidClue, CryptidPublic, CryptidRoomState, Flip7Public, Flip7RoomState, MazePublic, MazeRoomState, Drawing, TourneyPublic, TourneyRoomState, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
   RaceRoomState, SpiesPublic, SpiesRoomState, KungFuRoomState, Piece, Player,
-  RealmsPublic, RealmsRoomState, RealmsSide, RoomSettings, RoomState, Side,
+  RealmsPublic, RealmsRoomState, RealmsSide, RoomMeta, RoomSettings, RoomState, Side,
   SkribblRoomState, WordOption,
 } from '@pic-game/shared';
 
 const MAX_MESSAGES = 200;
+
+/** Everything one game keeps for this player alone. Cleared when the room
+ *  switches to a different game, so nothing of the last one leaks into it. */
+const noGamePrivate = (): Partial<GameStore> => ({
+  secret: null, choices: null, chooseEndsAt: null,
+  suggest: null, mySuggestion: null, suggestError: null,
+  turnResult: null, final: null,
+  realmsHand: [], realmsOwed: 0, spiesKey: null, bingoCard: null, cryptidClue: null,
+  gallery: null, galleryOpen: false,
+});
 
 export interface TurnResult {
   word: string;
@@ -68,6 +78,9 @@ interface GameStore {
   dropPlayer: (id: string) => void;
   setSettings: (s: RoomSettings) => void;
   setHost: (id: string) => void;
+  setMeta: (meta: RoomMeta) => void;
+  /** Moves the turn's deadline, after a pause pushed it back. */
+  setTurnClock: (endsAt: number) => void;
   beginChoosing: (p: { drawerId: string; round: number; endsAt: number; words?: WordOption[] }) => void;
   setSuggest: (s: SuggestState) => void;
   setMySuggestion: (text: string | null) => void;
@@ -133,12 +146,13 @@ export const useGame = create<GameStore>((set) => ({
   setMe: (me) => set({ me }),
 
   sync: (room) =>
-    set({
+    set((s) => ({
+      ...(s.room && s.room.kind !== room.kind ? noGamePrivate() : {}),
       room,
       turnResult: null,
       // A podium snapshot carries the gallery; any other state keeps the one we have.
       ...(room.kind === 'skribbl' && room.gallery.length ? { gallery: room.gallery } : {}),
-    }),
+    })),
 
   patchPlayer: (p) =>
     set((s) =>
@@ -162,6 +176,13 @@ export const useGame = create<GameStore>((set) => ({
   setSettings: (settings) =>
     set((s) => (s.room?.kind === 'skribbl' ? { room: { ...s.room, settings } } : {})),
   setHost: (hostId) => set((s) => (s.room ? { room: { ...s.room, hostId } } : {})),
+  setMeta: (meta) => set((s) => (s.room ? { room: { ...s.room, meta } } : {})),
+  setTurnClock: (endsAt) =>
+    set((s) => ({
+      chooseEndsAt: s.chooseEndsAt === null ? null : endsAt,
+      suggest: s.suggest ? { ...s.suggest, endsAt } : null,
+      room: s.room?.kind === 'skribbl' && s.room.turn ? { ...s.room, turn: { ...s.room.turn, endsAt } } : s.room,
+    })),
 
   beginChoosing: (p) =>
     set((s) => ({
@@ -336,13 +357,7 @@ export const useGame = create<GameStore>((set) => ({
   setKickedBy: (kickedBy) => set({ kickedBy }),
 
   reset: () =>
-    set({
-      me: null, room: null, secret: null, choices: null, chooseEndsAt: null,
-      suggest: null, mySuggestion: null, suggestError: null,
-      messages: [], turnResult: null, final: null, notice: null, kickedBy: null,
-      realmsHand: [], realmsOwed: 0, spiesKey: null, bingoCard: null, cryptidClue: null,
-      gallery: null, galleryOpen: false,
-    }),
+    set({ ...noGamePrivate(), me: null, room: null, messages: [], notice: null, kickedBy: null }),
 }));
 
 // ---- selectors ----

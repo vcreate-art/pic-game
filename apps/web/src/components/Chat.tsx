@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MAX_CHAT_LEN } from '../constants.js';
+import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { getSocket } from '../net/socket.js';
 import { selectHaveGuessed, selectIsDrawer, selectSkribbl, useGame } from '../store/game.js';
 
@@ -46,6 +47,7 @@ export function Chat() {
     const t = text.trim();
     if (!t || locked) return;
     socket.emit('chat:guess', { text: t });
+    if (isPostHogEnabled) posthog.capture('chat_message_sent', { message_type: isSkribbl && drawing ? 'guess' : 'chat' });
     setText('');
   };
 

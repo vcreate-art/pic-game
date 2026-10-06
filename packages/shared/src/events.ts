@@ -1,6 +1,6 @@
 import type {
   Avatar, CanvasOp, ChatMessage, Drawing, GameKind, PenTool, Player,
-  RoomSettings, RoomState, TurnPublic, Vote, WordOption,
+  RoomMeta, RoomSettings, RoomState, TurnPublic, Vote, WordOption,
 } from './types.js';
 import type { KungFuPublic, KungFuSettings, Piece, Side, Square } from './kungfu/types.js';
 import type {
@@ -56,6 +56,19 @@ export interface ClientToServerEvents {
     cb: (r: JoinAck) => void,
   ) => void;
   'room:leave': () => void;
+  /** Host only, outside the lobby: the same game again from the start. A
+   *  game in progress is abandoned with no result. */
+  'game:restart': () => void;
+  /** Host only, mid-game, in games that support it: everything stops until
+   *  the host resumes. */
+  'room:pause': () => void;
+  'room:resume': () => void;
+  /** Host only, outside the lobby: back to the lobby, abandoning a game in
+   *  progress with no result. */
+  'game:toLobby': () => void;
+  /** Host only, between games: the room plays a different game next, with
+   *  the same code, seats and session. */
+  'room:switch': (p: { kind: GameKind }, cb?: (r: { ok: boolean; message?: string }) => void) => void;
   /** Change your own name or avatar mid-room; everyone sees it at once. */
   'player:rename': (p: { name: string; avatar: Avatar }) => void;
   /** Host only. Removes a player and blocks that seat from coming back. */
@@ -236,6 +249,8 @@ export interface ServerToClientEvents {
   'player:left': (p: { id: string }) => void;
   'player:updated': (p: Player) => void;
   'room:settings': (s: RoomSettings) => void;
+  /** Session wins and host permissions, sent when they change. */
+  'room:meta': (m: RoomMeta) => void;
   'host:changed': (p: { hostId: string }) => void;
   /** Sent to the removed player's socket alone, just before they are dropped. */
   'kicked': (p: { by: string }) => void;
@@ -263,6 +278,8 @@ export interface ServerToClientEvents {
   }) => void;
   /** Emitted to the drawer's socket alone. Never broadcast. */
   'word:secret': (p: { word: string }) => void;
+  /** The turn's new deadline, after a pause pushed it back. */
+  'turn:clock': (p: { endsAt: number }) => void;
   'turn:drawing': (p: TurnPublic) => void;
   'hint:reveal': (p: { index: number; char: string }) => void;
   'turn:end': (p: {

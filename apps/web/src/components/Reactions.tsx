@@ -1,4 +1,5 @@
 import type { Vote } from '@pic-game/shared';
+import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { getSocket } from '../net/socket.js';
 import { selectSkribbl, useGame } from '../store/game.js';
 
@@ -15,7 +16,11 @@ export function Reactions() {
 
   const isDrawer = turn.drawerId === me;
   const mine: Vote | null = turn.likes.includes(me) ? 'like' : turn.dislikes.includes(me) ? 'dislike' : null;
-  const vote = (v: Vote) => getSocket().emit('draw:react', { vote: mine === v ? null : v });
+  const vote = (v: Vote) => {
+    const reaction = mine === v ? null : v;
+    getSocket().emit('draw:react', { vote: reaction });
+    if (isPostHogEnabled) posthog.capture('drawing_reaction_set', { reaction: reaction ?? 'cleared' });
+  };
 
   return (
     <div className="reactions" title={isDrawer ? 'What everyone thinks of your drawing' : 'Like this drawing?'}>

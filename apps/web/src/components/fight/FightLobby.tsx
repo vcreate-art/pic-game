@@ -9,6 +9,7 @@ import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { FighterCard } from './FighterCard.js';
 import { Controls, MoveList } from './MoveList.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 export const SIDE_LABEL: Record<FightSide, string> = { a: 'Player 1', b: 'Player 2' };
 
@@ -18,7 +19,7 @@ const ROUND_MODES = [
   { value: 3, name: 'Best of 5', blurb: 'For a grudge.' },
 ];
 
-export function FightLobby({ onLeave }: { onLeave: () => void }) {
+export function FightLobby() {
   const room = useGame(selectFight);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -40,7 +41,7 @@ export function FightLobby({ onLeave }: { onLeave: () => void }) {
         <InviteCard />
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Match settings</h2>
+          <SettingsTitle>Match settings</SettingsTitle>
 
           <div className="seats">
             {FIGHT_SIDES.map((side) => {
@@ -188,11 +189,6 @@ export function FightLobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

@@ -180,7 +180,7 @@ function Arrange({ game }: { game: BingoPublic }) {
   );
 }
 
-export function BingoGame({ onLeave }: { onLeave: () => void }) {
+export function BingoGame() {
   const room = useGame(selectBingo);
   const me = useGame((s) => s.me);
   const card = useGame((s) => s.bingoCard);
@@ -192,7 +192,7 @@ export function BingoGame({ onLeave }: { onLeave: () => void }) {
 
   if (!room || !me) return null;
   const { game } = room;
-  if (game.phase === 'lobby') return <BingoLobby onLeave={onLeave} />;
+  if (game.phase === 'lobby') return <BingoLobby />;
 
   const turns = game.settings.mode === 'turns';
   const ended = game.phase === 'ended';
@@ -269,13 +269,14 @@ export function BingoGame({ onLeave }: { onLeave: () => void }) {
                     ) : (
                       <span className="bplayer__lines">{n ? `${n} line${n === 1 ? '' : 's'}` : ''}</span>
                     )}
-                    {p.score > 0 && <span className="bplayer__wins" title="Wins in this room">{p.score}</span>}
+                    {!!room.meta.wins[p.id] && (
+                      <span className="bplayer__wins" title="Wins this session">{room.meta.wins[p.id]}</span>
+                    )}
                   </li>
                 );
               })}
             </ul>
           </section>
-          <button className="btn btn--danger" type="button" onClick={onLeave}>Leave room</button>
         </aside>
 
         <main className="bingo__main">

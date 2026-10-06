@@ -1,10 +1,10 @@
 import type { CanvasEngine } from '../canvas/engine.js';
-import { getFightView } from '../fight/instance.js';
-import { getRaceView } from '../race/instance.js';
-import { getMazeClient } from '../maze/client.js';
+import { disposeFightView, getFightView } from '../fight/instance.js';
+import { disposeRaceView, getRaceView } from '../race/instance.js';
+import { disposeMazeClient, getMazeClient } from '../maze/client.js';
 import { useGame } from '../store/game.js';
 import { getSocket } from './socket.js';
-import { syncClock } from './clock.js';
+import { setPausedAt, syncClock } from './clock.js';
 
 /**
  * Wires every server event to either the store or the canvas engine.
@@ -27,6 +27,15 @@ export function bindSocket(engine: CanvasEngine): () => void {
   socket.on('disconnect', onDisconnect);
 
   socket.on('state:sync', (state) => {
+    // The host switched games: nothing the last one drew may carry over.
+    const was = g().room?.kind;
+    if (was && was !== state.kind) {
+      disposeFightView();
+      disposeRaceView();
+      disposeMazeClient();
+      engine.clear();
+    }
+    setPausedAt(state.meta.paused?.at ?? null);
     g().sync(state);
     // Only the drawing game has a canvas to restore.
     if (state.kind === 'skribbl') engine.replay(state.ops);
@@ -38,6 +47,10 @@ export function bindSocket(engine: CanvasEngine): () => void {
   socket.on('player:left', ({ id }) => g().dropPlayer(id));
   socket.on('room:settings', (s) => g().setSettings(s));
   socket.on('host:changed', ({ hostId }) => g().setHost(hostId));
+  socket.on('room:meta', (m) => {
+    setPausedAt(m.paused?.at ?? null);
+    g().setMeta(m);
+  });
   socket.on('kicked', ({ by }) => g().setKickedBy(by));
 
   socket.on('turn:choosing', (p) => {
@@ -46,6 +59,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
   });
   socket.on('word:secret', ({ word }) => g().setSecret(word));
   socket.on('suggest:state', (st) => g().setSuggest(st));
+  socket.on('turn:clock', ({ endsAt }) => g().setTurnClock(endsAt));
   socket.on('turn:drawing', (turn) => g().beginDrawing(turn));
   socket.on('hint:reveal', ({ index, char }) => g().reveal(index, char));
   socket.on('turn:end', (r) => g().endTurn(r));
@@ -128,11 +142,13 @@ export function bindSocket(engine: CanvasEngine): () => void {
   if (socket.connected) onConnect();
 
   return () => {
+    // Off the room page, nothing is paused.
+    setPausedAt(null);
     socket.off('connect', onConnect);
     socket.off('disconnect', onDisconnect);
     for (const ev of [
       'state:sync', 'player:joined', 'player:updated', 'player:left',
-      'room:settings', 'host:changed', 'kicked', 'turn:choosing', 'word:secret', 'suggest:state',
+      'room:settings', 'room:meta', 'host:changed', 'kicked', 'turn:choosing', 'turn:clock', 'word:secret', 'suggest:state',
       'turn:drawing', 'hint:reveal', 'turn:end', 'game:end', 'draw:reactions',
       'draw:start', 'draw:append', 'draw:end', 'draw:fill',
       'canvas:undone', 'canvas:cleared', 'chat:message', 'guess:correct', 'error',

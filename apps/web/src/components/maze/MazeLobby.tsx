@@ -4,10 +4,12 @@ import {
 } from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectIsHost, selectMaze, useGame } from '../../store/game.js';
+import { WinCount } from '../WinCount.js';
 import { Avatar } from '../Avatar.js';
 import { InviteCard } from '../InviteCard.js';
 import { KickButton } from '../KickButton.js';
 import { CONTROL_HELP, ControlsPicker, useMazeControls } from './controls.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 const THEMES: { value: MazeThemeChoice; name: string }[] = [
   { value: 'random', name: 'Surprise me' },
@@ -19,7 +21,7 @@ const RADARS: { value: MazeRadar; name: string; blurb: string }[] = [
   { value: 'firing', name: 'Only when firing', blurb: 'A player shows up for three seconds after each shot. Sneaking pays.' },
 ];
 
-export function MazeLobby({ onLeave }: { onLeave: () => void }) {
+export function MazeLobby() {
   const room = useGame(selectMaze);
   const isHost = useGame(selectIsHost);
   const [controls, setControls] = useMazeControls();
@@ -42,14 +44,14 @@ export function MazeLobby({ onLeave }: { onLeave: () => void }) {
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
                 {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
-                {p.score > 0 && <span className="bingolobby__wins">{p.score} win{p.score === 1 ? '' : 's'}</span>}
+                <WinCount n={room.meta.wins[p.id]} />
               </li>
             ))}
           </ul>
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Maze Wars</h2>
+          <SettingsTitle>Game settings</SettingsTitle>
 
           <label className="settings__row bingolobby__row">
             <span className="settings__label">Match length</span>
@@ -163,11 +165,6 @@ export function MazeLobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

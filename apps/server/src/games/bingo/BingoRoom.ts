@@ -1,9 +1,9 @@
 import {
-  BINGO_BOUNDS, BINGO_DEFAULTS, CELLS, advanceTurn, callNumber, claim, daub, lines,
+  GAME_CAPACITY, BINGO_BOUNDS, BINGO_DEFAULTS, CELLS, advanceTurn, callNumber, claim, daub, lines,
   newGame, randomCallerCard, randomTurnsCard, turnOf, uncalled, validTurnsCard,
   type BingoGame, type BingoPhase, type BingoPublic, type BingoSettings, type RoomState,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 /** A wrong BINGO locks that player out of shouting again for this long. */
 const CLAIM_COOLDOWN_MS = 3000;
@@ -29,7 +29,12 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
   private finished = new Map<string, number[]>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private endsAt = 0;
+  /** The caller-mode "hold the draw": balls stop, but daubing and claims go
+   *  on. Different from pausing the room, which stops everything. */
   private paused = false;
+  /** Which clock `timer` is, and what was left of it when the room paused. */
+  private timerKind: 'turn' | 'ball' | null = null;
+  private held: { kind: 'turn' | 'ball'; ms: number } | null = null;
   private claimLock = new Map<string, number>();
 
   constructor(code: string, io: IO) {
@@ -46,8 +51,39 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
     return this.stage === 'lobby';
   }
 
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.stage === 'ended' ? 'ended' : 'playing';
+  }
+
+  protected resetToLobby(): void {
+    this.toLobbyNow();
+  }
+
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  /** Stops the turn timer or the ball draw. The deadline stays put, so every
+   *  countdown holds at the time that was left. */
+  protected override onPause(): void {
+    if (!this.timer || !this.timerKind) return;
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.held = { kind: this.timerKind, ms: Math.max(0, this.endsAt - Date.now()) };
+    this.timerKind = null;
+  }
+
+  protected override onResume(): void {
+    const held = this.held;
+    this.held = null;
+    if (!held) return;
+    if (held.kind === 'turn') this.startTurnTimer(held.ms);
+    else this.scheduleBall(held.ms);
+    this.broadcast();
+  }
+
   get maxPlayers(): number {
-    return 16;
+    return GAME_CAPACITY.bingo;
   }
 
   /** A turns game needs someone to take turns with; a caller game does not. */
@@ -230,11 +266,16 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
 
   /** Running out of time calls a number at random, rather than skipping: a
    *  skipped turn would let a slow player stall everyone else's grids. */
-  private startTurnTimer(): void {
+  private startTurnTimer(ms = this.settings.turnSeconds * 1000): void {
     this.clearTimer();
     const secs = this.settings.turnSeconds;
     if (!secs) return;
-    this.endsAt = Date.now() + secs * 1000;
+    this.endsAt = Date.now() + ms;
+    if (this.isPaused) {
+      this.held = { kind: 'turn', ms };
+      return;
+    }
+    this.timerKind = 'turn';
     this.timer = setTimeout(() => {
       this.timer = null;
       const g = this.game;
@@ -243,7 +284,7 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
       const who = turnOf(g);
       if (!who || !left.length) return;
       this.applyCall(left[Math.floor(Math.random() * left.length)]!, who);
-    }, secs * 1000);
+    }, ms);
   }
 
   // ----------------------------------------------------------- caller play
@@ -270,16 +311,21 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
     this.broadcast();
   }
 
-  private scheduleBall(): void {
+  private scheduleBall(ms = this.settings.callSeconds * 1000): void {
     this.clearTimer();
     const g = this.caller();
     const secs = this.settings.callSeconds;
     if (!g || !secs || this.paused || !uncalled(g).length) return;
-    this.endsAt = Date.now() + secs * 1000;
+    this.endsAt = Date.now() + ms;
+    if (this.isPaused) {
+      this.held = { kind: 'ball', ms };
+      return;
+    }
+    this.timerKind = 'ball';
     this.timer = setTimeout(() => {
       this.timer = null;
       this.drawBall();
-    }, secs * 1000);
+    }, ms);
   }
 
   /** Host: the next ball now, whether the draw is on a clock or by hand. */
@@ -321,12 +367,7 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
     this.clearTimer();
     const g = this.game!;
     this.stage = 'ended';
-    for (const id of g.winners) {
-      const p = this.players.get(id);
-      if (!p) continue;
-      p.score += 1;
-      this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
-    }
+    this.recordWin(g.winners);
     const names = g.winners.map((id) => this.nameOf(id));
     this.systemMessage(
       names.length > 1 ? `BINGO! ${names.join(' and ')} share the win.` : `BINGO! ${names[0]} wins.`,
@@ -358,6 +399,8 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
   private clearTimer(): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    this.timerKind = null;
+    this.held = null;
     this.endsAt = 0;
   }
 
@@ -401,16 +444,14 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'bingo',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }
 
   broadcast(): void {
     this.io.to(this.code).emit('bingo:state', this.gamePublic());
+    this.syncMeta();
   }
 
   handleChat(playerId: string, raw: string): void {

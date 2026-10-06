@@ -50,7 +50,7 @@ function RaceStage({ meta }: { meta: RaceMeta }) {
   );
 }
 
-export function RaceGame({ onLeave }: { onLeave: () => void }) {
+export function RaceGame() {
   const room = useGame(selectRace);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -75,7 +75,7 @@ export function RaceGame({ onLeave }: { onLeave: () => void }) {
   }, [game, players, me]);
 
   if (!room || !game || !meta) return null;
-  if (game.phase === 'lobby') return <RaceLobby onLeave={onLeave} />;
+  if (game.phase === 'lobby') return <RaceLobby />;
 
   const nameOf = (id: string) => room.players.find((p) => p.id === id);
   const standings = [...room.players].sort((a, b) => (game.points[b.id] ?? 0) - (game.points[a.id] ?? 0));
@@ -174,9 +174,6 @@ export function RaceGame({ onLeave }: { onLeave: () => void }) {
                 </li>
               ))}
             </ol>
-            <button className="btn btn--danger" type="button" onClick={onLeave}>
-              Leave room
-            </button>
           </section>
           <Chat />
         </div>

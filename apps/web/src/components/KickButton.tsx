@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { getSocket } from '../net/socket.js';
 
 /**
@@ -26,6 +27,7 @@ export function KickButton({ playerId, name }: { playerId: string; name: string 
         e.stopPropagation();
         if (armed) {
           socket.emit('player:kick', { playerId });
+          if (isPostHogEnabled) posthog.capture('player_removed');
           setArmed(false);
         } else {
           setArmed(true);

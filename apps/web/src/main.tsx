@@ -6,6 +6,9 @@ import { Route as rootRoute } from './routes/__root.js';
 import { Route as backstageRoute } from './routes/backstage.js';
 import { Route as indexRoute } from './routes/index.js';
 import { Route as roomRoute } from './routes/room.$code.js';
+import './lib/posthog.js';
+import './lib/posthogGames.js';
+import './lib/buttonInk.js';
 import './styles.css';
 
 const routeTree = rootRoute.addChildren([indexRoute, roomRoute, backstageRoute]);

@@ -7,6 +7,7 @@ import { selectIsHost, selectSpies, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 export const TEAM_NAME: Record<SpyTeam, string> = { red: 'Red', blue: 'Blue' };
 
@@ -24,7 +25,7 @@ const SOURCES: { value: WordSource; name: string; blurb: string }[] = [
   { value: 'custom', name: 'Only mine', blurb: `Needs ${SPIES_BOUNDS.customWords.minForGame} or more.` },
 ];
 
-export function SpiesLobby({ onLeave }: { onLeave: () => void }) {
+export function SpiesLobby() {
   const room = useGame(selectSpies);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -99,7 +100,7 @@ export function SpiesLobby({ onLeave }: { onLeave: () => void }) {
         </div>
 
         <section className="card spylobby__settings">
-          <h2 className="card__title">Game settings</h2>
+          <SettingsTitle>Game settings</SettingsTitle>
 
           {unassigned.length > 0 && (
             <p className="settings__note settings__note--left">
@@ -208,11 +209,6 @@ export function SpiesLobby({ onLeave }: { onLeave: () => void }) {
         </section>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

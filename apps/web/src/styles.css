@@ -45,6 +45,10 @@ button, input { font: inherit; color: inherit; }
    wordmark; mirrored it leans into it. */
 .is-flipped { display: inline-block; transform: scaleX(-1); }
 .brand__name { font-family: var(--display); font-weight: 800; font-size: 20px; letter-spacing: -.01em; }
+/* A narrow header keeps the dice and gives the room its space. */
+@media (max-width: 430px) {
+  .brand__name { display: none; }
+}
 
 .topbar__right { display: flex; align-items: center; gap: 12px; }
 
@@ -64,25 +68,6 @@ button, input { font: inherit; color: inherit; }
 .profile__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .profile__note { margin: 0; font-size: 12px; color: var(--ink-soft); }
 
-.people { position: relative; }
-.people__chip {
-  display: flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--line);
-  border-radius: 999px; background: var(--card); font-weight: 700; font-size: 13.5px; cursor: pointer;
-  font-variant-numeric: tabular-nums;
-}
-.people__chip:hover, .people__chip[aria-expanded="true"] { border-color: var(--accent); }
-.people__pop {
-  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 280px;
-  display: flex; flex-direction: column; gap: 10px;
-}
-.people__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow-y: auto; }
-.people__list li { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 9px; font-size: 13.5px; font-weight: 600; }
-.people__list li:hover { background: var(--paper); }
-.people__list li.is-away { opacity: .55; }
-.people__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.people__name em { font-weight: 500; color: var(--ink-soft); }
-.people__tag { font-size: 11px; color: var(--ink-soft); }
-
 .conn { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
 .conn.is-on { color: var(--ok); background: #dcfce7; }
 .conn.is-off { color: var(--warn); background: #fee2e2; }
@@ -92,7 +77,7 @@ button, input { font: inherit; color: inherit; }
 .notice {
   position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
   background: var(--ink); color: #fff; padding: 10px 18px;
-  border-radius: 999px; font-weight: 500; box-shadow: var(--shadow); z-index: 50;
+  border-radius: 999px; font-weight: 500; box-shadow: var(--shadow); z-index: 70;
 }
 
 /* ---------------------------------------------------------------- cards */
@@ -109,23 +94,42 @@ button, input { font: inherit; color: inherit; }
 /* ---------------------------------------------------------------- buttons */
 
 .btn {
+  /* The ink that spreads across a button on hover; see buttonInk.ts. */
+  --btn-ink: rgba(31, 34, 51, .07);
+  position: relative; overflow: hidden; isolation: isolate;
   border: 1px solid var(--line); background: var(--card); color: var(--ink);
   border-radius: 12px; padding: 10px 18px; font-weight: 600;
-  cursor: pointer; transition: transform .08s ease, background .15s ease, border-color .15s ease;
+  cursor: pointer; transition: transform .08s ease, background .15s ease, border-color .15s ease, color .2s ease;
 }
-.btn:hover:not(:disabled) { border-color: var(--accent); }
+/* The same ink as the game covers: a shade spreads from where the pointer
+   came in, under the label, and drains toward where it left. */
+.btn::before, .room__ctl::before, .paused__resume::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--btn-ink);
+  clip-path: circle(0% at var(--ex, 50%) var(--ey, 50%));
+  transition: clip-path .35s cubic-bezier(.3, .7, .3, 1);
+}
+@media (hover: hover) {
+  .btn:hover:not(:disabled)::before, .room__ctl:hover::before, .paused__resume:hover::before {
+    clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn::before, .room__ctl::before, .paused__resume::before { transition: none; }
+}
+/* A filled button keeps its own edge; the ink is its hover. */
+.btn:not(.btn--primary):hover:not(:disabled) { border-color: var(--accent); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn:focus-visible, .sheet__close:focus-visible, .join__cycle button:focus-visible {
   outline: 2px solid var(--ink); outline-offset: 2px;
 }
-.btn--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn--primary:hover:not(:disabled) { background: #4b3cc4; }
+.btn--primary { --btn-ink: rgba(0, 0, 0, .22); background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn--ghost { background: transparent; }
 /* Leaving a room is destructive and hard to undo mid-game, so it reads as such
    rather than sitting quietly among the neutral buttons. */
-.btn--danger { border-color: #fecaca; background: #fef2f2; color: var(--warn); }
-.btn--danger:hover:not(:disabled) { background: var(--warn); border-color: var(--warn); color: #fff; }
+.btn--danger { --btn-ink: var(--warn); border-color: #fecaca; background: #fef2f2; color: var(--warn); }
+.btn--danger:hover:not(:disabled) { border-color: var(--warn); color: #fff; }
 .btn--lg { padding: 13px 22px; font-size: 16px; width: 100%; }
 
 /* ---------------------------------------------------------------- landing */
@@ -145,11 +149,12 @@ button, input { font: inherit; color: inherit; }
 .landing__section { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 
 /* The front page. Colour belongs to the games, so the page around them is a
-   cool neutral and the join button is plain ink; the app purple stays in the
-   rooms. Overriding the tokens here reaches the Create sheet too. */
+   cool neutral and the join button is plain ink, purple only as it inks; the
+   app purple stays in the rooms. Overriding the tokens here reaches the
+   Create sheet too. */
 .landing--home {
   --paper: #f1f2f4; --line: #e0e2e8; --ink: #1c1d26; --ink-soft: #5e6275;
-  max-width: 1120px; padding-top: 36px;
+  max-width: 1000px; padding-top: 36px;
 }
 body:has(.landing--home) { background: #f1f2f4; }
 /* Games take the room; joining is a narrow panel that stays put while the
@@ -167,8 +172,13 @@ body:has(.landing--home) { background: #f1f2f4; }
 .landing__intro .landing__title { margin: 0; font-size: 40px; line-height: 1.05; }
 .landing__intro .landing__sub { margin-top: 6px; font-size: 15px; }
 /* One class deeper than `.landing__card .btn--primary`, which comes later. */
-.landing__join .landing__card .btn--primary { background: var(--ink); border-color: var(--ink); }
-.landing__join .landing__card .btn--primary:hover:not(:disabled) { background: #33354a; border-color: #33354a; }
+.landing__join .landing__card .btn--primary {
+  /* Near black already, so darker ink wouldn't show: it inks in the app's
+     accent instead, the join card's one bit of colour, and only on hover. */
+  --btn-ink: var(--accent);
+  background: var(--ink); border-color: var(--ink);
+}
+.landing__join .landing__card .btn--primary:hover:not(:disabled) { border-color: var(--accent); }
 
 .landing__heading {
   margin: 0 0 0 4px; font-family: var(--display); font-size: 21px; font-weight: 800;
@@ -628,8 +638,10 @@ body:has(.landing--home) { background: #f1f2f4; }
 .pick__cover {
   position: relative; overflow: hidden; display: flex; align-items: flex-end;
   aspect-ratio: 4 / 3; padding: 14px 16px; border-radius: 12px;
-  border: 3px solid var(--game, var(--ink));
-  background: var(--paper); color: var(--ink);
+  /* The same quiet edge as every other card, with the game's colour in the
+     surface instead, as a soft tint. */
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--game, var(--ink)) 12%, var(--card)); color: var(--ink);
   transition: color .2s ease;
 }
 /* Under the icon and the text, over the paper. */
@@ -640,7 +652,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   transition: clip-path .35s cubic-bezier(.3, .7, .3, 1);
 }
 .pick__art {
-  position: absolute; top: -10px; right: -10px; width: 90px; height: 90px;
+  position: absolute; top: -4px; right: -18px; width: 72px; height: 72px;
   color: var(--game, var(--ink)); opacity: .6;
 }
 /* A soft glow of the game's colour rising from the bottom-left corner,
@@ -650,10 +662,16 @@ body:has(.landing--home) { background: #f1f2f4; }
   background: radial-gradient(circle at 0% 100%,
     color-mix(in srgb, var(--game, var(--ink)) 5%, transparent), transparent 70%);
 }
+/* What kind of game, under the name. It folds away as the blurb slides up,
+   so the name and blurb have the cover to themselves. */
+.pick__cat {
+  display: block; max-height: 18px; margin-top: 3px; overflow: hidden;
+  transition: opacity .2s ease, max-height .3s ease, margin-top .3s ease;
+}
 .pick__text { position: relative; display: flex; flex-direction: column; }
 .pick__name {
   font-family: var(--display); font-weight: 800;
-  font-size: 24px; line-height: 1.02; letter-spacing: -.01em;
+  font-size: 20px; line-height: 1.05; letter-spacing: -.01em;
   transition: font-size .3s ease, margin-bottom .3s ease;
 }
 /* Rows from 0fr to 1fr animate the drawer to the blurb's own height,
@@ -663,7 +681,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   transition: grid-template-rows .35s cubic-bezier(.3, .7, .3, 1);
 }
 .pick__more > span {
-  overflow: hidden; min-height: 0; font-size: 14px; line-height: 1.4;
+  overflow: hidden; min-height: 0; font-size: 13px; line-height: 1.35;
   opacity: 0; transform: translateY(8px);
   transition: opacity .25s ease, transform .35s cubic-bezier(.3, .7, .3, 1);
 }
@@ -672,7 +690,8 @@ body:has(.landing--home) { background: #f1f2f4; }
    point on the edge. */
 .pick:focus-visible .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
 .pick:focus-visible .pick__cover { color: #fff; }
-.pick:focus-visible .pick__name { font-size: 20px; margin-bottom: 6px; }
+.pick:focus-visible .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
+.pick:focus-visible .pick__name { font-size: 17px; margin-bottom: 5px; }
 .pick:focus-visible .pick__more { grid-template-rows: 1fr; }
 .pick:focus-visible .pick__more > span { opacity: 1; transform: none; }
 /* Only with a real pointer: on touch, :hover sticks to the last tapped card.
@@ -680,7 +699,8 @@ body:has(.landing--home) { background: #f1f2f4; }
 @media (hover: hover) {
   .pick:hover .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
   .pick:hover .pick__cover { color: #fff; }
-  .pick:hover .pick__name { font-size: 20px; margin-bottom: 6px; }
+  .pick:hover .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
+  .pick:hover .pick__name { font-size: 17px; margin-bottom: 5px; }
   .pick:hover .pick__more { grid-template-rows: 1fr; }
   .pick:hover .pick__more > span { opacity: 1; transform: none; }
   .pick__blurb { display: none; }
@@ -690,18 +710,20 @@ body:has(.landing--home) { background: #f1f2f4; }
   .pick__cover, .pick__ink, .pick__name, .pick__more, .pick__more > span { transition: none; }
 }
 .pick:active .pick__cover { transform: translateY(1px); }
-/* Focus and "this one's sheet is open" share one ring in the game's colour,
-   set off the cover by a gap of page colour. */
+/* Keyboard focus is a ring in the game's colour, set off the cover by a gap
+   of page colour. */
 .pick:focus-visible { outline: none; }
-.pick:focus-visible .pick__cover, .pick.is-active .pick__cover {
+.pick:focus-visible .pick__cover {
   box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--game, var(--ink));
 }
+/* The selected game is filled with its ink, as if the pointer were on it,
+   rather than ringed. */
+.pick.is-active .pick__ink { clip-path: circle(150% at 50% 50%); }
+.pick.is-active .pick__cover { color: #fff; }
+.pick.is-active .gamecat { color: rgba(255, 255, 255, .8); }
 .landing__card .btn--primary {
   background: var(--game, var(--accent)); border-color: var(--game, var(--accent));
   transition: background-color .15s ease, border-color .15s ease;
-}
-.landing__card .btn--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--game, var(--accent)) 85%, #000);
 }
 
 /* ---------------------------------------------------------------- create sheet */
@@ -724,8 +746,9 @@ body:has(.landing--home) { background: #f1f2f4; }
   border-radius: 12px; color: #fff; background: var(--game);
 }
 .sheet__tile svg { width: 26px; height: 26px; }
+.sheet__titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .sheet__title {
-  flex: 1; min-width: 0; margin: 0; font-family: var(--display); font-size: 24px;
+  margin: 0; font-family: var(--display); font-size: 24px;
   font-weight: 800; line-height: 1.1; color: var(--game);
 }
 .sheet__close {
@@ -867,8 +890,16 @@ body:has(.landing--home) { background: #f1f2f4; }
 
 /* Beside the join card on a narrow desktop, three across would leave a
    cover too small to hold its name and the longest blurb when open. */
-@media (min-width: 901px) and (max-width: 1119px) {
-  .picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Covers stay small wherever they would otherwise stretch to fill the row:
+   two across beside the join card on a narrow desktop, three when the page
+   stacks. */
+@media (min-width: 901px) and (max-width: 1039px) {
+  .picker { grid-template-columns: repeat(2, minmax(0, 210px)); }
+  /* The grid stops short of its column, so both columns close up together. */
+  .landing--home .landing__cols { grid-template-columns: auto 380px; justify-content: center; }
+}
+@media (min-width: 561px) and (max-width: 900px) {
+  .picker { grid-template-columns: repeat(3, minmax(0, 210px)); }
 }
 @media (max-width: 900px) {
   .landing--home .landing__cols {
@@ -881,7 +912,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 @media (max-width: 560px) {
   .picker { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; }
   .pick__name { font-size: 18px; }
-  .pick__art { width: 64px; height: 64px; }
+  .pick__art { width: 60px; height: 60px; }
 }
 
 .chess__side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -2388,4 +2419,195 @@ body:has(.landing--home) { background: #f1f2f4; }
 @media (max-width: 560px) {
   .backstage { padding-top: 16px; }
   .backstage__title { font-size: 28px; }
+}
+
+/* ---------------------------------------------------------------- game category */
+
+.gamecat {
+  font-size: 12.5px; font-weight: 700; line-height: 1.35; white-space: nowrap;
+  color: var(--game, var(--ink-soft));
+}
+.sheet__cat { font-size: 13px; }
+
+/* ---------------------------------------------------------------- room panel */
+
+/* The room's controls, from the header. It wears the current game's colour
+   (--game): the chip's icon, the panel's tile and its active control. */
+.room { position: relative; }
+/* In a room the game takes the brand's place on the left as the screen's
+   title: its icon on a tile of its colour and its name in the display face.
+   The whole title is the button that opens the room panel. */
+.room__chip {
+  display: flex; align-items: center; gap: 10px; padding: 3px 8px 3px 3px;
+  border: 0; border-radius: 12px; background: none;
+  font-family: var(--display); font-weight: 800; font-size: 21px; line-height: 1.15;
+  cursor: pointer; max-width: 360px;
+}
+.room__chip:hover, .room__chip[aria-expanded="true"] { background: color-mix(in srgb, var(--game) 8%, var(--card)); }
+.room__chip:focus-visible { outline: 2px solid var(--game); outline-offset: 2px; }
+.room__chiptile {
+  display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 9px;
+  background: var(--game); color: #fff;
+}
+.room__chiptile svg { width: 19px; height: 19px; }
+.room__chipname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room__caret { width: 14px; height: 14px; color: var(--ink-soft); flex: none; }
+
+.room__scrim { display: none; }
+.room__panel {
+  position: absolute; left: 0; top: calc(100% + 8px); z-index: 60; width: 340px;
+  max-height: calc(100vh - 90px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 16px; padding: 16px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 18px 40px -18px rgba(31, 34, 51, .35);
+}
+
+/* The host's three controls as one strip: icon over label, equal widths. */
+.room__controls { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.room__ctl {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 9px 4px 8px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--paper);
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.room__ctl svg { width: 18px; height: 18px; }
+.room__ctl {
+  --btn-ink: color-mix(in srgb, var(--game) 12%, transparent);
+  position: relative; overflow: hidden; isolation: isolate;
+}
+.room__ctl.is-on { --btn-ink: rgba(0, 0, 0, .2); }
+.room__ctl:hover { border-color: var(--game); color: var(--game); }
+.room__ctl.is-on:hover { color: #fff; }
+.room__ctl.is-on { background: var(--game); border-color: var(--game); color: #fff; }
+.room__ctl:focus-visible { outline: 2px solid var(--game); outline-offset: 2px; }
+.room__confirm { display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; }
+.room__confirm p { margin: 0; }
+.room__confirmrow { display: flex; gap: 8px; }
+.room__confirmrow .btn { flex: 1; padding: 9px 12px; }
+.room__go { background: var(--game); border-color: var(--game); }
+.room__go:hover:not(:disabled) { background: color-mix(in srgb, var(--game) 85%, #000); }
+
+.room__section { display: flex; flex-direction: column; gap: 8px; }
+.room__h {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0;
+  font-family: var(--display); font-size: 17px; font-weight: 800;
+}
+.room__hnote { font-family: var(--ui); font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+.room__people { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.room__people li { display: flex; align-items: center; gap: 9px; padding: 5px 4px; border-radius: 9px; }
+.room__people li.is-away { opacity: .55; }
+.room__name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 14px; font-weight: 600;
+}
+.room__name em { font-style: normal; font-weight: 500; color: var(--ink-soft); }
+.room__away { margin-left: 6px; font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+.room__wins { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.room__note { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.room__leave {
+  align-self: flex-start; padding: 2px 0; border: 0; background: none; cursor: pointer;
+  font-size: 13.5px; font-weight: 600; color: var(--warn);
+}
+.room__leave:hover { text-decoration: underline; }
+
+.topbar__room { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+/* The host's way to another game, by the room's name, in the lobby only. */
+/* A settings card's heading, with the host's Change game link in its corner. */
+.card__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.card__head .card__title { margin: 0; }
+.switchgame__link {
+  flex: none; padding: 2px 0; border: 0; background: none; cursor: pointer;
+  font-size: 13.5px; font-weight: 600; color: var(--accent);
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
+}
+.switchgame__link:hover { text-decoration-color: currentColor; }
+.switchgame__link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+/* The settings card turned into the game grid: the lobby's own settings
+   step aside until the host picks or closes it. */
+.card:has(> .card__head.is-picking) > :not(.card__head):not(.switchgrid) { display: none; }
+.switchgrid { display: flex; flex-direction: column; gap: 12px; }
+/* Compact covers to fit the card: three across, no blurb drawer (the front
+   page already explains each game), the ink still answers the pointer. */
+.switchgrid .picker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 2px; }
+.switchgrid .pick__cover { padding: 10px 11px; border-radius: 10px; }
+.switchgrid .pick__art { top: -3px; right: -12px; width: 46px; height: 46px; }
+.switchgrid .pick__name, .switchgrid .pick:hover .pick__name, .switchgrid .pick:focus-visible .pick__name {
+  font-size: 15px; margin-bottom: 0;
+}
+.switchgrid .pick__cat, .switchgrid .pick:hover .pick__cat, .switchgrid .pick:focus-visible .pick__cat {
+  max-height: 18px; margin-top: 2px; opacity: 1; font-size: 11.5px;
+}
+.switchgrid .pick__more, .switchgrid .pick__blurb { display: none; }
+.switchgrid .pick:disabled { cursor: default; opacity: .55; }
+.switchgrid .pick.is-active:disabled { opacity: 1; }
+
+/* On a phone the panel is a sheet up from the bottom, over a scrim. */
+@media (max-width: 560px) {
+  .room__chip { max-width: 220px; font-size: 18px; }
+  .room__scrim { display: block; position: fixed; inset: 0; z-index: 59; background: rgba(31, 34, 51, .4); }
+  .room__panel {
+    position: fixed; left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 85vh;
+    border-radius: 20px 20px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    animation: sheet-rise .24s cubic-bezier(.2, .9, .3, 1);
+  }
+}
+
+/* ---------------------------------------------------------------- paused */
+
+/* Over the game, under the header, so the room panel stays reachable. The
+   game shows through, tinted in its own colour. */
+.topbar { position: relative; z-index: 65; }
+.paused {
+  position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; padding: 20px; overflow-y: auto;
+  background: color-mix(in srgb, color-mix(in srgb, var(--game) 16%, var(--paper)) 84%, transparent);
+  backdrop-filter: blur(5px);
+  animation: sheet-fade .18s ease;
+}
+.paused__inner { display: flex; flex-direction: column; align-items: center; text-align: center; }
+/* In order of weight: what's happening, who and how long, what to do next,
+   and last and quietest, how tonight is going. */
+.paused__word {
+  margin: 0; font-family: var(--display); font-weight: 800; line-height: .9;
+  font-size: clamp(64px, 14vw, 128px); letter-spacing: -.03em; color: var(--game);
+}
+.paused__line { margin: 10px 0 0; font-size: 15px; color: var(--ink-soft); }
+.paused__time { font-variant-numeric: tabular-nums; }
+.paused__resume {
+  margin-top: 26px; min-width: 220px; padding: 15px 36px; border: 0; border-radius: 14px; cursor: pointer;
+  background: var(--game); color: #fff; font-size: 18px; font-weight: 700;
+  box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--game) 80%, transparent);
+}
+.paused__resume { --btn-ink: rgba(0, 0, 0, .22); position: relative; overflow: hidden; isolation: isolate; }
+.paused__resume:focus-visible { outline: 3px solid var(--game); outline-offset: 3px; }
+.paused__wait {
+  margin: 26px 0 0; padding: 12px 22px; border-radius: 14px; font-size: 16px; font-weight: 600;
+  color: var(--game); background: color-mix(in srgb, var(--game) 10%, transparent);
+}
+/* Background reading while everyone waits: no card, a rule and small type. */
+.paused__board {
+  width: min(300px, 100%); margin-top: 44px; padding-top: 14px; text-align: left;
+  border-top: 1px solid color-mix(in srgb, var(--game) 25%, transparent);
+}
+.paused__boardh {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 6px;
+  font-family: var(--display); font-size: 15px; font-weight: 800; color: var(--ink-soft);
+}
+.paused__boardnote { font-family: var(--ui); font-size: 12px; font-weight: 500; }
+.paused__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.paused__rows li { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.paused__rows li.is-away { opacity: .55; }
+.paused__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; font-weight: 600; }
+.paused__wins { font-size: 12.5px; font-weight: 700; color: var(--game); font-variant-numeric: tabular-nums; }
+.paused__more { margin: 4px 0 0; font-size: 12px; color: var(--ink-soft); }
+/* The 3-2-1: the same tinted screen, one huge number, each landing afresh. */
+.countdown__label { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink-soft); }
+.countdown__n {
+  margin: 0; font-family: var(--display); font-weight: 800; line-height: .85;
+  font-size: clamp(140px, 30vw, 260px); color: var(--game); font-variant-numeric: tabular-nums;
+  animation: countdown-land .45s cubic-bezier(.2, .9, .3, 1.3);
+}
+@keyframes countdown-land { from { transform: scale(1.35); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .paused, .room__panel, .countdown__n { animation: none; }
 }

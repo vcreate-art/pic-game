@@ -1,11 +1,11 @@
 import { performance } from 'node:perf_hooks';
 import {
-  AIM_STEPS, MAZE_DEFAULTS, MAZE_HZ, MAZE_THEMES, MAZE_KILL_LIMITS, MAZE_MAX_PLAYERS, MAZE_MIN_PLAYERS, MAZE_MINUTES,
+  GAME_CAPACITY, AIM_STEPS, MAZE_DEFAULTS, MAZE_HZ, MAZE_THEMES, MAZE_KILL_LIMITS, MAZE_MAX_PLAYERS, MAZE_MIN_PLAYERS, MAZE_MINUTES,
   createWorld, generateMaze, mazeSize, setAway, stepWorld, toMazeFrame,
   type MazeEvent, type MazeInput, type MazePhase, type MazePublic, type MazeSettings, type MazeTheme, type MazeWorld,
   type RoomState,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 const STEP_MS = 1000 / MAZE_HZ;
 /** Most ticks run in one wake-up to catch up after a stall. */
@@ -64,8 +64,34 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
     return this.stage === 'lobby';
   }
 
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.stage === 'ended' ? 'ended' : 'playing';
+  }
+
+  /** The loop stops ticking while paused; the match clock moves back by the
+   *  pause, and nobody resumes still running from before it. */
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  protected override onResume(pausedMs: number): void {
+    this.endsAt += pausedMs;
+    for (const s of this.seats) {
+      s.queue = [];
+      s.last = null;
+    }
+    this.broadcast();
+  }
+
+  protected resetToLobby(): void {
+    this.stopLoop();
+    this.stage = 'lobby';
+    this.world = null;
+    this.broadcast();
+  }
+
   get maxPlayers(): number {
-    return 16;
+    return GAME_CAPACITY.maze;
   }
 
   protected get minPlayers(): number {
@@ -185,6 +211,12 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
       const now = performance.now();
       this.acc += now - this.last;
       this.last = now;
+      // Paused: no ticks, and the match clock waits.
+      if (this.isPaused) {
+        this.acc = 0;
+        this.loop = setTimeout(run, STEP_MS);
+        return;
+      }
       const events: MazeEvent[] = [];
       let n = 0;
       while (this.acc >= STEP_MS && n < MAX_CATCH_UP) {
@@ -235,12 +267,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
     if (w) {
       const best = Math.max(...w.fighters.map((f) => f.kills));
       this.winners = best > 0 ? w.fighters.filter((f) => f.kills === best).map((f) => f.id) : [];
-      for (const id of this.winners) {
-        const p = this.players.get(id);
-        if (!p) continue;
-        p.score += 1;
-        this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
-      }
+      this.recordWin(this.winners);
       const names = this.winners.map((id) => this.players.get(id)?.name ?? 'Someone');
       this.systemMessage(names.length ? `${names.join(' and ')} wins with ${best} kills!` : 'Time! Nobody scored.');
     }
@@ -287,16 +314,14 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'maze',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }
 
   broadcast(): void {
     this.io.to(this.code).emit('maze:state', this.gamePublic());
+    this.syncMeta();
   }
 
   handleChat(playerId: string, raw: string): void {

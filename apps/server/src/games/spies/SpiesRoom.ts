@@ -1,10 +1,10 @@
 import {
-  SPIES_BOUNDS, SPIES_DEFAULTS, SPY_TEAMS, SPY_WORDS, clueProblem, deal, giveClue,
+  GAME_CAPACITY, SPIES_BOUNDS, SPIES_DEFAULTS, SPY_TEAMS, SPY_WORDS, clueProblem, deal, giveClue,
   parseCustomWords, passTurn, remaining, reveal, validCount, type RoomState, type SpiesGame,
   type SpiesPhase, type SpiesPublic, type SpiesSettings, type SpiesTeamSeats, type SpyRole,
   type SpyTeam,
 } from '@pic-game/shared';
-import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 
 const emptyTeams = (): Record<SpyTeam, SpiesTeamSeats> => ({
   red: { spymaster: null, operatives: [] },
@@ -32,6 +32,8 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
   private marks = new Map<number, Set<string>>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private endsAt = 0;
+  /** What was left of the turn clock when the room paused. */
+  private heldMs: number | null = null;
 
   constructor(code: string, io: IO) {
     super(code, io);
@@ -47,8 +49,40 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     return this.phase === 'lobby';
   }
 
+  lifecycle(): RoomLifecycle {
+    return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
+  }
+
+  protected resetToLobby(): void {
+    this.clearTimer();
+    this.game = null;
+    this.marks.clear();
+    this.broadcast();
+  }
+
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  /** Stops the turn clock, if the game has one. The deadline stays put, so
+   *  the countdown holds at the time that was left. */
+  protected override onPause(): void {
+    if (!this.timer) return;
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.heldMs = Math.max(0, this.endsAt - Date.now());
+  }
+
+  protected override onResume(): void {
+    const ms = this.heldMs;
+    this.heldMs = null;
+    if (ms === null) return;
+    this.startTimer(ms);
+    this.broadcast();
+  }
+
   get maxPlayers(): number {
-    return 16;
+    return GAME_CAPACITY.spies;
   }
 
   protected get minPlayers(): number {
@@ -276,6 +310,8 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
   private finish(): void {
     this.clearTimer();
     const g = this.game!;
+    const team = g.winner ? this.teams[g.winner] : null;
+    this.recordWin(team ? [team.spymaster, ...team.operatives] : []);
     this.systemMessage(
       g.reason === 'assassin'
         ? `The assassin! ${g.winner} wins.`
@@ -299,7 +335,8 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
 
   /** An optional clock on each phase. Running out of time passes the turn:
    *  a spymaster who never gives a clue forfeits their team's go. */
-  private startTimer(): void {
+  /** `ms` is what's left of the turn when picking up after a pause. */
+  private startTimer(ms?: number): void {
     this.clearTimer();
     const g = this.game;
     if (!g || g.phase === 'ended') return;
@@ -307,7 +344,12 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     // number is tapped in; a clue clock set in a typed game must not linger.
     const secs = g.phase === 'guess' ? this.settings.guessSeconds : this.spoken ? 0 : this.settings.clueSeconds;
     if (!secs) return;
-    this.endsAt = Date.now() + secs * 1000;
+    const wait = ms ?? secs * 1000;
+    this.endsAt = Date.now() + wait;
+    if (this.isPaused) {
+      this.heldMs = wait;
+      return;
+    }
     this.timer = setTimeout(() => {
       this.timer = null;
       if (!this.game || this.game.phase === 'ended') return;
@@ -316,12 +358,13 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
       this.marks.clear();
       this.startTimer();
       this.broadcast();
-    }, secs * 1000);
+    }, wait);
   }
 
   private clearTimer(): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    this.heldMs = null;
     this.endsAt = 0;
   }
 
@@ -364,16 +407,14 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
   publicState(): RoomState {
     return {
       kind: 'spies',
-      code: this.code,
-      players: this.publicPlayers(),
-      hostId: this.hostId,
-      serverTime: Date.now(),
+      ...this.baseState(),
       game: this.gamePublic(),
     };
   }
 
   broadcast(): void {
     this.io.to(this.code).emit('spies:state', this.gamePublic());
+    this.syncMeta();
   }
 
   handleChat(playerId: string, raw: string): void {

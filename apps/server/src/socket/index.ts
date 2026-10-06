@@ -30,7 +30,12 @@ type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
 /** Per-connection session. The room/player binding lives here rather than on the
  *  socket id, which is not stable across reconnects. */
 interface Session {
-  room: AnyRoom | null;
+  /** The code of the room this socket is seated in. */
+  code: string | null;
+  /** That room, looked up afresh on every use: switching games replaces the
+   *  room object under the same code, so a stored reference would go stale.
+   *  Null too if the seat is gone, or the code now names a different room. */
+  readonly room: AnyRoom | null;
   playerId: string | null;
   chat: TokenBucket;
   draw: TokenBucket;
@@ -66,10 +71,25 @@ function cleanSize(raw: unknown): number {
   return (BRUSH_SIZES as readonly number[]).includes(n) ? n : BRUSH_SIZES[0];
 }
 
+/** What still goes through while a game is paused: the room itself, chat,
+ *  and the host's controls. Every game move is held back. */
+const ALLOWED_WHILE_PAUSED = new Set<string>([
+  'time:ping', 'room:create', 'room:join', 'room:leave', 'room:switch', 'room:pause', 'room:resume',
+  'game:restart', 'game:toLobby', 'chat:guess', 'player:rename', 'player:kick',
+]);
+
+export function allowedWhilePaused(event: string): boolean {
+  return ALLOWED_WHILE_PAUSED.has(event);
+}
+
 export function attachSocket(io: IO, rooms: RoomManager): void {
   io.on('connection', (socket: Sock) => {
     const s: Session = {
-      room: null,
+      code: null,
+      get room() {
+        const room = this.code ? rooms.get(this.code) : undefined;
+        return room && this.playerId && room.players.has(this.playerId) ? room : null;
+      },
       playerId: null,
       chat: new TokenBucket(CHAT_BUCKET.capacity, CHAT_BUCKET.refillPerSec),
       draw: new TokenBucket(DRAW_BUCKET.capacity, DRAW_BUCKET.refillPerSec),
@@ -79,8 +99,16 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       maze: new TokenBucket(MAZE_INPUT_BUCKET.capacity, MAZE_INPUT_BUCKET.refillPerSec),
     };
 
+    // One guard for every game, ahead of the handlers below.
+    socket.use((packet, next) => {
+      if (!s.room?.isPaused || allowedWhilePaused(packet[0])) return next();
+      // A move that waits on an answer gets one, so nothing hangs.
+      const cb = packet.at(-1);
+      if (typeof cb === 'function') cb({ ok: false, message: 'The game is paused.' });
+    });
+
     const bind = (room: AnyRoom, playerId: string) => {
-      s.room = room;
+      s.code = room.code;
       s.playerId = playerId;
       socket.join(room.code);
     };
@@ -123,7 +151,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
         const prev = s.room;
         const prevId = s.playerId;
         socket.leave(prev.code);
-        s.room = null;
+        s.code = null;
         s.playerId = null;
         prev.removePlayer(prevId);
       }
@@ -160,7 +188,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
           const prev = s.room;
           const prevId = s.playerId;
           socket.leave(prev.code);
-          s.room = null;
+          s.code = null;
           s.playerId = null;
           prev.removePlayer(prevId);
         }
@@ -743,12 +771,40 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
     // Validated in full by the room; the socket's own size cap bounds it.
     socket.on('tourney:restore', tourneyAct((r, id, p) => r.restore(id, p?.state)));
 
+    socket.on('game:restart', () => {
+      if (!s.room || !s.playerId) return;
+      s.room.restart(s.playerId);
+    });
+
+    socket.on('room:pause', () => {
+      if (!s.room || !s.playerId) return;
+      s.room.pauseGame(s.playerId);
+    });
+
+    socket.on('room:resume', () => {
+      if (!s.room || !s.playerId) return;
+      s.room.resumeGame(s.playerId);
+    });
+
+    socket.on('game:toLobby', () => {
+      if (!s.room || !s.playerId) return;
+      s.room.backToLobby(s.playerId);
+    });
+
+    socket.on('room:switch', (p, cb) => {
+      const reply = typeof cb === 'function' ? cb : () => {};
+      if (!s.room || !s.playerId) return reply({ ok: false, message: 'You are not in a room.' });
+      const kind = p?.kind;
+      if (!GAME_KINDS.includes(kind as GameKind)) return reply({ ok: false, message: 'Pick a game.' });
+      reply(rooms.switchKind(s.room.code, kind as GameKind, s.playerId));
+    });
+
     socket.on('room:leave', () => {
       if (!s.room || !s.playerId) return;
       const room = s.room;
       const id = s.playerId;
       socket.leave(room.code);
-      s.room = null;
+      s.code = null;
       s.playerId = null;
       room.removePlayer(id);
     });

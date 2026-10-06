@@ -30,7 +30,7 @@ function useTick(ms: number, on: boolean): void {
   }, [ms, on]);
 }
 
-export function FightGame({ onLeave }: { onLeave: () => void }) {
+export function FightGame() {
   const room = useGame(selectFight);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -67,7 +67,7 @@ export function FightGame({ onLeave }: { onLeave: () => void }) {
   }, [game, players]);
 
   if (!room || !me || !game) return null;
-  if (game.phase === 'lobby') return <FightLobby onLeave={onLeave} />;
+  if (game.phase === 'lobby') return <FightLobby />;
 
   const mySide = FIGHT_SIDES.find((s) => game.seats[s] === me) ?? null;
   const playerOf = (s: FightSide) => room.players.find((p) => p.id === game.seats[s]) ?? null;
@@ -193,9 +193,6 @@ export function FightGame({ onLeave }: { onLeave: () => void }) {
                 Watching: {watching.map((p) => p.name).join(', ')}
               </p>
             )}
-            <button className="btn btn--danger" type="button" onClick={onLeave}>
-              Leave room
-            </button>
           </section>
           <Chat />
         </div>

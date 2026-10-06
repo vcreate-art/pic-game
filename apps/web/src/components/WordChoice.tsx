@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   CHOOSE_SECONDS, SUGGEST_SECONDS, SUGGEST_MAX_LEN, type SuggestAck,
 } from '@pic-game/shared';
+import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { getSocket } from '../net/socket.js';
 import { selectDrawer, selectIsDrawer, useGame } from '../store/game.js';
 import { Timer } from './Timer.js';
@@ -61,7 +62,10 @@ export function WordChoice() {
                 key={w.id}
                 type="button"
                 className="wordchoice__btn"
-                onClick={() => socket.emit('word:choose', { id: w.id })}
+                onClick={() => {
+                  socket.emit('word:choose', { id: w.id });
+                  if (isPostHogEnabled) posthog.capture('word_chosen');
+                }}
               >
                 {w.text}
               </button>
@@ -83,6 +87,7 @@ export function WordChoice() {
       socket.emit('word:suggest', { text: t }, (res: SuggestAck) => {
         if (res.ok) {
           useGame.getState().setMySuggestion(res.text);
+          if (isPostHogEnabled) posthog.capture('word_suggested');
           setText('');
         } else {
           useGame.getState().setSuggestError(res.message);

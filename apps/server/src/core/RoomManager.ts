@@ -1,6 +1,6 @@
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@pic-game/shared';
-import type { BackstageRoom, GameKind } from '@pic-game/shared';
+import { GAME_CAPACITY, GAME_LABELS, PLAYABLE_KINDS, type BackstageRoom, type GameKind } from '@pic-game/shared';
 import { FightRoom } from '../games/fight/FightRoom.js';
 import { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
 import { RaceRoom } from '../games/race/RaceRoom.js';
@@ -29,6 +29,45 @@ export class RoomManager {
   create(kind: GameKind = 'skribbl'): AnyRoom {
     let code = makeRoomCode();
     while (this.rooms.has(code)) code = makeRoomCode();
+    const room = this.build(kind, code);
+    this.rooms.set(code, room);
+    return room;
+  }
+
+  /**
+   * Swaps the game a room is playing, keeping its code, seats, host and
+   * session, so everyone stays where they are. Only the host may, only
+   * between games, and only into a game that seats everyone here.
+   */
+  switchKind(code: string, kind: GameKind, by: string): { ok: true } | { ok: false; message: string } {
+    const old = this.get(code);
+    if (!old) return { ok: false, message: 'That room has closed.' };
+    if (old.hostId !== by) return { ok: false, message: 'Only the host can switch games.' };
+    if (!PLAYABLE_KINDS.includes(kind)) return { ok: false, message: 'That game is not available.' };
+    if (kind === old.kind) return { ok: false, message: `You're already playing ${GAME_LABELS[kind].name}.` };
+    if (!old.canSwitch()) return { ok: false, message: 'Go back to the lobby to switch games.' };
+    if (old.players.size > GAME_CAPACITY[kind]) {
+      return {
+        ok: false,
+        message: `${GAME_LABELS[kind].name} seats ${GAME_CAPACITY[kind]}, and ${old.players.size} are here.`,
+      };
+    }
+
+    const next = this.build(kind, old.code);
+    next.adoptFrom(old);
+    this.rooms.set(old.code, next);
+    // Nothing of the old game may act on the room from here: no empty-room
+    // collection, and destroy() stops every timer the game had running.
+    old.onEmpty = undefined;
+    old.destroy();
+
+    next.broadcastSnapshot();
+    next.systemMessage(`Switched to ${GAME_LABELS[kind].name}.`);
+    return { ok: true };
+  }
+
+  /** A fresh room of the given game under the given code. */
+  private build(kind: GameKind, code: string): AnyRoom {
     const room: AnyRoom =
       kind === 'kungfu'
         ? new KungFuRoom(code, this.io)
@@ -52,7 +91,6 @@ export class RoomManager {
                           ? new TourneyRoom(code, this.io)
                           : new SkribblRoom(code, this.io);
     room.onEmpty = (r) => this.collect(r);
-    this.rooms.set(code, room);
     return room;
   }
 
@@ -61,6 +99,8 @@ export class RoomManager {
   }
 
   private collect(room: BaseRoom<CorePlayer>): void {
+    // A game swapped out by switchKind no longer owns the code.
+    if (this.rooms.get(room.code) !== room) return;
     if (room.activeCount() > 0) return; // someone rejoined during the grace period
     room.destroy();
     this.rooms.delete(room.code);

@@ -1,9 +1,11 @@
 import { CRYPTID_MAX_PLAYERS, CRYPTID_MIN_PLAYERS } from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectCryptid, selectIsHost, useGame } from '../../store/game.js';
+import { WinCount } from '../WinCount.js';
 import { Avatar } from '../Avatar.js';
 import { InviteCard } from '../InviteCard.js';
 import { KickButton } from '../KickButton.js';
+import { SettingsTitle } from '../SettingsTitle.js';
 
 const MODES = [
   { advanced: false, name: 'Standard', blurb: 'Every clue says where the creature could be. Six structures in three colours.' },
@@ -15,7 +17,7 @@ const SETUPS = [
   { setupCubes: false, name: 'Skip setup', blurb: 'Straight to the questions. Quicker, with less to go on at the start.' },
 ];
 
-export function CryptidLobby({ onLeave }: { onLeave: () => void }) {
+export function CryptidLobby() {
   const room = useGame(selectCryptid);
   const isHost = useGame(selectIsHost);
   const socket = getSocket();
@@ -36,7 +38,7 @@ export function CryptidLobby({ onLeave }: { onLeave: () => void }) {
               <li key={p.id} className="lobby__player">
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
-                {p.score > 0 && <span className="bingolobby__wins">{p.score} found</span>}
+                <WinCount n={room.meta.wins[p.id]} />
                 {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
               </li>
             ))}
@@ -44,7 +46,7 @@ export function CryptidLobby({ onLeave }: { onLeave: () => void }) {
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Cryptid</h2>
+          <SettingsTitle>Game settings</SettingsTitle>
 
           <div className="settings__modes">
             <span className="settings__label">Game</span>
@@ -112,11 +114,6 @@ export function CryptidLobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }
