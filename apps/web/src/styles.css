@@ -640,14 +640,15 @@ body:has(.landing--home) { background: #f1f2f4; }
   transition: clip-path .5s cubic-bezier(.3, .7, .3, 1);
 }
 .pick__art {
-  position: absolute; top: -10px; right: -10px; width: 80px; height: 80px;
+  position: absolute; top: -10px; right: -10px; width: 90px; height: 90px;
   color: var(--game, var(--ink)); opacity: .6;
 }
-/* A soft disc of the game's colour behind the icon, like a sticker in the
-   corner of the box. First in the cover, so the ink covers it on hover. */
+/* A soft glow of the game's colour rising from the bottom-left corner,
+   under the name. First in the cover, so the ink covers it on hover. */
 .pick__cover::before {
-  content: ''; position: absolute; top: -40px; right: -40px; width: 140px; height: 140px;
-  border-radius: 50%; background: color-mix(in srgb, var(--game, var(--ink)) 12%, var(--paper));
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 0% 100%,
+    color-mix(in srgb, var(--game, var(--ink)) 5%, transparent), transparent 70%);
 }
 .pick__text { position: relative; display: flex; flex-direction: column; }
 .pick__name {
