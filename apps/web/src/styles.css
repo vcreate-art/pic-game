@@ -134,7 +134,7 @@ button, input { font: inherit; color: inherit; }
    rooms. Overriding the tokens here reaches the Create sheet too. */
 .landing--home {
   --paper: #f1f2f4; --line: #e0e2e8; --ink: #1c1d26; --ink-soft: #5e6275;
-  max-width: 1120px; padding-top: 36px;
+  max-width: 1000px; padding-top: 36px;
 }
 body:has(.landing--home) { background: #f1f2f4; }
 /* Games take the room; joining is a narrow panel that stays put while the
@@ -644,7 +644,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 .pick__text { position: relative; display: flex; flex-direction: column; }
 .pick__name {
   font-family: var(--display); font-weight: 800;
-  font-size: 24px; line-height: 1.02; letter-spacing: -.01em;
+  font-size: 20px; line-height: 1.05; letter-spacing: -.01em;
   transition: font-size .3s ease, margin-bottom .3s ease;
 }
 /* Rows from 0fr to 1fr animate the drawer to the blurb's own height,
@@ -654,7 +654,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   transition: grid-template-rows .35s cubic-bezier(.3, .7, .3, 1);
 }
 .pick__more > span {
-  overflow: hidden; min-height: 0; font-size: 14px; line-height: 1.4;
+  overflow: hidden; min-height: 0; font-size: 13px; line-height: 1.35;
   opacity: 0; transform: translateY(8px);
   transition: opacity .25s ease, transform .35s cubic-bezier(.3, .7, .3, 1);
 }
@@ -664,7 +664,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 .pick:focus-visible .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
 .pick:focus-visible .pick__cover { color: #fff; }
 .pick:focus-visible .pick__cat { opacity: 0; }
-.pick:focus-visible .pick__name { font-size: 20px; margin-bottom: 6px; }
+.pick:focus-visible .pick__name { font-size: 17px; margin-bottom: 5px; }
 .pick:focus-visible .pick__more { grid-template-rows: 1fr; }
 .pick:focus-visible .pick__more > span { opacity: 1; transform: none; }
 /* Only with a real pointer: on touch, :hover sticks to the last tapped card.
@@ -673,7 +673,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   .pick:hover .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
   .pick:hover .pick__cover { color: #fff; }
   .pick:hover .pick__cat { opacity: 0; }
-  .pick:hover .pick__name { font-size: 20px; margin-bottom: 6px; }
+  .pick:hover .pick__name { font-size: 17px; margin-bottom: 5px; }
   .pick:hover .pick__more { grid-template-rows: 1fr; }
   .pick:hover .pick__more > span { opacity: 1; transform: none; }
   .pick__blurb { display: none; }
@@ -860,8 +860,16 @@ body:has(.landing--home) { background: #f1f2f4; }
 
 /* Beside the join card on a narrow desktop, three across would leave a
    cover too small to hold its name and the longest blurb when open. */
-@media (min-width: 901px) and (max-width: 1119px) {
-  .picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Covers stay small wherever they would otherwise stretch to fill the row:
+   two across beside the join card on a narrow desktop, three when the page
+   stacks. */
+@media (min-width: 901px) and (max-width: 1039px) {
+  .picker { grid-template-columns: repeat(2, minmax(0, 210px)); }
+  /* The grid stops short of its column, so both columns close up together. */
+  .landing--home .landing__cols { grid-template-columns: auto 380px; justify-content: center; }
+}
+@media (min-width: 561px) and (max-width: 900px) {
+  .picker { grid-template-columns: repeat(3, minmax(0, 210px)); }
 }
 @media (max-width: 900px) {
   .landing--home .landing__cols {
