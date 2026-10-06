@@ -278,6 +278,8 @@ export interface ServerToClientEvents {
   }) => void;
   /** Emitted to the drawer's socket alone. Never broadcast. */
   'word:secret': (p: { word: string }) => void;
+  /** The turn's new deadline, after a pause pushed it back. */
+  'turn:clock': (p: { endsAt: number }) => void;
   'turn:drawing': (p: TurnPublic) => void;
   'hint:reveal': (p: { index: number; char: string }) => void;
   'turn:end': (p: {

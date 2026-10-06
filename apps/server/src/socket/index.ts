@@ -100,9 +100,11 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
     };
 
     // One guard for every game, ahead of the handlers below.
-    socket.use(([event], next) => {
-      if (s.room?.isPaused && !allowedWhilePaused(event)) return;
-      next();
+    socket.use((packet, next) => {
+      if (!s.room?.isPaused || allowedWhilePaused(packet[0])) return next();
+      // A move that waits on an answer gets one, so nothing hangs.
+      const cb = packet.at(-1);
+      if (typeof cb === 'function') cb({ ok: false, message: 'The game is paused.' });
     });
 
     const bind = (room: AnyRoom, playerId: string) => {

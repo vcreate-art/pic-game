@@ -79,6 +79,8 @@ interface GameStore {
   setSettings: (s: RoomSettings) => void;
   setHost: (id: string) => void;
   setMeta: (meta: RoomMeta) => void;
+  /** Moves the turn's deadline, after a pause pushed it back. */
+  setTurnClock: (endsAt: number) => void;
   beginChoosing: (p: { drawerId: string; round: number; endsAt: number; words?: WordOption[] }) => void;
   setSuggest: (s: SuggestState) => void;
   setMySuggestion: (text: string | null) => void;
@@ -175,6 +177,12 @@ export const useGame = create<GameStore>((set) => ({
     set((s) => (s.room?.kind === 'skribbl' ? { room: { ...s.room, settings } } : {})),
   setHost: (hostId) => set((s) => (s.room ? { room: { ...s.room, hostId } } : {})),
   setMeta: (meta) => set((s) => (s.room ? { room: { ...s.room, meta } } : {})),
+  setTurnClock: (endsAt) =>
+    set((s) => ({
+      chooseEndsAt: s.chooseEndsAt === null ? null : endsAt,
+      suggest: s.suggest ? { ...s.suggest, endsAt } : null,
+      room: s.room?.kind === 'skribbl' && s.room.turn ? { ...s.room, turn: { ...s.room.turn, endsAt } } : s.room,
+    })),
 
   beginChoosing: (p) =>
     set((s) => ({

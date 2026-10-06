@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { GameKind } from '@pic-game/shared';
+import { CHOOSE_SECONDS, DEFAULT_SETTINGS, type GameKind } from '@pic-game/shared';
 import { PAUSE_HOST_AWAY_MS } from '../config.js';
 import { RoomManager } from '../core/RoomManager.js';
 import { allowedWhilePaused } from '../socket/index.js';
@@ -92,7 +92,7 @@ describe('pausing a turn-based game', () => {
 });
 
 describe('games that cannot pause yet', () => {
-  it.each(['race', 'skribbl', 'maze'] as const)('%s does not offer pause', (kind) => {
+  it.each(['race', 'maze'] as const)('%s does not offer pause', (kind) => {
     const { room, host } = playing(kind, 2);
     room.pauseGame(host);
     expect(room.isPaused).toBe(false);
@@ -109,5 +109,62 @@ describe('what goes through while paused', () => {
     for (const e of ['flip7:hit', 'realms:play', 'cryptid:search', 'tourney:report', 'game:start']) {
       expect(allowedWhilePaused(e)).toBe(false);
     }
+  });
+});
+
+describe('pausing Draw & Guess', () => {
+  /** A drawing turn under way, with the word as the drawer was told it. */
+  function drawing() {
+    vi.useFakeTimers();
+    const t = playing('skribbl', 3);
+    vi.advanceTimersByTime(CHOOSE_SECONDS * 1000 + 50); // the drawer runs out of time and gets a word
+    const secret = t.sent.find((m) => m.event === 'word:secret');
+    const word = (secret?.args[0] as { word: string }).word;
+    const drawer = t.seats.find((p) => p.socketId === secret?.to)!;
+    const guesser = t.seats.find((p) => p.id !== drawer.id)!;
+    return { ...t, word, drawer, guesser };
+  }
+  const phase = (r: unknown) => (r as { publicState(): { phase: string } }).publicState().phase;
+
+  it('holds the turn clock for as long as it is paused', () => {
+    const { room, host } = drawing();
+    expect(phase(room)).toBe('drawing');
+    vi.advanceTimersByTime(10_000);
+    room.pauseGame(host);
+    vi.advanceTimersByTime(10 * 60_000);
+    expect(phase(room)).toBe('drawing');
+  });
+
+  it('carries on with the time that was left', () => {
+    const { room, host, sent } = drawing();
+    const drawMs = DEFAULT_SETTINGS.drawTime * 1000;
+    vi.advanceTimersByTime(10_000);
+    room.pauseGame(host);
+    vi.advanceTimersByTime(60_000);
+    room.resumeGame(host);
+    const clock = sent.filter((m) => m.event === 'turn:clock').at(-1)?.args[0] as { endsAt: number };
+    expect(Math.abs(clock.endsAt - Date.now() - (drawMs - 10_000))).toBeLessThan(200);
+    vi.advanceTimersByTime(drawMs - 10_000 - 1000);
+    expect(phase(room)).toBe('drawing');
+    vi.advanceTimersByTime(2000);
+    expect(phase(room)).toBe('turnEnd');
+  });
+
+  it('holds back a correct guess until it carries on', () => {
+    const { room, host, word, guesser, sent } = drawing();
+    room.pauseGame(host);
+    room.handleChat(guesser.id, word);
+    expect(sent.some((m) => m.event === 'guess:correct')).toBe(false);
+    expect(sent.some((m) => m.event === 'chat:message' && JSON.stringify(m.args).includes(word))).toBe(false);
+    room.resumeGame(host);
+    room.handleChat(guesser.id, word);
+    expect(sent.some((m) => m.event === 'guess:correct')).toBe(true);
+  });
+
+  it('still lets people talk while paused', () => {
+    const { room, host, guesser, sent } = drawing();
+    room.pauseGame(host);
+    room.handleChat(guesser.id, 'brb, getting a drink');
+    expect(sent.some((m) => m.event === 'chat:message' && JSON.stringify(m.args).includes('getting a drink'))).toBe(true);
   });
 });

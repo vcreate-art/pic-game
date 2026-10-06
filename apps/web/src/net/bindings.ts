@@ -59,6 +59,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
   });
   socket.on('word:secret', ({ word }) => g().setSecret(word));
   socket.on('suggest:state', (st) => g().setSuggest(st));
+  socket.on('turn:clock', ({ endsAt }) => g().setTurnClock(endsAt));
   socket.on('turn:drawing', (turn) => g().beginDrawing(turn));
   socket.on('hint:reveal', ({ index, char }) => g().reveal(index, char));
   socket.on('turn:end', (r) => g().endTurn(r));
@@ -147,7 +148,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
     socket.off('disconnect', onDisconnect);
     for (const ev of [
       'state:sync', 'player:joined', 'player:updated', 'player:left',
-      'room:settings', 'room:meta', 'host:changed', 'kicked', 'turn:choosing', 'word:secret', 'suggest:state',
+      'room:settings', 'room:meta', 'host:changed', 'kicked', 'turn:choosing', 'turn:clock', 'word:secret', 'suggest:state',
       'turn:drawing', 'hint:reveal', 'turn:end', 'game:end', 'draw:reactions',
       'draw:start', 'draw:append', 'draw:end', 'draw:fill',
       'canvas:undone', 'canvas:cleared', 'chat:message', 'guess:correct', 'error',
