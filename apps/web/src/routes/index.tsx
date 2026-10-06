@@ -215,9 +215,6 @@ function Landing() {
             <p className="sheet__blurb">{GAME_LABELS[game].blurb}</p>
             <JoinPanel
               submitLabel={`Create ${GAME_LABELS[game].name}`}
-              // With a name already in, the keyboard popping up on open just
-              // hides the Create button.
-              autoFocus={!draft.name.trim()}
               busy={busy}
               error={error}
               onSubmit={create}

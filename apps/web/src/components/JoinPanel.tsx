@@ -31,7 +31,6 @@ export function JoinPanel({
   onSubmit,
   draft,
   onDraft,
-  autoFocus = true,
   children,
 }: {
   submitLabel: string;
@@ -40,7 +39,6 @@ export function JoinPanel({
   onSubmit: (id: Identity) => void;
   draft?: Identity;
   onDraft?: (id: Identity) => void;
-  autoFocus?: boolean;
   children?: React.ReactNode;
 }) {
   const [own, setOwn] = useState(initialIdentity);
@@ -93,7 +91,7 @@ export function JoinPanel({
           maxLength={MAX_NAME_LEN}
           placeholder="Your name"
           onChange={(e) => setName(e.target.value)}
-          autoFocus={autoFocus}
+          autoFocus
         />
       </label>
 
