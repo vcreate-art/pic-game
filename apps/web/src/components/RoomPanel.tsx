@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, type CSSProperties } from 'react';
 import { GAME_LABELS } from '@pic-game/shared';
 import { ChevronDown, DoorOpen, Pause, Play, RotateCcw } from 'lucide-react';
+import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { useDismiss } from '../lib/useDismiss.js';
 import { getSocket } from '../net/socket.js';
 import { useLeaveRoom } from '../net/useLeaveRoom.js';
@@ -49,6 +50,7 @@ export function RoomPanel() {
 
   const send = (event: 'room:pause' | 'room:resume' | 'game:restart' | 'game:toLobby') => {
     getSocket().emit(event);
+    if (isPostHogEnabled) posthog.capture('room_control_used', { control: event });
     close();
   };
   // Throwing away a game in progress takes a second tap.

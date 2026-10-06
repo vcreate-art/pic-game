@@ -6,6 +6,8 @@ import { CategoryLabel } from '../components/CategoryLabel.js';
 import { GameCovers } from '../components/GameCovers.js';
 import { GAME_ICONS } from '../components/gameIcons.js';
 import { JoinPanel, initialIdentity, type Identity } from '../components/JoinPanel.js';
+import posthog, { isPostHogEnabled } from '../lib/posthog.js';
+import { logGameEntry } from '../lib/posthogLogs.js';
 import { peekRoom } from '../api/client.js';
 import { getSocket, saveSeat } from '../net/socket.js';
 import { useGame } from '../store/game.js';
@@ -67,12 +69,14 @@ function Landing() {
   });
 
   /** Join and create both land here: take the seat and go to the room. */
-  const enter = (res: JoinAck) => {
+  const enter = (res: JoinAck, event: 'game_created' | 'room_joined') => {
     setBusy(false);
     if (!res.ok) {
       setError(res.message);
       return;
     }
+    if (isPostHogEnabled) posthog.capture(event, { game_kind: res.state.kind, entry_point: 'landing' });
+    logGameEntry(event === 'game_created' ? 'created' : 'joined', res.state.kind, 'landing');
     useGame.getState().setMe(res.playerId);
     useGame.getState().sync(res.state);
     saveSeat({ code: res.state.code, playerId: res.playerId, token: res.token });
@@ -83,7 +87,7 @@ function Landing() {
     if (!game) return;
     setBusy(true);
     setError(null);
-    getSocket().emit('room:create', { name: id.name, avatar: id.avatar, game }, enter);
+    getSocket().emit('room:create', { name: id.name, avatar: id.avatar, game }, (res) => enter(res, 'game_created'));
   };
 
   const join = (id: Identity) => {
@@ -102,7 +106,7 @@ function Landing() {
           setError('No room with that code.');
           return;
         }
-        getSocket().emit('room:join', { code: wanted, name: id.name, avatar: id.avatar }, enter);
+        getSocket().emit('room:join', { code: wanted, name: id.name, avatar: id.avatar }, (res) => enter(res, 'room_joined'));
       })
       .catch(() => {
         setBusy(false);

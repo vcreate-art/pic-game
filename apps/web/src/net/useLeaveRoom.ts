@@ -1,4 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
+import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { useGame } from '../store/game.js';
 import { clearSeat, getSocket } from './socket.js';
 
@@ -8,6 +9,7 @@ export function useLeaveRoom(): () => void {
   const navigate = useNavigate();
   return () => {
     getSocket().emit('room:leave');
+    if (isPostHogEnabled) posthog.capture('room_left');
     clearSeat();
     useGame.getState().reset();
     void navigate({ to: '/' });

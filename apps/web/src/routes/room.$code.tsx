@@ -16,6 +16,8 @@ import { Gallery } from '../components/Gallery.js';
 import { RealmsGame } from '../components/realms/RealmsGame.js';
 import { SkribblGame } from '../components/skribbl/SkribblGame.js';
 import { bindSocket } from '../net/bindings.js';
+import posthog, { isPostHogEnabled } from '../lib/posthog.js';
+import { logGameEntry } from '../lib/posthogLogs.js';
 import { clearSeat, getSocket, loadProfile, loadSeat, saveSeat } from '../net/socket.js';
 import { useGame } from '../store/game.js';
 import { Route as rootRoute } from './__root.js';
@@ -71,10 +73,10 @@ function RoomPage() {
     const profile = loadProfile();
     if (!profile) return; // no nickname yet — the panel below collects one
     identity.current = profile;
-    joinRoom(profile, loadSeat(code)?.token);
+    joinRoom(profile, loadSeat(code)?.token, false);
   }, [code]);
 
-  function joinRoom(id: Identity, token?: string) {
+  function joinRoom(id: Identity, token?: string, captureJoin = true) {
     setBusy(true);
     setError(null);
     identity.current = id;
@@ -85,6 +87,8 @@ function RoomPage() {
         if (res.code === 'NOT_FOUND') clearSeat();
         return;
       }
+      if (captureJoin && isPostHogEnabled) posthog.capture('room_joined', { game_kind: res.state.kind, entry_point: 'invite' });
+      if (captureJoin) logGameEntry('joined', res.state.kind, 'invite');
       useGame.getState().setMe(res.playerId);
       useGame.getState().sync(res.state);
       saveSeat({ code, playerId: res.playerId, token: res.token });

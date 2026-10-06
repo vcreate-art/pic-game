@@ -9,6 +9,7 @@ import { IS_PROD, PORT, isAllowedOrigin } from './config.js';
 import { RoomManager } from './core/RoomManager.js';
 import { makeRoutes } from './http/routes.js';
 import { attachSocket } from './socket/index.js';
+import { logServerLifecycle, shutdownPostHogLogs } from './posthogLogs.js';
 
 const app = express();
 // A delegate rather than a plain origin check, so it can see the Host header and
@@ -48,6 +49,7 @@ if (existsSync(WEB_DIST)) {
 }
 
 http.listen(PORT, () => {
+  logServerLifecycle('server_started');
   console.log(`[pic-game] server listening on http://localhost:${PORT}`);
   console.log(
     IS_PROD
@@ -59,7 +61,10 @@ http.listen(PORT, () => {
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, () => {
     console.log(`\n[pic-game] ${sig} — shutting down`);
+    logServerLifecycle('server_stopping');
     io.close();
-    http.close(() => process.exit(0));
+    http.close(() => {
+      void shutdownPostHogLogs().finally(() => process.exit(0));
+    });
   });
 }

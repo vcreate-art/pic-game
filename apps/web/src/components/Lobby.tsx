@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { getSocket } from '../net/socket.js';
 import { selectIsHost, selectSkribbl, useGame } from '../store/game.js';
 import { Avatar } from './Avatar.js';
@@ -50,7 +51,10 @@ export function Lobby() {
             type="button"
             className="btn btn--primary btn--lg"
             disabled={!enough || short}
-            onClick={() => socket.emit('game:start')}
+            onClick={() => {
+              socket.emit('game:start');
+              if (isPostHogEnabled) posthog.capture('game_started', { game_kind: room.kind });
+            }}
           >
             {!enough ? 'Need 2+ players' : short ? 'Add more of your words' : 'Start game'}
           </button>
