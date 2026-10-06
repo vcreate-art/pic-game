@@ -25,7 +25,7 @@ export function RaceControls() {
   );
 }
 
-export function RaceLobby({ onLeave }: { onLeave: () => void }) {
+export function RaceLobby() {
   const room = useGame(selectRace);
   const isHost = useGame(selectIsHost);
   const socket = getSocket();
@@ -109,11 +109,6 @@ export function RaceLobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

@@ -38,7 +38,7 @@ function Cube({ color }: { color: string }) {
   return <span className="cpiece cpiece--cube" style={{ background: color }} />;
 }
 
-export function CryptidGame({ onLeave }: { onLeave: () => void }) {
+export function CryptidGame() {
   const room = useGame(selectCryptid);
   const me = useGame((s) => s.me);
   const myClue = useGame((s) => s.cryptidClue);
@@ -69,7 +69,7 @@ export function CryptidGame({ onLeave }: { onLeave: () => void }) {
   }, [shadeOn, myMask]);
 
   if (!room || !me || !game) return null;
-  if (game.phase === 'lobby' || !board) return <CryptidLobby onLeave={onLeave} />;
+  if (game.phase === 'lobby' || !board) return <CryptidLobby />;
 
   const seatOf = (id: string) => Math.max(0, game.players.indexOf(id));
   const colorOf = (id: string) => SEAT_COLORS[seatOf(id) % SEAT_COLORS.length]!;
@@ -174,7 +174,6 @@ export function CryptidGame({ onLeave }: { onLeave: () => void }) {
             <p className="card cwatch">You arrived mid-game, so you are watching this one. You are in the next.</p>
           )}
 
-          <button className="btn btn--danger" type="button" onClick={onLeave}>Leave room</button>
         </aside>
 
         <main className="cryptid__main">

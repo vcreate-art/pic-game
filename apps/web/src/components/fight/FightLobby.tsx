@@ -18,7 +18,7 @@ const ROUND_MODES = [
   { value: 3, name: 'Best of 5', blurb: 'For a grudge.' },
 ];
 
-export function FightLobby({ onLeave }: { onLeave: () => void }) {
+export function FightLobby() {
   const room = useGame(selectFight);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -188,11 +188,6 @@ export function FightLobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

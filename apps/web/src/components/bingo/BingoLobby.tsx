@@ -19,7 +19,7 @@ const PATTERNS: { value: BingoPattern; name: string; blurb: string }[] = [
 const TURN_TIMES = [0, 10, 15, 20, 30, 60];
 const CALL_TIMES = [0, 3, 5, 8, 12, 20];
 
-export function BingoLobby({ onLeave }: { onLeave: () => void }) {
+export function BingoLobby() {
   const room = useGame(selectBingo);
   const isHost = useGame(selectIsHost);
   const socket = getSocket();
@@ -49,7 +49,7 @@ export function BingoLobby({ onLeave }: { onLeave: () => void }) {
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Bingo</h2>
+          <h2 className="card__title">Game settings</h2>
 
           <div className="settings__modes">
             <span className="settings__label">Game</span>
@@ -149,11 +149,6 @@ export function BingoLobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

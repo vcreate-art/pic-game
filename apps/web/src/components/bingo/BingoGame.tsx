@@ -180,7 +180,7 @@ function Arrange({ game }: { game: BingoPublic }) {
   );
 }
 
-export function BingoGame({ onLeave }: { onLeave: () => void }) {
+export function BingoGame() {
   const room = useGame(selectBingo);
   const me = useGame((s) => s.me);
   const card = useGame((s) => s.bingoCard);
@@ -192,7 +192,7 @@ export function BingoGame({ onLeave }: { onLeave: () => void }) {
 
   if (!room || !me) return null;
   const { game } = room;
-  if (game.phase === 'lobby') return <BingoLobby onLeave={onLeave} />;
+  if (game.phase === 'lobby') return <BingoLobby />;
 
   const turns = game.settings.mode === 'turns';
   const ended = game.phase === 'ended';
@@ -277,7 +277,6 @@ export function BingoGame({ onLeave }: { onLeave: () => void }) {
               })}
             </ul>
           </section>
-          <button className="btn btn--danger" type="button" onClick={onLeave}>Leave room</button>
         </aside>
 
         <main className="bingo__main">

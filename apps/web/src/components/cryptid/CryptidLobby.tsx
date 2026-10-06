@@ -16,7 +16,7 @@ const SETUPS = [
   { setupCubes: false, name: 'Skip setup', blurb: 'Straight to the questions. Quicker, with less to go on at the start.' },
 ];
 
-export function CryptidLobby({ onLeave }: { onLeave: () => void }) {
+export function CryptidLobby() {
   const room = useGame(selectCryptid);
   const isHost = useGame(selectIsHost);
   const socket = getSocket();
@@ -45,7 +45,7 @@ export function CryptidLobby({ onLeave }: { onLeave: () => void }) {
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Cryptid</h2>
+          <h2 className="card__title">Game settings</h2>
 
           <div className="settings__modes">
             <span className="settings__label">Game</span>
@@ -113,11 +113,6 @@ export function CryptidLobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

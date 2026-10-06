@@ -8,7 +8,7 @@ import { InviteCard } from '../InviteCard.js';
 
 const LENGTHS: Record<number, string> = { 100: 'Quick', 150: 'Short', 200: 'The box', 300: 'Long' };
 
-export function Flip7Lobby({ onLeave }: { onLeave: () => void }) {
+export function Flip7Lobby() {
   const room = useGame(selectFlip7);
   const isHost = useGame(selectIsHost);
   const socket = getSocket();
@@ -37,7 +37,7 @@ export function Flip7Lobby({ onLeave }: { onLeave: () => void }) {
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Flip 7</h2>
+          <h2 className="card__title">Game settings</h2>
 
           <div className="settings__modes">
             <span className="settings__label">Play to</span>
@@ -84,11 +84,6 @@ export function Flip7Lobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

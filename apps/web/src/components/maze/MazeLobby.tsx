@@ -20,7 +20,7 @@ const RADARS: { value: MazeRadar; name: string; blurb: string }[] = [
   { value: 'firing', name: 'Only when firing', blurb: 'A player shows up for three seconds after each shot. Sneaking pays.' },
 ];
 
-export function MazeLobby({ onLeave }: { onLeave: () => void }) {
+export function MazeLobby() {
   const room = useGame(selectMaze);
   const isHost = useGame(selectIsHost);
   const [controls, setControls] = useMazeControls();
@@ -50,7 +50,7 @@ export function MazeLobby({ onLeave }: { onLeave: () => void }) {
         </div>
 
         <div className="lobby__settings card">
-          <h2 className="card__title">Maze Wars</h2>
+          <h2 className="card__title">Game settings</h2>
 
           <label className="settings__row bingolobby__row">
             <span className="settings__label">Match length</span>
@@ -164,11 +164,6 @@ export function MazeLobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

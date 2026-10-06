@@ -2434,17 +2434,6 @@ body:has(.landing--home) { background: #f1f2f4; }
   box-shadow: 0 18px 40px -18px rgba(31, 34, 51, .35);
 }
 
-.room__head { display: flex; align-items: center; gap: 12px; }
-.room__tile {
-  display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 11px;
-  background: var(--game); color: #fff;
-}
-.room__tile svg { width: 24px; height: 24px; }
-.room__titles { min-width: 0; }
-.room__game { margin: 0; font-family: var(--display); font-size: 20px; font-weight: 800; line-height: 1.1; }
-.room__status { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); }
-.room__status.is-paused { color: var(--game); font-weight: 600; }
-
 /* The host's three controls as one strip: icon over label, equal widths. */
 .room__controls { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
 .room__ctl {

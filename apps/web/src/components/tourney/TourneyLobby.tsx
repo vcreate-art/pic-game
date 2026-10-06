@@ -16,7 +16,7 @@ const BONUS_LABELS: { key: keyof TourneyBonuses; name: string; note: string }[] 
 const RISE_EVERY = [0, 1, 2, 3, 4, 5, 6, 8, 10];
 const RISE_BY = [10, 25, 50, 75, 100];
 
-export function TourneyLobby({ onLeave }: { onLeave: () => void }) {
+export function TourneyLobby() {
   const room = useGame(selectTourney);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -218,9 +218,6 @@ export function TourneyLobby({ onLeave }: { onLeave: () => void }) {
         </section>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>Leave room</button>
-      </div>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { InviteCard } from '../InviteCard.js';
 
 const SEAT_LABEL: Record<RealmsSide, string> = { a: 'First player', b: 'Second player' };
 
-export function RealmsLobby({ onLeave }: { onLeave: () => void }) {
+export function RealmsLobby() {
   const room = useGame(selectRealms);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -106,11 +106,6 @@ export function RealmsLobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

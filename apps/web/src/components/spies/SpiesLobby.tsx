@@ -24,7 +24,7 @@ const SOURCES: { value: WordSource; name: string; blurb: string }[] = [
   { value: 'custom', name: 'Only mine', blurb: `Needs ${SPIES_BOUNDS.customWords.minForGame} or more.` },
 ];
 
-export function SpiesLobby({ onLeave }: { onLeave: () => void }) {
+export function SpiesLobby() {
   const room = useGame(selectSpies);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -208,11 +208,6 @@ export function SpiesLobby({ onLeave }: { onLeave: () => void }) {
         </section>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

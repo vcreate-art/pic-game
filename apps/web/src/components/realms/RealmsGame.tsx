@@ -5,7 +5,7 @@ import { Chat } from '../Chat.js';
 import { Card, CardStack } from './Card.js';
 import { RealmsLobby } from './RealmsLobby.js';
 
-export function RealmsGame({ onLeave }: { onLeave: () => void }) {
+export function RealmsGame() {
   const room = useGame(selectRealms);
   const me = useGame((s) => s.me);
   const hand = useGame((s) => s.realmsHand);
@@ -14,7 +14,7 @@ export function RealmsGame({ onLeave }: { onLeave: () => void }) {
   if (!room || !me) return null;
 
   const { game } = room;
-  if (game.phase === 'lobby') return <RealmsLobby onLeave={onLeave} />;
+  if (game.phase === 'lobby') return <RealmsLobby />;
 
   const mySide: RealmsSide | null = game.seats.a === me ? 'a' : game.seats.b === me ? 'b' : null;
   const foeSide: RealmsSide = mySide === 'b' ? 'a' : 'b';
@@ -155,9 +155,6 @@ export function RealmsGame({ onLeave }: { onLeave: () => void }) {
               onClick={() => socket.emit('realms:end')}
             >
               End turn
-            </button>
-            <button className="btn btn--danger" type="button" onClick={onLeave}>
-              Leave room
             </button>
           </div>
         </section>

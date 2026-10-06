@@ -14,7 +14,7 @@ const PIECE_ROWS: Array<[PieceType, string]> = [
   ['b', 'Bishop'], ['r', 'Rook'], ['q', 'Queen'],
 ];
 
-export function KungFuLobby({ onLeave }: { onLeave: () => void }) {
+export function KungFuLobby() {
   const room = useGame(selectKungFu);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -143,11 +143,6 @@ export function KungFuLobby({ onLeave }: { onLeave: () => void }) {
         </div>
       </div>
 
-      <div className="leavebar">
-        <button className="btn btn--danger" type="button" onClick={onLeave}>
-          Leave room
-        </button>
-      </div>
     </div>
   );
 }

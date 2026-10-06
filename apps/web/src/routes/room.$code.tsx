@@ -16,7 +16,6 @@ import { Gallery } from '../components/Gallery.js';
 import { RealmsGame } from '../components/realms/RealmsGame.js';
 import { SkribblGame } from '../components/skribbl/SkribblGame.js';
 import { bindSocket } from '../net/bindings.js';
-import { useLeaveRoom } from '../net/useLeaveRoom.js';
 import { clearSeat, getSocket, loadProfile, loadSeat, saveSeat } from '../net/socket.js';
 import { useGame } from '../store/game.js';
 import { Route as rootRoute } from './__root.js';
@@ -92,7 +91,6 @@ function RoomPage() {
     });
   }
 
-  const leave = useLeaveRoom();
 
 
   /** Being removed ends the session here. The seat token is deliberately kept:
@@ -130,41 +128,36 @@ function RoomPage() {
 
   // Chess runs its own lobby, because "waiting to start" there means choosing
   // sides on the board rather than setting up a word list.
-  if (room.kind === 'kungfu') return <KungFuGame onLeave={leave} />;
+  if (room.kind === 'kungfu') return <KungFuGame />;
 
-  if (room.kind === 'realms') return <RealmsGame onLeave={leave} />;
+  if (room.kind === 'realms') return <RealmsGame />;
 
-  if (room.kind === 'fight') return <FightGame onLeave={leave} />;
+  if (room.kind === 'fight') return <FightGame />;
 
-  if (room.kind === 'race') return <RaceGame onLeave={leave} />;
+  if (room.kind === 'race') return <RaceGame />;
 
-  if (room.kind === 'spies') return <SpiesGame onLeave={leave} />;
+  if (room.kind === 'spies') return <SpiesGame />;
 
-  if (room.kind === 'bingo') return <BingoGame onLeave={leave} />;
+  if (room.kind === 'bingo') return <BingoGame />;
 
-  if (room.kind === 'cryptid') return <CryptidGame onLeave={leave} />;
+  if (room.kind === 'cryptid') return <CryptidGame />;
 
-  if (room.kind === 'flip7') return <Flip7Game onLeave={leave} />;
+  if (room.kind === 'flip7') return <Flip7Game />;
 
-  if (room.kind === 'maze') return <MazeGame onLeave={leave} />;
+  if (room.kind === 'maze') return <MazeGame />;
 
-  if (room.kind === 'tourney') return <TourneyGame onLeave={leave} />;
+  if (room.kind === 'tourney') return <TourneyGame />;
 
   if (phase === 'lobby') {
     return (
       <div className="lobbyscreen">
         <Lobby />
         <Gallery />
-        <div className="leavebar">
-          <button className="btn btn--danger" type="button" onClick={leave}>
-            Leave room
-          </button>
-        </div>
       </div>
     );
   }
 
-  return <SkribblGame onLeave={leave} />;
+  return <SkribblGame />;
 }
 
 export const Route = createRoute({
