@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { WORDS_EN } from '@pic-game/shared';
+import { WORDS_EN, type BackstageSnapshot } from '@pic-game/shared';
 import type { RoomManager } from '../core/RoomManager.js';
 
 export function makeRoutes(rooms: RoomManager): Router {
@@ -25,6 +25,13 @@ export function makeRoutes(rooms: RoomManager): Router {
       kind: room.kind,
       inLobby: room.isLobby(),
     });
+  });
+
+  /** Read-only feed for the backstage dashboard. Open, with no auth, so it
+   *  carries names and progress but never room codes or seat tokens. */
+  r.get('/api/backstage', (_req, res) => {
+    const body: BackstageSnapshot = { at: Date.now(), rooms: rooms.backstage() };
+    res.set('Cache-Control', 'no-store').json(body);
   });
 
   r.get('/api/word-packs', (_req, res) => {

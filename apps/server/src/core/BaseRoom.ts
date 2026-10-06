@@ -27,6 +27,10 @@ export interface CorePlayer extends Player {
  */
 export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   readonly code: string;
+  /** Names the room where the code must not appear, such as the backstage
+   *  dashboard. Random, so it says nothing about the code. */
+  readonly uid = randomUUID();
+  readonly createdAt = Date.now();
   hostId = '';
   readonly players = new Map<string, P>();
   /** Join order, which games may also use as turn order. */

@@ -1,6 +1,6 @@
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@pic-game/shared';
-import type { GameKind } from '@pic-game/shared';
+import type { BackstageRoom, GameKind } from '@pic-game/shared';
 import { FightRoom } from '../games/fight/FightRoom.js';
 import { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
 import { RaceRoom } from '../games/race/RaceRoom.js';
@@ -68,6 +68,25 @@ export class RoomManager {
 
   get size(): number {
     return this.rooms.size;
+  }
+
+  /** Every live room for the backstage dashboard: who is in it and how far
+   *  the game has got, without the code that would let someone join. */
+  backstage(): BackstageRoom[] {
+    return [...this.rooms.values()].map((room) => {
+      const state = room.publicState();
+      return {
+        id: room.uid,
+        kind: room.kind,
+        phase: state.kind === 'skribbl' ? state.phase : state.game.phase,
+        inLobby: room.isLobby(),
+        createdAt: room.createdAt,
+        maxPlayers: room.maxPlayers,
+        players: state.players.map((p) => ({
+          name: p.name, avatar: p.avatar, score: p.score, connected: p.connected, host: p.id === room.hostId,
+        })),
+      };
+    });
   }
 
   stats(): { rooms: number; players: number } {
