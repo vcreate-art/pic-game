@@ -149,7 +149,7 @@ button, input { font: inherit; color: inherit; }
    rooms. Overriding the tokens here reaches the Create sheet too. */
 .landing--home {
   --paper: #f1f2f4; --line: #e0e2e8; --ink: #1c1d26; --ink-soft: #5e6275;
-  max-width: 1200px; padding-top: 36px;
+  max-width: 1120px; padding-top: 36px;
 }
 body:has(.landing--home) { background: #f1f2f4; }
 /* Games take the room; joining is a narrow panel that stays put while the
