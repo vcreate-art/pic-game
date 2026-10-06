@@ -32,6 +32,8 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
   private marks = new Map<number, Set<string>>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private endsAt = 0;
+  /** What was left of the turn clock when the room paused. */
+  private heldMs: number | null = null;
 
   constructor(code: string, io: IO) {
     super(code, io);
@@ -55,6 +57,27 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     this.clearTimer();
     this.game = null;
     this.marks.clear();
+    this.broadcast();
+  }
+
+  protected override get pausable(): boolean {
+    return true;
+  }
+
+  /** Stops the turn clock, if the game has one. The deadline stays put, so
+   *  the countdown holds at the time that was left. */
+  protected override onPause(): void {
+    if (!this.timer) return;
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.heldMs = Math.max(0, this.endsAt - Date.now());
+  }
+
+  protected override onResume(): void {
+    const ms = this.heldMs;
+    this.heldMs = null;
+    if (ms === null) return;
+    this.startTimer(ms);
     this.broadcast();
   }
 
@@ -312,7 +335,8 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
 
   /** An optional clock on each phase. Running out of time passes the turn:
    *  a spymaster who never gives a clue forfeits their team's go. */
-  private startTimer(): void {
+  /** `ms` is what's left of the turn when picking up after a pause. */
+  private startTimer(ms?: number): void {
     this.clearTimer();
     const g = this.game;
     if (!g || g.phase === 'ended') return;
@@ -320,7 +344,12 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     // number is tapped in; a clue clock set in a typed game must not linger.
     const secs = g.phase === 'guess' ? this.settings.guessSeconds : this.spoken ? 0 : this.settings.clueSeconds;
     if (!secs) return;
-    this.endsAt = Date.now() + secs * 1000;
+    const wait = ms ?? secs * 1000;
+    this.endsAt = Date.now() + wait;
+    if (this.isPaused) {
+      this.heldMs = wait;
+      return;
+    }
     this.timer = setTimeout(() => {
       this.timer = null;
       if (!this.game || this.game.phase === 'ended') return;
@@ -329,12 +358,13 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
       this.marks.clear();
       this.startTimer();
       this.broadcast();
-    }, secs * 1000);
+    }, wait);
   }
 
   private clearTimer(): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    this.heldMs = null;
     this.endsAt = 0;
   }
 

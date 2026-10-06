@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CHOOSE_SECONDS, DEFAULT_SETTINGS, type GameKind } from '@pic-game/shared';
 import { PAUSE_HOST_AWAY_MS } from '../config.js';
 import { RoomManager } from '../core/RoomManager.js';
+import type { BingoRoom } from '../games/bingo/BingoRoom.js';
+import type { SpiesRoom } from '../games/spies/SpiesRoom.js';
 import { allowedWhilePaused } from '../socket/index.js';
 import { fakeIO } from './fakeIO.js';
 
@@ -166,5 +168,68 @@ describe('pausing Draw & Guess', () => {
     room.pauseGame(host);
     room.handleChat(guesser.id, 'brb, getting a drink');
     expect(sent.some((m) => m.event === 'chat:message' && JSON.stringify(m.args).includes('getting a drink'))).toBe(true);
+  });
+});
+
+describe('pausing Bingo', () => {
+  /** Classic 75-ball, a ball every 5 seconds. */
+  function calling() {
+    vi.useFakeTimers();
+    const { io, sent } = fakeIO();
+    const room = new RoomManager(io).create('bingo') as BingoRoom;
+    const a = room.addPlayer('A', av, 's1');
+    room.addPlayer('B', av, 's2');
+    room.updateSettings(a.id, { mode: 'caller', callSeconds: 5 });
+    room.startGame(a.id);
+    const called = () => room.gamePublic().called?.length ?? 0;
+    return { room, host: a.id, sent, called };
+  }
+
+  it('stops drawing balls while paused and picks up with the time left', () => {
+    const { room, host, called } = calling();
+    vi.advanceTimersByTime(2000);
+    room.pauseGame(host);
+    const before = called();
+    vi.advanceTimersByTime(60_000);
+    expect(called()).toBe(before);
+    room.resumeGame(host);
+    vi.advanceTimersByTime(2900);
+    expect(called()).toBe(before);
+    vi.advanceTimersByTime(200);
+    expect(called()).toBe(before + 1);
+  });
+
+  it('keeps the countdown on screen while paused', () => {
+    const { room, host } = calling();
+    vi.advanceTimersByTime(2000);
+    const endsAt = room.gamePublic().endsAt;
+    room.pauseGame(host);
+    expect(room.gamePublic().endsAt).toBe(endsAt);
+  });
+});
+
+describe('pausing Word Spies', () => {
+  it('holds the turn clock and resumes with the time left', () => {
+    vi.useFakeTimers();
+    const { io } = fakeIO();
+    const room = new RoomManager(io).create('spies') as SpiesRoom;
+    const ids = ['A', 'B', 'C', 'D'].map((n, i) => room.addPlayer(n, av, `s${i}`).id);
+    room.updateSettings(ids[0]!, { clueSeconds: 30 });
+    room.join(ids[0]!, 'red', 'spymaster');
+    room.join(ids[1]!, 'red', 'operative');
+    room.join(ids[2]!, 'blue', 'spymaster');
+    room.join(ids[3]!, 'blue', 'operative');
+    room.startGame(ids[0]!);
+    const turn = () => room.gamePublic().turn;
+    const first = turn();
+    vi.advanceTimersByTime(10_000);
+    room.pauseGame(ids[0]!);
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(turn()).toBe(first);
+    room.resumeGame(ids[0]!);
+    vi.advanceTimersByTime(19_000);
+    expect(turn()).toBe(first);
+    vi.advanceTimersByTime(2000);
+    expect(turn()).not.toBe(first);
   });
 });
