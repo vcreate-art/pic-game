@@ -683,12 +683,17 @@ body:has(.landing--home) { background: #f1f2f4; }
   .pick__cover, .pick__ink, .pick__name, .pick__more, .pick__more > span { transition: none; }
 }
 .pick:active .pick__cover { transform: translateY(1px); }
-/* Focus and "this one's sheet is open" share one ring in the game's colour,
-   set off the cover by a gap of page colour. */
+/* Keyboard focus is a ring in the game's colour, set off the cover by a gap
+   of page colour. */
 .pick:focus-visible { outline: none; }
-.pick:focus-visible .pick__cover, .pick.is-active .pick__cover {
+.pick:focus-visible .pick__cover {
   box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--game, var(--ink));
 }
+/* The selected game is filled with its ink, as if the pointer were on it,
+   rather than ringed. */
+.pick.is-active .pick__ink { clip-path: circle(150% at 50% 50%); }
+.pick.is-active .pick__cover { color: #fff; }
+.pick.is-active .gamecat { color: rgba(255, 255, 255, .8); }
 .landing__card .btn--primary {
   background: var(--game, var(--accent)); border-color: var(--game, var(--accent));
   transition: background-color .15s ease, border-color .15s ease;
@@ -2478,21 +2483,20 @@ body:has(.landing--home) { background: #f1f2f4; }
 .topbar__room { display: flex; align-items: center; gap: 10px; min-width: 0; }
 
 /* The host's way to another game, by the room's name, in the lobby only. */
-/* A settings card's heading, with the host's Change game icon in its corner. */
+/* A settings card's heading, with the host's Change game link in its corner. */
 .card__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .card__head .card__title { margin: 0; }
-.switchgame__btn {
-  display: grid; place-items: center; flex: none; width: 32px; height: 32px; margin: -6px -6px -6px 0;
-  border: 1px solid var(--line); border-radius: 9px; background: var(--card); color: var(--ink-soft); cursor: pointer;
+.switchgame__link {
+  flex: none; padding: 2px 0; border: 0; background: none; cursor: pointer;
+  font-size: 13.5px; font-weight: 600; color: var(--accent);
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
 }
-.switchgame__btn svg { width: 16px; height: 16px; }
-.switchgame__btn:hover { color: var(--ink); border-color: var(--ink-soft); }
-.switchgame__btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.switchgame__link:hover { text-decoration-color: currentColor; }
+.switchgame__link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 /* The settings card turned into the game grid: the lobby's own settings
    step aside until the host picks or closes it. */
 .card:has(> .card__head.is-picking) > :not(.card__head):not(.switchgrid) { display: none; }
 .switchgrid { display: flex; flex-direction: column; gap: 12px; }
-.switchgrid__sub { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
 /* Compact covers to fit the card: three across, no blurb drawer (the front
    page already explains each game), the ink still answers the pointer. */
 .switchgrid .picker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 2px; }
@@ -2507,7 +2511,6 @@ body:has(.landing--home) { background: #f1f2f4; }
 .switchgrid .pick__more, .switchgrid .pick__blurb { display: none; }
 .switchgrid .pick:disabled { cursor: default; opacity: .55; }
 .switchgrid .pick.is-active:disabled { opacity: 1; }
-.switchgame__btn[aria-expanded="true"] { color: var(--ink); border-color: var(--ink-soft); }
 
 /* On a phone the panel is a sheet up from the bottom, over a scrim. */
 @media (max-width: 560px) {

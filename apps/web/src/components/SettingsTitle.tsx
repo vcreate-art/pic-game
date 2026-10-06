@@ -1,12 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { GAME_CAPACITY, type GameKind } from '@pic-game/shared';
-import { ArrowLeftRight, X } from 'lucide-react';
 import { getSocket } from '../net/socket.js';
 import { selectIsHost, useGame } from '../store/game.js';
 import { GameCovers } from './GameCovers.js';
 
 /**
- * A lobby's settings card heading. For the host, its corner holds the way
+ * A lobby's settings card heading. For the host, a link in its corner leads
  * to another game: the card turns from this game's settings into every game
  * as a cover, and back. The settings are for this game, so that's where
  * you'd look for another, and nothing pops up over the lobby.
@@ -43,19 +42,16 @@ export function SettingsTitle({ children }: { children: ReactNode }) {
         {canPick && (
           <button
             type="button"
-            className="switchgame__btn"
+            className="switchgame__link"
             aria-expanded={picking}
-            aria-label={picking ? 'Back to the settings' : 'Change game'}
-            title={picking ? 'Back to the settings' : 'Change game'}
             onClick={() => setPicking((v) => !v)}
           >
-            {picking ? <X aria-hidden="true" /> : <ArrowLeftRight aria-hidden="true" />}
+            {picking ? 'Back to settings' : 'Change game'}
           </button>
         )}
       </div>
       {picking && room && (
         <div className="switchgrid">
-          <p className="switchgrid__sub">Everyone stays in the room, and tonight’s wins carry over.</p>
           <GameCovers
             onPick={pick}
             active={room.kind}
