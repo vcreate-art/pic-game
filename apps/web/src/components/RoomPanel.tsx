@@ -15,7 +15,7 @@ type Confirm = 'restart' | 'toLobby';
  * Everything about the room rather than the game, from the header over every
  * screen: which game is on, who is here and how many each has won tonight,
  * and for the host, pausing, restarting or going back to the lobby. Picking
- * another game is SwitchGame's, in the lobby. It wears the game's colour.
+ * another game happens on the lobby's settings card. It wears the game's colour.
  */
 export function RoomPanel() {
   const room = useGame((s) => s.room);
