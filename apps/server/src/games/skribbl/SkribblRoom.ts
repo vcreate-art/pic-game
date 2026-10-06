@@ -12,6 +12,7 @@ import {
   RECONNECT_GRACE_MS, SUGGEST_SECONDS, TURN_END_SECONDS, EMPTY_ROOM_TTL_MS,
 } from '../../config.js';
 import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { topScorers } from '../../core/RoomSession.js';
 import { pickWords } from './words.js';
 
 export interface ServerPlayer extends CorePlayer {
@@ -502,6 +503,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   private endGame(): void {
     this.clearTimers();
     this.phase = 'gameEnd';
+    this.recordWin(topScorers(Object.fromEntries([...this.players.values()].map((p) => [p.id, p.score]))));
     this.io.to(this.code).emit('game:end', { players: this.publicPlayers(), gallery: this.galleryPublic() });
     this.phaseTimer = setTimeout(() => this.abortToLobby(), GAME_END_SECONDS * 1000);
   }

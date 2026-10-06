@@ -252,6 +252,8 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
     const prev = this.undoStack.at(-1);
     if (!prev) return;
     this.undoStack = this.undoStack.slice(0, -1);
+    // Undoing the result that ended it takes the win back as well.
+    if (this.t.phase === 'ended' && prev.phase !== 'ended') this.revokeLastWin();
     this.t = prev;
     this.systemMessage('The host took back the last result.');
     this.broadcast();
@@ -287,6 +289,7 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
   }
 
   private announceWinners(): void {
+    this.recordWin(this.t.winners.map((id) => this.t.entrants.find((e) => e.id === id)?.playerId));
     const names = this.t.winners.map((id) => this.nameOf(id));
     this.systemMessage(names.length > 1 ? `It's a tie: ${names.join(' and ')} share the win!` : `${names[0]} wins the tournament!`);
   }

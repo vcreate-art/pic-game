@@ -321,12 +321,7 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
     this.clearTimer();
     const g = this.game!;
     this.stage = 'ended';
-    for (const id of g.winners) {
-      const p = this.players.get(id);
-      if (!p) continue;
-      p.score += 1;
-      this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
-    }
+    this.recordWin(g.winners);
     const names = g.winners.map((id) => this.nameOf(id));
     this.systemMessage(
       names.length > 1 ? `BINGO! ${names.join(' and ')} share the win.` : `BINGO! ${names[0]} wins.`,

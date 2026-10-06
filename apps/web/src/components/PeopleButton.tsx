@@ -3,11 +3,12 @@ import { useDismiss } from '../lib/useDismiss.js';
 import { selectIsHost, useGame } from '../store/game.js';
 import { Avatar } from './Avatar.js';
 import { KickButton } from './KickButton.js';
+import { WinCount } from './WinCount.js';
 
 /**
  * Everyone in the room, from the header, whatever game is running. Mid-game
  * most screens show only the people playing, so this is where the host finds
- * a watcher to remove, and anyone can see who is here.
+ * a watcher to remove, and anyone can see who is here and the session's wins.
  */
 export function PeopleButton() {
   const room = useGame((s) => s.room);
@@ -46,10 +47,16 @@ export function PeopleButton() {
                   {p.id === me && <em> (you)</em>}
                 </span>
                 {!p.connected && <span className="people__tag">away</span>}
+                <WinCount n={room.meta.wins[p.id]} />
                 {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
               </li>
             ))}
           </ul>
+          {room.meta.games > 0 && (
+            <p className="profile__note">
+              {room.meta.games} {room.meta.games === 1 ? 'game' : 'games'} played this session.
+            </p>
+          )}
           {isHost && players.length > 1 && (
             <p className="profile__note">Tap × and then Remove? to take someone out. They cannot rejoin this room.</p>
           )}

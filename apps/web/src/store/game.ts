@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type {
   BingoCard, BingoPublic, BingoRoomState, CardColor, CryptidClue, CryptidPublic, CryptidRoomState, Flip7Public, Flip7RoomState, MazePublic, MazeRoomState, Drawing, TourneyPublic, TourneyRoomState, CardInstance, ChatMessage, FightPublic, FightRoomState, KungFuPublic, RacePublic,
   RaceRoomState, SpiesPublic, SpiesRoomState, KungFuRoomState, Piece, Player,
-  RealmsPublic, RealmsRoomState, RealmsSide, RoomSettings, RoomState, Side,
+  RealmsPublic, RealmsRoomState, RealmsSide, RoomMeta, RoomSettings, RoomState, Side,
   SkribblRoomState, WordOption,
 } from '@pic-game/shared';
 
@@ -68,6 +68,7 @@ interface GameStore {
   dropPlayer: (id: string) => void;
   setSettings: (s: RoomSettings) => void;
   setHost: (id: string) => void;
+  setMeta: (meta: RoomMeta) => void;
   beginChoosing: (p: { drawerId: string; round: number; endsAt: number; words?: WordOption[] }) => void;
   setSuggest: (s: SuggestState) => void;
   setMySuggestion: (text: string | null) => void;
@@ -162,6 +163,7 @@ export const useGame = create<GameStore>((set) => ({
   setSettings: (settings) =>
     set((s) => (s.room?.kind === 'skribbl' ? { room: { ...s.room, settings } } : {})),
   setHost: (hostId) => set((s) => (s.room ? { room: { ...s.room, hostId } } : {})),
+  setMeta: (meta) => set((s) => (s.room ? { room: { ...s.room, meta } } : {})),
 
   beginChoosing: (p) =>
     set((s) => ({

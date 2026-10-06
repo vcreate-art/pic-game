@@ -24,6 +24,9 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
   readonly kind = 'cryptid' as const;
   settings: CryptidSettings = { ...CRYPTID_DEFAULTS };
   private game: CryptidGame | null = null;
+  /** Whether this game's result has gone to the session; several paths
+   *  pass through afterMove once a game has ended. */
+  private recorded = false;
   /** Names of players who left mid-game, for the history. */
   private departed: Record<string, string> = {};
   private awayTimer: ReturnType<typeof setTimeout> | null = null;
@@ -130,6 +133,7 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
     const puzzle = generatePuzzle(seats.length, this.settings.advanced, Math.random);
     const cubes = this.settings.setupCubes ? SETUP_CUBES : 0;
     this.game = newCryptid(puzzle.board, seats, puzzle.clues, puzzle.answer, cubes);
+    this.recorded = false;
     this.departed = {};
     for (const id of this.players.keys()) this.sendClue(id);
     this.systemMessage(
@@ -183,12 +187,9 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
    *  and tell everyone. */
   private afterMove(): void {
     const g = this.game;
-    if (g?.stage === 'ended' && g.winner) {
-      const p = this.players.get(g.winner);
-      if (p) {
-        p.score += 1;
-        this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
-      }
+    if (g?.stage === 'ended' && !this.recorded) {
+      this.recorded = true;
+      this.recordWin([g.winner]);
     }
     this.watchTurn();
     this.broadcast();

@@ -147,12 +147,7 @@ export class Flip7Room extends BaseRoom<CorePlayer> {
         this.systemMessage(`Round ${done.round}: ${line}.`);
       }
       if (g.stage === 'ended' && done) {
-        for (const w of g.winners) {
-          const p = this.players.get(w);
-          if (!p) continue;
-          p.score += 1;
-          this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
-        }
+        this.recordWin(g.winners);
         this.systemMessage(`${g.winners.map((w) => this.nameOf(w)).join(' and ')} wins with ${g.totals[g.winners[0]!]}!`);
       }
     }

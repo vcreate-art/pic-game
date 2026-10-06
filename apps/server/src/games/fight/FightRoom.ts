@@ -244,6 +244,7 @@ export class FightRoom extends BaseRoom<CorePlayer> {
     this.phase = 'ended';
     this.winner = winner;
     this.reason = reason;
+    this.recordWin([winner && this.seats[winner]]);
     this.broadcast();
   }
 

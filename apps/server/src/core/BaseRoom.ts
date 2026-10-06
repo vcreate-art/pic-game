@@ -5,6 +5,7 @@ import type {
   RoomStateBase, ServerToClientEvents,
 } from '@pic-game/shared';
 import { EMPTY_ROOM_TTL_MS, RECONNECT_GRACE_MS } from '../config.js';
+import { RoomSession } from './RoomSession.js';
 
 export type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 
@@ -36,16 +37,9 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   /** Join order, which games may also use as turn order. */
   order: string[] = [];
 
-  /**
-   * Seat tokens the host has removed.
-   *
-   * With no accounts a kick is a soft block: it stops the client reconnecting
-   * and stops a return through the invite link on the same seat, which covers
-   * ordinary nuisance. Someone determined can clear their session and come back
-   * as a new player. Keying on IP would be stronger but would eject everyone
-   * behind the same router, which is how this gets played over home Wi-Fi.
-   */
-  private readonly banned = new Set<string>();
+  /** Wins, kicks and history that outlive this game. Handed on when the
+   *  room switches to a different game. */
+  session = new RoomSession();
 
   /** Set when the room empties; cancelled the moment someone joins. */
   emptyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -173,7 +167,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     if (!target) return;
 
     const host = this.players.get(byPlayerId);
-    this.banned.add(target.token);
+    this.session.banned.add(target.token);
     // Told before removal, while the socket is still in the room.
     this.emitTo(targetId, 'kicked', { by: host?.name ?? 'the host' });
     this.systemMessage(`${target.name} was removed by ${host?.name ?? 'the host'}.`);
@@ -193,7 +187,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   }
 
   isBanned(token: string | undefined): boolean {
-    return !!token && this.banned.has(token);
+    return !!token && this.session.banned.has(token);
   }
 
   activeCount(): number {
@@ -250,7 +244,32 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
 
   /** Room-level facts every game's state carries. */
   meta(): RoomMeta {
-    return { wins: {}, games: 0, can: { restart: false, toLobby: false, switch: false } };
+    return {
+      wins: this.session.winsOf(this.players.keys()),
+      games: this.session.games,
+      can: { restart: false, toLobby: false, switch: false },
+    };
+  }
+
+  /** Sends the room-level facts on their own. Most games broadcast only their
+   *  own state, which doesn't carry them. */
+  protected emitMeta(): void {
+    this.io.to(this.code).emit('room:meta', this.meta());
+  }
+
+  /** Every game reports its result here, from wherever it ends. Ties give each
+   *  winner a win; an empty list is a game nobody won. Players who have left
+   *  the room by now don't score. */
+  protected recordWin(ids: readonly (string | null | undefined)[]): void {
+    const winners = ids.filter((id): id is string => !!id && this.players.has(id));
+    this.session.record(this.kind, winners);
+    this.emitMeta();
+  }
+
+  /** Takes back the last recorded result, for a host undoing a game's end. */
+  protected revokeLastWin(): void {
+    this.session.revokeLast();
+    this.emitMeta();
   }
 
   /** The fields every game's `publicState()` starts from. */

@@ -269,7 +269,9 @@ export function BingoGame({ onLeave }: { onLeave: () => void }) {
                     ) : (
                       <span className="bplayer__lines">{n ? `${n} line${n === 1 ? '' : 's'}` : ''}</span>
                     )}
-                    {p.score > 0 && <span className="bplayer__wins" title="Wins in this room">{p.score}</span>}
+                    {!!room.meta.wins[p.id] && (
+                      <span className="bplayer__wins" title="Wins this session">{room.meta.wins[p.id]}</span>
+                    )}
                   </li>
                 );
               })}

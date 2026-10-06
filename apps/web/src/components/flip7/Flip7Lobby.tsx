@@ -1,6 +1,7 @@
 import { FLIP7_BONUS, FLIP7_MAX_PLAYERS, FLIP7_MIN_PLAYERS, FLIP7_TARGETS } from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectFlip7, selectIsHost, useGame } from '../../store/game.js';
+import { WinCount } from '../WinCount.js';
 import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
@@ -29,7 +30,7 @@ export function Flip7Lobby({ onLeave }: { onLeave: () => void }) {
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
                 {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
-                {p.score > 0 && <span className="bingolobby__wins">{p.score} win{p.score === 1 ? '' : 's'}</span>}
+                <WinCount n={room.meta.wins[p.id]} />
               </li>
             ))}
           </ul>

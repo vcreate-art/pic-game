@@ -189,6 +189,7 @@ export class RealmsRoom extends BaseRoom<CorePlayer> {
       this.game.phase = 'ended';
       this.game.winner = winner;
     }
+    this.recordWin([winner && this.seats[winner]]);
     this.io.to(this.code).emit('realms:over', { winner });
     this.broadcast();
   }

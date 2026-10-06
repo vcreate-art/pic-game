@@ -249,6 +249,7 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
     this.phase = 'ended';
     this.winner = winner;
     this.reason = reason;
+    this.recordWin([winner && this.seats[winner]]);
     this.io.to(this.code).emit('chess:over', { winner, reason });
     this.broadcast();
   }

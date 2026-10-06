@@ -1,6 +1,6 @@
 import type {
   Avatar, CanvasOp, ChatMessage, Drawing, GameKind, PenTool, Player,
-  RoomSettings, RoomState, TurnPublic, Vote, WordOption,
+  RoomMeta, RoomSettings, RoomState, TurnPublic, Vote, WordOption,
 } from './types.js';
 import type { KungFuPublic, KungFuSettings, Piece, Side, Square } from './kungfu/types.js';
 import type {
@@ -236,6 +236,8 @@ export interface ServerToClientEvents {
   'player:left': (p: { id: string }) => void;
   'player:updated': (p: Player) => void;
   'room:settings': (s: RoomSettings) => void;
+  /** Session wins and host permissions, sent when they change. */
+  'room:meta': (m: RoomMeta) => void;
   'host:changed': (p: { hostId: string }) => void;
   /** Sent to the removed player's socket alone, just before they are dropped. */
   'kicked': (p: { by: string }) => void;

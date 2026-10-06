@@ -235,12 +235,7 @@ export class MazeRoom extends BaseRoom<CorePlayer> {
     if (w) {
       const best = Math.max(...w.fighters.map((f) => f.kills));
       this.winners = best > 0 ? w.fighters.filter((f) => f.kills === best).map((f) => f.id) : [];
-      for (const id of this.winners) {
-        const p = this.players.get(id);
-        if (!p) continue;
-        p.score += 1;
-        this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
-      }
+      this.recordWin(this.winners);
       const names = this.winners.map((id) => this.players.get(id)?.name ?? 'Someone');
       this.systemMessage(names.length ? `${names.join(' and ')} wins with ${best} kills!` : 'Time! Nobody scored.');
     }

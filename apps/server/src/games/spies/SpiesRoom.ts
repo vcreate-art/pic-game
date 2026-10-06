@@ -276,6 +276,8 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
   private finish(): void {
     this.clearTimer();
     const g = this.game!;
+    const team = g.winner ? this.teams[g.winner] : null;
+    this.recordWin(team ? [team.spymaster, ...team.operatives] : []);
     this.systemMessage(
       g.reason === 'assassin'
         ? `The assassin! ${g.winner} wins.`

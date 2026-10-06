@@ -1,6 +1,7 @@
 import { CRYPTID_MAX_PLAYERS, CRYPTID_MIN_PLAYERS } from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectCryptid, selectIsHost, useGame } from '../../store/game.js';
+import { WinCount } from '../WinCount.js';
 import { Avatar } from '../Avatar.js';
 import { InviteCard } from '../InviteCard.js';
 import { KickButton } from '../KickButton.js';
@@ -36,7 +37,7 @@ export function CryptidLobby({ onLeave }: { onLeave: () => void }) {
               <li key={p.id} className="lobby__player">
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
-                {p.score > 0 && <span className="bingolobby__wins">{p.score} found</span>}
+                <WinCount n={room.meta.wins[p.id]} />
                 {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
               </li>
             ))}

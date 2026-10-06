@@ -4,6 +4,7 @@ import {
   type RaceEvent, type RacePhase, type RacePublic, type RaceSettings, type RoomState,
 } from '@pic-game/shared';
 import { BaseRoom, type CorePlayer, type IO } from '../../core/BaseRoom.js';
+import { topScorers } from '../../core/RoomSession.js';
 
 const COUNTDOWN_MS = 3500;
 const RESULTS_MS = 7000;
@@ -185,6 +186,7 @@ export class RaceRoom extends BaseRoom<CorePlayer> {
       if (last) {
         this.phase = 'podium';
         this.nextAt = 0;
+        this.recordWin(topScorers(this.points));
         this.broadcast();
       } else {
         this.beginLevel(this.level + 1);

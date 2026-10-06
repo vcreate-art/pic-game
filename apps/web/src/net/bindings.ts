@@ -38,6 +38,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
   socket.on('player:left', ({ id }) => g().dropPlayer(id));
   socket.on('room:settings', (s) => g().setSettings(s));
   socket.on('host:changed', ({ hostId }) => g().setHost(hostId));
+  socket.on('room:meta', (m) => g().setMeta(m));
   socket.on('kicked', ({ by }) => g().setKickedBy(by));
 
   socket.on('turn:choosing', (p) => {
@@ -132,7 +133,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
     socket.off('disconnect', onDisconnect);
     for (const ev of [
       'state:sync', 'player:joined', 'player:updated', 'player:left',
-      'room:settings', 'host:changed', 'kicked', 'turn:choosing', 'word:secret', 'suggest:state',
+      'room:settings', 'room:meta', 'host:changed', 'kicked', 'turn:choosing', 'word:secret', 'suggest:state',
       'turn:drawing', 'hint:reveal', 'turn:end', 'game:end', 'draw:reactions',
       'draw:start', 'draw:append', 'draw:end', 'draw:fill',
       'canvas:undone', 'canvas:cleared', 'chat:message', 'guess:correct', 'error',
