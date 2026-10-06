@@ -2519,36 +2519,42 @@ body:has(.landing--home) { background: #f1f2f4; }
   backdrop-filter: blur(5px);
   animation: sheet-fade .18s ease;
 }
-.paused__inner { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.paused__inner { display: flex; flex-direction: column; align-items: center; text-align: center; }
+/* In order of weight: what's happening, who and how long, what to do next,
+   and last and quietest, how tonight is going. */
 .paused__word {
   margin: 0; font-family: var(--display); font-weight: 800; line-height: .9;
   font-size: clamp(64px, 14vw, 128px); letter-spacing: -.03em; color: var(--game);
 }
-.paused__line { margin: 0; font-size: 16px; }
-.paused__time { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.paused__wait { margin: 0; font-size: 15px; color: var(--ink-soft); }
+.paused__line { margin: 10px 0 0; font-size: 15px; color: var(--ink-soft); }
+.paused__time { font-variant-numeric: tabular-nums; }
 .paused__resume {
-  margin-top: 8px; padding: 13px 34px; border: 0; border-radius: 12px; cursor: pointer;
-  background: var(--game); color: #fff; font-size: 16px; font-weight: 700;
+  margin-top: 26px; min-width: 220px; padding: 15px 36px; border: 0; border-radius: 14px; cursor: pointer;
+  background: var(--game); color: #fff; font-size: 18px; font-weight: 700;
+  box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--game) 80%, transparent);
 }
 .paused__resume:hover { background: color-mix(in srgb, var(--game) 85%, #000); }
-/* Tonight's standings, for something to look at while everyone waits. */
+.paused__resume:focus-visible { outline: 3px solid var(--game); outline-offset: 3px; }
+.paused__wait {
+  margin: 26px 0 0; padding: 12px 22px; border-radius: 14px; font-size: 16px; font-weight: 600;
+  color: var(--game); background: color-mix(in srgb, var(--game) 10%, transparent);
+}
+/* Background reading while everyone waits: no card, a rule and small type. */
 .paused__board {
-  width: min(340px, 100%); margin-top: 18px; padding: 14px 16px; text-align: left;
-  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  width: min(300px, 100%); margin-top: 44px; padding-top: 14px; text-align: left;
+  border-top: 1px solid color-mix(in srgb, var(--game) 25%, transparent);
 }
 .paused__boardh {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 8px;
-  font-family: var(--display); font-size: 17px; font-weight: 800;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 6px;
+  font-family: var(--display); font-size: 15px; font-weight: 800; color: var(--ink-soft);
 }
-.paused__boardnote { font-family: var(--ui); font-size: 12px; font-weight: 500; color: var(--ink-soft); }
-.paused__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.paused__rows li { display: flex; align-items: center; gap: 9px; padding: 3px 0; }
+.paused__boardnote { font-family: var(--ui); font-size: 12px; font-weight: 500; }
+.paused__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.paused__rows li { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
 .paused__rows li.is-away { opacity: .55; }
-.paused__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
-.paused__wins { font-size: 13px; font-weight: 700; color: var(--game); font-variant-numeric: tabular-nums; }
-.paused__more { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-soft); }
-.paused__resume:focus-visible { outline: 3px solid var(--game); outline-offset: 3px; }
+.paused__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; font-weight: 600; }
+.paused__wins { font-size: 12.5px; font-weight: 700; color: var(--game); font-variant-numeric: tabular-nums; }
+.paused__more { margin: 4px 0 0; font-size: 12px; color: var(--ink-soft); }
 /* The 3-2-1: the same tinted screen, one huge number, each landing afresh. */
 .countdown__label { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink-soft); }
 .countdown__n {

@@ -50,15 +50,16 @@ export function PausedOverlay() {
       <div className="paused__inner">
         <h2 id="paused-title" className="paused__word">Paused</h2>
         <p className="paused__line">
-          {isHost ? 'You paused the game' : `${nameOf(paused.by)} paused the game`}{' '}
+          {paused.by === hostId && isHost ? 'You' : nameOf(paused.by)} paused it,{' '}
           <span className="paused__time">{elapsed(now - paused.at)} ago</span>
         </p>
+        {/* The one thing to do next: resume, or for everyone else, wait for it. */}
         {isHost ? (
           <button type="button" className="paused__resume" onClick={() => getSocket().emit('room:resume')}>
             Resume
           </button>
         ) : (
-          <p className="paused__wait">Waiting for {nameOf(hostId)} to carry on.</p>
+          <p className="paused__wait">Waiting for {nameOf(hostId)} to resume</p>
         )}
 
         <section className="paused__board" aria-labelledby="paused-board">
@@ -73,7 +74,7 @@ export function PausedOverlay() {
               const n = wins[p.id] ?? 0;
               return (
                 <li key={p.id} className={p.connected ? '' : 'is-away'}>
-                  <Avatar data={p.avatar} size={26} host={p.id === hostId} />
+                  <Avatar data={p.avatar} size={22} host={p.id === hostId} />
                   <span className="paused__name">{p.name}</span>
                   <span className="paused__wins">{n ? `${n} ${n === 1 ? 'win' : 'wins'}` : ''}</span>
                 </li>
