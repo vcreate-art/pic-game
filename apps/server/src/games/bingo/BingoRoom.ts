@@ -50,6 +50,10 @@ export class BingoRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.stage === 'ended' ? 'ended' : 'playing';
   }
 
+  protected resetToLobby(): void {
+    this.toLobbyNow();
+  }
+
   get maxPlayers(): number {
     return GAME_CAPACITY.bingo;
   }

@@ -56,6 +56,12 @@ export interface ClientToServerEvents {
     cb: (r: JoinAck) => void,
   ) => void;
   'room:leave': () => void;
+  /** Host only, outside the lobby: the same game again from the start. A
+   *  game in progress is abandoned with no result. */
+  'game:restart': () => void;
+  /** Host only, outside the lobby: back to the lobby, abandoning a game in
+   *  progress with no result. */
+  'game:toLobby': () => void;
   /** Host only, between games: the room plays a different game next, with
    *  the same code, seats and session. */
   'room:switch': (p: { kind: GameKind }, cb?: (r: { ok: boolean; message?: string }) => void) => void;

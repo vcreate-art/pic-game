@@ -47,6 +47,14 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.t.phase === 'ended' ? 'ended' : 'playing';
   }
 
+  /** The same players, signed up afresh: the bracket and results go. */
+  protected resetToLobby(): void {
+    const entrants = this.t.entrants.map((e) => newEntrant(e.id, e.name, e.main, e.playerId));
+    this.t = { ...newTourney(this.t.settings), entrants };
+    this.undoStack = [];
+    this.broadcast();
+  }
+
   get maxPlayers(): number {
     return GAME_CAPACITY.tourney;
   }
@@ -270,10 +278,7 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
   /** Same players, fresh tournament. */
   toSetup(by: string): void {
     if (!this.isHost(by) || this.t.phase !== 'ended') return;
-    const entrants = this.t.entrants.map((e) => newEntrant(e.id, e.name, e.main, e.playerId));
-    this.t = { ...newTourney(this.t.settings), entrants };
-    this.undoStack = [];
-    this.broadcast();
+    this.resetToLobby();
   }
 
   /** A tournament saved in the host's browser, brought back after a restart.

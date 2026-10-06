@@ -86,6 +86,10 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     return this.isLobby() ? 'lobby' : this.phase === 'gameEnd' ? 'ended' : 'playing';
   }
 
+  protected resetToLobby(): void {
+    this.abortToLobby();
+  }
+
   /** A bigger group than the default can switch in; the limit rises to fit
    *  them rather than turning anyone away. */
   override adoptFrom(old: BaseRoom<CorePlayer>): void {

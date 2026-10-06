@@ -63,6 +63,8 @@ class TestRoom extends BaseRoom<CorePlayer> {
   lifecycle(): 'lobby' {
     return 'lobby';
   }
+  startGame(): void {}
+  protected resetToLobby(): void {}
   protected createPlayer(base: CorePlayer): CorePlayer {
     return base;
   }

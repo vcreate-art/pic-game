@@ -47,6 +47,10 @@ export class CryptidRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.game?.stage === 'ended' ? 'ended' : 'playing';
   }
 
+  protected resetToLobby(): void {
+    this.toLobbyNow();
+  }
+
   get maxPlayers(): number {
     // Five play; the rest can watch.
     return GAME_CAPACITY.cryptid;

@@ -36,6 +36,10 @@ export class Flip7Room extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.game?.stage === 'ended' ? 'ended' : 'playing';
   }
 
+  protected resetToLobby(): void {
+    this.toLobbyNow();
+  }
+
   get maxPlayers(): number {
     return GAME_CAPACITY.flip7;
   }

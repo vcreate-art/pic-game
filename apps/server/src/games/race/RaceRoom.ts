@@ -61,6 +61,13 @@ export class RaceRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.phase === 'podium' ? 'ended' : 'playing';
   }
 
+  protected resetToLobby(): void {
+    this.clearTimers();
+    this.phase = 'lobby';
+    this.nextAt = 0;
+    this.broadcast();
+  }
+
   get maxPlayers(): number {
     return GAME_CAPACITY.race;
   }

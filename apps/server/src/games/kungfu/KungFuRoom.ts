@@ -50,6 +50,15 @@ export class KungFuRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
   }
 
+  /** Seats stay taken, so a restart deals straight back in. */
+  protected resetToLobby(): void {
+    this.phase = 'lobby';
+    this.eliminated = [];
+    this.winner = null;
+    this.reason = null;
+    this.broadcast();
+  }
+
   /** Two seats, but onlookers are welcome. */
   get maxPlayers(): number {
     return GAME_CAPACITY.kungfu;

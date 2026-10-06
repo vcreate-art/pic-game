@@ -2431,3 +2431,6 @@ body:has(.landing--home) { background: #f1f2f4; }
   .roommenu__name { display: none; }
   .roommenu__pop { position: fixed; left: 12px; right: 12px; top: 60px; width: auto; }
 }
+.roommenu__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.roommenu__actions .btn { flex: 1; padding: 9px 12px; }
+.roommenu__confirm { margin: 0; font-size: 13.5px; }

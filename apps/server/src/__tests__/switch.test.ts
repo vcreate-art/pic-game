@@ -112,3 +112,54 @@ describe('room meta', () => {
     expect(last?.args[0]).toMatchObject({ can: { switch: false } });
   });
 });
+
+describe('restart and back to lobby', () => {
+  it('restarts a game in progress without recording a result', () => {
+    const { room, seats, sent } = table('flip7');
+    room.startGame(seats[0]!.id);
+    const before = room.publicState();
+    room.restart(seats[0]!.id);
+    expect(room.lifecycle()).toBe('playing');
+    expect(room.meta().games).toBe(0);
+    expect(room.publicState()).not.toEqual(before);
+    expect(sent.some((m) => m.event === 'chat:message' && JSON.stringify(m.args).includes('restarted'))).toBe(true);
+  });
+
+  it('goes back to the lobby without recording a result', () => {
+    const { room, seats } = table('bingo');
+    room.startGame(seats[0]!.id);
+    room.backToLobby(seats[0]!.id);
+    expect(room.lifecycle()).toBe('lobby');
+    expect(room.meta().games).toBe(0);
+    expect(room.meta().can).toEqual({ restart: false, toLobby: false, switch: true });
+  });
+
+  it('is the host’s call alone', () => {
+    const { room, seats } = table('flip7');
+    room.startGame(seats[0]!.id);
+    room.backToLobby(seats[1]!.id);
+    room.restart(seats[1]!.id);
+    expect(room.lifecycle()).toBe('playing');
+  });
+
+  it('does nothing from the lobby', () => {
+    const { room, seats, sent } = table('flip7');
+    const count = sent.length;
+    room.restart(seats[0]!.id);
+    room.backToLobby(seats[0]!.id);
+    expect(room.lifecycle()).toBe('lobby');
+    expect(sent.length).toBe(count);
+  });
+
+  it('stops a real-time game’s loop when it goes back to the lobby', () => {
+    vi.useFakeTimers();
+    const { rooms } = table();
+    const maze = rooms.create('maze');
+    const a = maze.addPlayer('A', av, 'x1');
+    maze.addPlayer('B', av, 'x2');
+    maze.startGame(a.id);
+    expect(maze.lifecycle()).toBe('playing');
+    maze.backToLobby(a.id);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});

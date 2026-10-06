@@ -63,6 +63,15 @@ export class FightRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
   }
 
+  /** Seats and picks stay, so a restart goes straight to the fight. */
+  protected resetToLobby(): void {
+    this.stopLoop();
+    this.clearPause();
+    this.phase = 'lobby';
+    this.match = null;
+    this.broadcast();
+  }
+
   /** Two fighters, and room for a crowd. */
   get maxPlayers(): number {
     return GAME_CAPACITY.fight;

@@ -9,8 +9,9 @@ import { GAME_ICONS } from './gameIcons.js';
 
 /**
  * The room's own controls, in the header over every game: which game is on,
- * and for the host, switching to another between games. Leaving is here for
- * everyone, whatever screen the game shows.
+ * and for the host, restarting it, going back to the lobby, or switching to
+ * another between games. Leaving is here for everyone, whatever screen the
+ * game shows.
  */
 export function RoomMenu() {
   const room = useGame((s) => s.room);
@@ -18,14 +19,28 @@ export function RoomMenu() {
   const leave = useLeaveRoom();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Abandoning a game in progress takes a second tap.
+  const [confirm, setConfirm] = useState<'restart' | 'toLobby' | null>(null);
   const box = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => {
+    setOpen(false);
+    setConfirm(null);
+  }, []);
   useDismiss(box, open, close);
 
   if (!room) return null;
   const { icon: Icon, color } = GAME_ICONS[room.kind];
-  const canSwitch = room.meta.can.switch;
+  const { can } = room.meta;
+  const canSwitch = can.switch;
   const here = room.players.length;
+  // Mid-game is the only time these lose anything.
+  const midGame = !canSwitch;
+
+  const act = (what: 'restart' | 'toLobby') => {
+    if (midGame && confirm !== what) return setConfirm(what);
+    getSocket().emit(what === 'restart' ? 'game:restart' : 'game:toLobby');
+    close();
+  };
 
   const switchTo = (kind: GameKind) => {
     setBusy(true);
@@ -51,6 +66,41 @@ export function RoomMenu() {
       </button>
       {open && (
         <div className="roommenu__pop card">
+          {isHost && (can.restart || can.toLobby) && (
+            <section className="roommenu__section" aria-labelledby="roommenu-game">
+              <h2 id="roommenu-game" className="card__title">This game</h2>
+              {confirm ? (
+                <>
+                  <p className="roommenu__confirm">
+                    {confirm === 'restart'
+                      ? 'Start over? This game ends now and nobody gets the win.'
+                      : 'Back to the lobby? This game ends now and nobody gets the win.'}
+                  </p>
+                  <div className="roommenu__actions">
+                    <button type="button" className="btn btn--primary" onClick={() => act(confirm)}>
+                      {confirm === 'restart' ? 'Start over' : 'Back to the lobby'}
+                    </button>
+                    <button type="button" className="btn" onClick={() => setConfirm(null)}>
+                      Keep playing
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="roommenu__actions">
+                  {can.restart && (
+                    <button type="button" className="btn" onClick={() => act('restart')}>
+                      {midGame ? 'Restart' : 'Play again'}
+                    </button>
+                  )}
+                  {can.toLobby && (
+                    <button type="button" className="btn" onClick={() => act('toLobby')}>
+                      Back to lobby
+                    </button>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
           {isHost ? (
             <section className="roommenu__section" aria-labelledby="roommenu-switch">
               <h2 id="roommenu-switch" className="card__title">Switch game</h2>

@@ -67,6 +67,11 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   abstract isLobby(): boolean;
   /** Each game's own phases, mapped onto the shared three. */
   abstract lifecycle(): RoomLifecycle;
+  /** Starts a game from the lobby (host only), or explains why it can't. */
+  abstract startGame(by: string): void;
+  /** Drops whatever game is on and goes back to the lobby, keeping the
+   *  seats and settings. Stops every timer the game had running. */
+  protected abstract resetToLobby(): void;
   /** Below this, an in-progress game gives up and returns to the lobby. */
   protected abstract get minPlayers(): number;
   /** Adds whatever per-game fields a seat needs on top of the core ones. */
@@ -253,8 +258,33 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     return {
       wins: this.session.winsOf(this.players.keys()),
       games: this.session.games,
-      can: { restart: false, toLobby: false, switch: this.canSwitch() },
+      can: {
+        restart: this.lifecycle() !== 'lobby',
+        toLobby: this.lifecycle() !== 'lobby',
+        switch: this.canSwitch(),
+      },
     };
+  }
+
+  /** Host only: the same game again from the start, with the same players
+   *  and settings. Abandons a game in progress without recording a result. */
+  restart(by: string): void {
+    if (by !== this.hostId || this.lifecycle() === 'lobby') return;
+    const midGame = this.lifecycle() === 'playing';
+    this.resetToLobby();
+    if (midGame) this.systemMessage('The host restarted the game.');
+    this.startGame(by);
+    this.syncMeta();
+  }
+
+  /** Host only: back to the lobby, abandoning a game in progress without
+   *  recording a result. */
+  backToLobby(by: string): void {
+    if (by !== this.hostId || this.lifecycle() === 'lobby') return;
+    const midGame = this.lifecycle() === 'playing';
+    this.resetToLobby();
+    if (midGame) this.systemMessage('The host ended the game.');
+    this.syncMeta();
   }
 
   /** Switching games is only allowed between them, never mid-game. */

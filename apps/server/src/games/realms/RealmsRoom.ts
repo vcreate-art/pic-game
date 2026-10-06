@@ -37,6 +37,12 @@ export class RealmsRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
   }
 
+  /** Seats stay taken, so a restart deals straight back in. */
+  protected resetToLobby(): void {
+    this.phase = 'lobby';
+    this.broadcast();
+  }
+
   get maxPlayers(): number {
     // Two seats, but onlookers are welcome.
     return GAME_CAPACITY.realms;

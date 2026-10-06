@@ -51,6 +51,13 @@ export class SpiesRoom extends BaseRoom<CorePlayer> {
     return this.isLobby() ? 'lobby' : this.phase === 'ended' ? 'ended' : 'playing';
   }
 
+  protected resetToLobby(): void {
+    this.clearTimer();
+    this.game = null;
+    this.marks.clear();
+    this.broadcast();
+  }
+
   get maxPlayers(): number {
     return GAME_CAPACITY.spies;
   }

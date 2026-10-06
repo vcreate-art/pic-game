@@ -752,6 +752,16 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
     // Validated in full by the room; the socket's own size cap bounds it.
     socket.on('tourney:restore', tourneyAct((r, id, p) => r.restore(id, p?.state)));
 
+    socket.on('game:restart', () => {
+      if (!s.room || !s.playerId) return;
+      s.room.restart(s.playerId);
+    });
+
+    socket.on('game:toLobby', () => {
+      if (!s.room || !s.playerId) return;
+      s.room.backToLobby(s.playerId);
+    });
+
     socket.on('room:switch', (p, cb) => {
       const reply = typeof cb === 'function' ? cb : () => {};
       if (!s.room || !s.playerId) return reply({ ok: false, message: 'You are not in a room.' });
