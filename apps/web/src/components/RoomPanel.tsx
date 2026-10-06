@@ -64,12 +64,13 @@ export function RoomPanel() {
         className="room__chip"
         aria-expanded={open}
         aria-haspopup="dialog"
-        aria-label={`${name}, ${players.length} in the room`}
+        aria-label={`${name}: room menu`}
         onClick={() => (open ? close() : setOpen(true))}
       >
-        <Icon className="room__chipicon" aria-hidden="true" />
+        <span className="room__chiptile" aria-hidden="true">
+          <Icon />
+        </span>
         <span className="room__chipname">{name}</span>
-        <span className="room__count" aria-hidden="true">{players.length}</span>
         <ChevronDown className="room__caret" aria-hidden="true" />
       </button>
 

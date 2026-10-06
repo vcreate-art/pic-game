@@ -2405,24 +2405,23 @@ body:has(.landing--home) { background: #f1f2f4; }
 /* The room's controls, from the header. It wears the current game's colour
    (--game): the chip's icon, the panel's tile and its active control. */
 .room { position: relative; }
-/* In a room the chip takes the brand's place on the left, so it reads as
-   the screen's title: the game's name in the display face. */
+/* In a room the game takes the brand's place on the left as the screen's
+   title: its icon on a tile of its colour and its name in the display face.
+   The whole title is the button that opens the room panel. */
 .room__chip {
-  display: flex; align-items: center; gap: 8px; padding: 5px 9px 5px 12px;
-  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
-  font-family: var(--display); font-weight: 800; font-size: 17px; line-height: 1.2;
-  cursor: pointer; max-width: 300px;
+  display: flex; align-items: center; gap: 10px; padding: 3px 8px 3px 3px;
+  border: 0; border-radius: 12px; background: none;
+  font-family: var(--display); font-weight: 800; font-size: 21px; line-height: 1.15;
+  cursor: pointer; max-width: 360px;
 }
-.room__chip:hover, .room__chip[aria-expanded="true"] { border-color: var(--game); }
+.room__chip:hover, .room__chip[aria-expanded="true"] { background: color-mix(in srgb, var(--game) 8%, var(--card)); }
 .room__chip:focus-visible { outline: 2px solid var(--game); outline-offset: 2px; }
-.room__chipicon { width: 18px; height: 18px; color: var(--game); flex: none; }
-.room__chipname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.room__count {
-  display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px;
-  font-family: var(--ui); font-weight: 700;
-  background: color-mix(in srgb, var(--game) 12%, var(--card)); color: var(--game);
-  font-size: 12px; font-variant-numeric: tabular-nums;
+.room__chiptile {
+  display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 9px;
+  background: var(--game); color: #fff;
 }
+.room__chiptile svg { width: 19px; height: 19px; }
+.room__chipname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .room__caret { width: 14px; height: 14px; color: var(--ink-soft); flex: none; }
 
 .room__scrim { display: none; }
@@ -2498,7 +2497,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 
 /* On a phone the panel is a sheet up from the bottom, over a scrim. */
 @media (max-width: 560px) {
-  .room__chip { max-width: 190px; font-size: 16px; }
+  .room__chip { max-width: 220px; font-size: 18px; }
   .sheet__card.switchgame { max-height: 88vh; }
   .room__scrim { display: block; position: fixed; inset: 0; z-index: 59; background: rgba(31, 34, 51, .4); }
   .room__panel {
