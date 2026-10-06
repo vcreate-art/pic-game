@@ -19,6 +19,12 @@ if (posthogKey && posthogHost) {
       environment: import.meta.env.PROD ? 'production' : 'development',
     },
   });
+  // PostHog already puts screen and viewport size on every event; these are
+  // the rest of what decides how the page lays out and how covers open.
+  posthog.register({
+    device_pixel_ratio: window.devicePixelRatio,
+    primary_input: window.matchMedia('(hover: hover)').matches ? 'mouse' : 'touch',
+  });
 } else if (import.meta.env.DEV) {
   const missingVariable = posthogKey ? 'VITE_POSTHOG_HOST' : 'VITE_POSTHOG_KEY';
   throw new Error(

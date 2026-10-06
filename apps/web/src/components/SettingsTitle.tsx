@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { GAME_CAPACITY, type GameKind } from '@pic-game/shared';
+import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { getSocket } from '../net/socket.js';
 import { selectIsHost, useGame } from '../store/game.js';
 import { GameCovers } from './GameCovers.js';
@@ -28,8 +29,10 @@ export function SettingsTitle({ children }: { children: ReactNode }) {
     setBusy(true);
     getSocket().emit('room:switch', { kind }, (r) => {
       setBusy(false);
-      if (r.ok) setPicking(false);
-      else useGame.getState().setNotice(r.message ?? 'Could not switch games.');
+      if (r.ok) {
+        setPicking(false);
+        if (isPostHogEnabled) posthog.capture('game_switched', { from_game_kind: room?.kind, game_kind: kind });
+      } else useGame.getState().setNotice(r.message ?? 'Could not switch games.');
     });
   };
 
@@ -53,6 +56,7 @@ export function SettingsTitle({ children }: { children: ReactNode }) {
       {picking && room && (
         <div className="switchgrid">
           <GameCovers
+            surface="switcher"
             onPick={pick}
             active={room.kind}
             note={(k) =>

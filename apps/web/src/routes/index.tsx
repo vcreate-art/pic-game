@@ -156,7 +156,7 @@ function Landing() {
         </section>
 
         <section className="landing__section landing__start">
-          <GameCovers onPick={open} active={game} />
+          <GameCovers surface="landing" onPick={open} active={game} />
         </section>
       </div>
 
