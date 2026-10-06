@@ -182,10 +182,17 @@ function Landing() {
                   style={{ '--game': color } as CSSProperties}
                 >
                   <span className="pick__cover">
-                    <Icon className="pick__art" strokeWidth={1.75} aria-hidden="true" />
-                    <strong className="pick__name">{GAME_LABELS[k].name}</strong>
+                    <span className="pick__flip">
+                      <span className="pick__face">
+                        <Icon className="pick__art" strokeWidth={1.75} aria-hidden="true" />
+                        <strong className="pick__name">{GAME_LABELS[k].name}</strong>
+                      </span>
+                      <span className="pick__face pick__face--back">{GAME_LABELS[k].blurb}</span>
+                    </span>
                   </span>
-                  <span className="pick__blurb">{GAME_LABELS[k].blurb}</span>
+                  {/* Where there's no hover to turn the cover over, the blurb
+                      sits under it instead. The back face already reads it out. */}
+                  <span className="pick__blurb" aria-hidden="true">{GAME_LABELS[k].blurb}</span>
                 </button>
               );
             })}

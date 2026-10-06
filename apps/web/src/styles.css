@@ -612,20 +612,34 @@ body:has(.landing--home) { background: #f1f2f4; }
 
 /* ---------------------------------------------------------------- game picker */
 
-.picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 18px; padding-top: .25em; }
+.picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 18px; padding-top: .25em; }
 
 /* Each game is a box cover: its own colour is the surface and its name is
-   the art, with the icon as a watermark bleeding off the corner. The blurb
-   sits under the cover, the way it would on a shelf label. */
+   the art, with the icon as a watermark bleeding off the corner. Pointing
+   at it (or focusing it) turns it over to show the blurb on the back. */
 .pick {
   display: flex; flex-direction: column; gap: 10px; padding: 0;
   border: 0; background: none; text-align: left; cursor: pointer;
 }
 .pick__cover {
-  position: relative; overflow: hidden; display: flex; align-items: flex-end;
-  aspect-ratio: 4 / 3; padding: 14px 16px; border-radius: 12px;
+  position: relative; display: block; aspect-ratio: 4 / 3;
+  border-radius: 12px; perspective: 900px;
+}
+.pick__flip {
+  position: absolute; inset: 0; transform-style: preserve-3d;
+  transition: transform .45s cubic-bezier(.3, .7, .3, 1);
+}
+.pick__face {
+  position: absolute; inset: 0; display: flex; align-items: flex-end;
+  padding: 14px 16px; border-radius: 12px; overflow: hidden;
   background: var(--game, var(--ink)); color: #fff;
-  transition: background-color .15s ease;
+  -webkit-backface-visibility: hidden; backface-visibility: hidden;
+}
+/* A shade darker than the front, so the turn reads as a change of side. */
+.pick__face--back {
+  transform: rotateY(180deg); align-items: center;
+  background: color-mix(in srgb, var(--game, var(--ink)) 78%, #000);
+  font-size: 14px; line-height: 1.4;
 }
 .pick__art {
   position: absolute; top: -16px; right: -16px; width: 104px; height: 104px; opacity: .2;
@@ -635,8 +649,16 @@ body:has(.landing--home) { background: #f1f2f4; }
   font-size: 24px; line-height: 1.02; letter-spacing: -.01em;
 }
 .pick__blurb { padding: 0 2px; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
+.pick:focus-visible .pick__flip { transform: rotateY(180deg); }
+/* Only with a real pointer: on touch, :hover sticks to the last tapped card.
+   There the blurb stays under the cover. */
 @media (hover: hover) {
-  .pick:hover .pick__cover { background: color-mix(in srgb, var(--game, var(--ink)) 86%, #000); }
+  .pick:hover .pick__flip { transform: rotateY(180deg); }
+  .pick__blurb { display: none; }
+  .picker { row-gap: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pick__flip { transition: none; }
 }
 .pick:active .pick__cover { transform: translateY(1px); }
 /* Focus and "this one's sheet is open" share one ring in the game's colour,
@@ -814,8 +836,10 @@ body:has(.landing--home) { background: #f1f2f4; }
 .seat__who { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0; }
 .seat__open { font-size: 13px; color: var(--ink-soft); font-style: italic; }
 
-@media (max-width: 1100px) {
-  .picker { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Beside the join card on a narrow desktop, three across would leave a
+   cover too small to hold the longest blurb on its back. */
+@media (min-width: 901px) and (max-width: 1013px) {
+  .picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {
   .landing--home .landing__cols {
