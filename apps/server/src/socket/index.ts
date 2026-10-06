@@ -30,7 +30,12 @@ type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
 /** Per-connection session. The room/player binding lives here rather than on the
  *  socket id, which is not stable across reconnects. */
 interface Session {
-  room: AnyRoom | null;
+  /** The code of the room this socket is seated in. */
+  code: string | null;
+  /** That room, looked up afresh on every use: switching games replaces the
+   *  room object under the same code, so a stored reference would go stale.
+   *  Null too if the seat is gone, or the code now names a different room. */
+  readonly room: AnyRoom | null;
   playerId: string | null;
   chat: TokenBucket;
   draw: TokenBucket;
@@ -69,7 +74,11 @@ function cleanSize(raw: unknown): number {
 export function attachSocket(io: IO, rooms: RoomManager): void {
   io.on('connection', (socket: Sock) => {
     const s: Session = {
-      room: null,
+      code: null,
+      get room() {
+        const room = this.code ? rooms.get(this.code) : undefined;
+        return room && this.playerId && room.players.has(this.playerId) ? room : null;
+      },
       playerId: null,
       chat: new TokenBucket(CHAT_BUCKET.capacity, CHAT_BUCKET.refillPerSec),
       draw: new TokenBucket(DRAW_BUCKET.capacity, DRAW_BUCKET.refillPerSec),
@@ -80,7 +89,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
     };
 
     const bind = (room: AnyRoom, playerId: string) => {
-      s.room = room;
+      s.code = room.code;
       s.playerId = playerId;
       socket.join(room.code);
     };
@@ -123,7 +132,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
         const prev = s.room;
         const prevId = s.playerId;
         socket.leave(prev.code);
-        s.room = null;
+        s.code = null;
         s.playerId = null;
         prev.removePlayer(prevId);
       }
@@ -160,7 +169,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
           const prev = s.room;
           const prevId = s.playerId;
           socket.leave(prev.code);
-          s.room = null;
+          s.code = null;
           s.playerId = null;
           prev.removePlayer(prevId);
         }
@@ -748,7 +757,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       const room = s.room;
       const id = s.playerId;
       socket.leave(room.code);
-      s.room = null;
+      s.code = null;
       s.playerId = null;
       room.removePlayer(id);
     });
