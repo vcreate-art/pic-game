@@ -45,7 +45,7 @@ export class RoomManager {
     if (old.hostId !== by) return { ok: false, message: 'Only the host can switch games.' };
     if (!PLAYABLE_KINDS.includes(kind)) return { ok: false, message: 'That game is not available.' };
     if (kind === old.kind) return { ok: false, message: `You're already playing ${GAME_LABELS[kind].name}.` };
-    if (!old.canSwitch()) return { ok: false, message: 'Finish or end this game first.' };
+    if (!old.canSwitch()) return { ok: false, message: 'Go back to the lobby to switch games.' };
     if (old.players.size > GAME_CAPACITY[kind]) {
       return {
         ok: false,

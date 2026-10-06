@@ -1,8 +1,9 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { GAME_LABELS, PLAYABLE_KINDS, type GameKind, type JoinAck } from '@pic-game/shared';
+import { GAME_LABELS, type GameKind, type JoinAck } from '@pic-game/shared';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { X } from 'lucide-react';
 import { CategoryLabel } from '../components/CategoryLabel.js';
+import { GameCovers } from '../components/GameCovers.js';
 import { GAME_ICONS } from '../components/gameIcons.js';
 import { JoinPanel, initialIdentity, type Identity } from '../components/JoinPanel.js';
 import { peekRoom } from '../api/client.js';
@@ -35,16 +36,6 @@ function useKeyboardInset(active: boolean): CSSProperties | undefined {
     };
   }, [active]);
   return inset;
-}
-
-/** Where the pointer crossed a cover's edge, so the ink spreads from the
- *  point it came in and drains toward the point it left. Sliding from one
- *  cover to the next, it reads as one stroke passing between them. */
-function inkFrom(e: React.PointerEvent<HTMLButtonElement>) {
-  const cover = e.currentTarget.firstElementChild as HTMLElement;
-  const box = e.currentTarget.getBoundingClientRect();
-  cover.style.setProperty('--ex', `${((e.clientX - box.left) / cover.offsetWidth) * 100}%`);
-  cover.style.setProperty('--ey', `${((e.clientY - box.top) / cover.offsetHeight) * 100}%`);
 }
 
 function Landing() {
@@ -161,37 +152,7 @@ function Landing() {
         </section>
 
         <section className="landing__section landing__start">
-          <div className="picker">
-            {PLAYABLE_KINDS.map((k) => {
-              const { icon: Icon, color } = GAME_ICONS[k];
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  className={`pick ${game === k ? 'is-active' : ''}`}
-                  onClick={() => open(k)}
-                  onPointerEnter={inkFrom}
-                  onPointerLeave={inkFrom}
-                  style={{ '--game': color } as CSSProperties}
-                >
-                  <span className="pick__cover">
-                    <span className="pick__ink" aria-hidden="true" />
-                    <Icon className="pick__art" strokeWidth={1.75} aria-hidden="true" />
-                    <span className="pick__text">
-                      <strong className="pick__name">{GAME_LABELS[k].name}</strong>
-                      <CategoryLabel kind={k} className="pick__cat" />
-                      <span className="pick__more">
-                        <span>{GAME_LABELS[k].blurb}</span>
-                      </span>
-                    </span>
-                  </span>
-                  {/* Where there's no hover to open the cover, the blurb sits
-                      under it instead. The one inside already reads it out. */}
-                  <span className="pick__blurb" aria-hidden="true">{GAME_LABELS[k].blurb}</span>
-                </button>
-              );
-            })}
-          </div>
+          <GameCovers onPick={open} active={game} />
         </section>
       </div>
 

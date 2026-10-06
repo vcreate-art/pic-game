@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Server } from 'socket.io';
 import type {
   Avatar, ChatMessage, ClientToServerEvents, GameKind, Player, RoomMeta, RoomPause, RoomState,
-  RoomStateBase, ServerToClientEvents,
+  RoomStage, RoomStateBase, ServerToClientEvents,
 } from '@pic-game/shared';
 import { EMPTY_ROOM_TTL_MS, PAUSE_HOST_AWAY_MS, RECONNECT_GRACE_MS } from '../config.js';
 import { RoomSession } from './RoomSession.js';
@@ -11,7 +11,7 @@ export type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 
 /** Where a room is in its game, in the terms every game shares: getting
  *  ready, in the middle of one, or looking at the result. */
-export type RoomLifecycle = 'lobby' | 'playing' | 'ended';
+export type RoomLifecycle = RoomStage;
 
 /** What every game needs to know about a seat, whatever the game is. */
 export interface CorePlayer extends Player {
@@ -286,6 +286,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     return {
       wins: this.session.winsOf(this.players.keys()),
       games: this.session.games,
+      stage: this.lifecycle(),
       paused: this.roomPause,
       can: {
         pause: this.canPause(),
@@ -365,9 +366,10 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     this.syncMeta();
   }
 
-  /** Switching games is only allowed between them, never mid-game. */
+  /** Switching games happens from the lobby: from an end screen the host
+   *  goes back to the lobby first. */
   canSwitch(): boolean {
-    return this.lifecycle() !== 'playing';
+    return this.lifecycle() === 'lobby';
   }
 
   /**

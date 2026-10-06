@@ -58,7 +58,7 @@ describe('RoomManager.switchKind', () => {
     room.startGame(seats[0]!.id);
     expect(room.lifecycle()).toBe('playing');
     const r = rooms.switchKind(room.code, 'bingo', seats[0]!.id);
-    expect(r).toEqual({ ok: false, message: 'Finish or end this game first.' });
+    expect(r).toEqual({ ok: false, message: 'Go back to the lobby to switch games.' });
     expect(rooms.get(room.code)).toBe(room);
   });
 

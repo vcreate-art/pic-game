@@ -244,6 +244,9 @@ export const GAME_CAPACITY: Record<GameKind, number> = {
   bingo: 16, cryptid: 12, flip7: 16, maze: 16, tourney: 64,
 };
 
+/** Where a room is in its game, in the terms every game shares. */
+export type RoomStage = 'lobby' | 'playing' | 'ended';
+
 /** A paused game: who paused it, and when (server epoch ms). */
 export interface RoomPause {
   by: string;
@@ -253,6 +256,7 @@ export interface RoomPause {
 /** Room-level facts that outlive any one game: the session's wins, and what
  *  the host can do right now, so the UI doesn't repeat the server's rules. */
 export interface RoomMeta {
+  stage: RoomStage;
   /** Set while the host has the game paused. */
   paused: RoomPause | null;
   /** Wins this session, by player id. Survives switching games. */
