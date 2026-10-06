@@ -184,7 +184,7 @@ export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
   fight: { name: 'Stick Kombat', blurb: 'Best of three. Then finish them.' },
   race: { name: 'Meat Race', blurb: 'Run, jump, glide and climb. Beat the saws and each other.' },
   spies: { name: 'Word Spies', blurb: 'One-word clues, two teams, and an assassin to avoid.' },
-  tourney: { name: 'MK11 Tournament', blurb: 'Points, rising entry fees and best-of-3 MK11 matches. Last one standing wins.' },
+  tourney: { name: 'MK11 Tournament', blurb: 'Best-of-3 MK11 matches and rising entry fees. Last one standing wins.' },
   bingo: { name: 'Bingo', blurb: 'Fill your grid, call numbers in turn, or play the 75-ball hall game.' },
   cryptid: { name: 'Cryptid', blurb: 'One clue each, one creature on the map. Ask, search, and find it first.' },
   flip7: { name: 'Flip 7', blurb: 'Flip cards, dodge duplicates, bank before you bust. Seven different numbers wins big.' },

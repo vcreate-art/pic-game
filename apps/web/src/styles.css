@@ -116,6 +116,9 @@ button, input { font: inherit; color: inherit; }
 .btn:hover:not(:disabled) { border-color: var(--accent); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn:focus-visible, .sheet__close:focus-visible, .join__cycle button:focus-visible {
+  outline: 2px solid var(--ink); outline-offset: 2px;
+}
 .btn--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn--primary:hover:not(:disabled) { background: #4b3cc4; }
 .btn--ghost { background: transparent; }
@@ -140,6 +143,42 @@ button, input { font: inherit; color: inherit; }
 .landing__join { grid-area: join; }
 .landing__start { grid-area: start; }
 .landing__section { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+
+/* The front page. Colour belongs to the games, so the page around them is a
+   cool neutral and the join button is plain ink; the app purple stays in the
+   rooms. Overriding the tokens here reaches the Create sheet too. */
+.landing--home {
+  --paper: #f1f2f4; --line: #e0e2e8; --ink: #1c1d26; --ink-soft: #5e6275;
+  max-width: 1200px; padding-top: 36px;
+}
+body:has(.landing--home) { background: #f1f2f4; }
+/* Games take the room; joining is a narrow panel that stays put while the
+   grid scrolls. */
+.landing--home .landing__cols { grid-template-columns: minmax(0, 1fr) 340px; gap: 48px; }
+.landing--home .landing__join { position: sticky; top: 20px; }
+.landing--home .landing__start { gap: 22px; margin-top: 0; }
+.landing--home .landing__heading { font-size: 18px; }
+.landing--home .landing__join .landing__card { box-shadow: none; }
+.landing__intro .landing__title { margin: 0; font-size: 40px; line-height: 1.05; }
+.landing__intro .landing__sub { margin-top: 6px; font-size: 15px; }
+/* One class deeper than `.landing__card .btn--primary`, which comes later. */
+.landing__join .landing__card .btn--primary { background: var(--ink); border-color: var(--ink); }
+.landing__join .landing__card .btn--primary:hover:not(:disabled) { background: #33354a; border-color: #33354a; }
+
+/* Six cells drawn under a transparent input, so the code reads like the
+   slots it fills while typing and pasting stay native. */
+.code { position: relative; display: block; }
+.code__input {
+  position: absolute; inset: 0; width: 100%; opacity: 0;
+  border: 0; padding: 0; cursor: text;
+}
+.code__cells { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.code__cell {
+  display: grid; place-items: center; height: 50px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--paper);
+  font-family: var(--display); font-weight: 800; font-size: 24px; line-height: 1;
+}
+.code:focus-within .code__cell.is-next { border-color: var(--ink); box-shadow: 0 0 0 2px var(--ink); background: var(--card); }
 .landing__heading {
   margin: 0 0 0 4px; font-family: var(--display); font-size: 21px; font-weight: 800;
   letter-spacing: -.01em; line-height: 1.2;
@@ -160,7 +199,8 @@ button, input { font: inherit; color: inherit; }
 .join__cycle { display: flex; gap: 8px; }
 .join__cycle button {
   border: 1px solid var(--line); background: var(--paper);
-  border-radius: 10px; padding: 7px 13px; font-size: 13px; font-weight: 600; cursor: pointer;
+  border-radius: 10px; padding: 7px 11px; font-size: 13px; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
 }
 .join__cycle button:hover { border-color: var(--accent); }
 
@@ -185,11 +225,7 @@ button, input { font: inherit; color: inherit; }
   border: 1px solid var(--line); background: var(--paper);
   border-radius: 12px; padding: 12px 14px; outline: none;
 }
-.field__input:focus { border-color: var(--accent); background: var(--card); }
-.field__input--code {
-  text-transform: uppercase; letter-spacing: .28em;
-  font-family: var(--display); font-weight: 700; font-size: 18px;
-}
+.field__input:focus { border-color: var(--accent); background: var(--card); box-shadow: 0 0 0 3px var(--accent-soft); }
 .field__error { margin: 0; color: var(--warn); font-size: 13px; font-weight: 500; }
 
 /* ---------------------------------------------------------------- lobby */
@@ -578,26 +614,38 @@ button, input { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- game picker */
 
-.picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 18px; }
 
+/* Each game is a box cover: its own colour is the surface and its name is
+   the art, with the icon as a watermark bleeding off the corner. The blurb
+   sits under the cover, the way it would on a shelf label. */
 .pick {
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px;
-  padding: 14px 12px; text-align: center; cursor: pointer;
-  background: var(--card); border: 1px solid var(--line);
-  border-radius: var(--radius); box-shadow: var(--shadow);
-  transition: border-color .15s ease, transform .08s ease;
+  display: flex; flex-direction: column; gap: 10px; padding: 0;
+  border: 0; background: none; text-align: left; cursor: pointer;
 }
-/* Hover and selection take the game's own color rather than the app purple. */
-/* Hover only where there is a real pointer: on touch, :hover sticks to the
-   last tapped card and leaves it tilted. */
+.pick__cover {
+  position: relative; overflow: hidden; display: flex; align-items: flex-end;
+  aspect-ratio: 4 / 3; padding: 14px 16px; border-radius: 12px;
+  background: var(--game, var(--ink)); color: #fff;
+  transition: background-color .15s ease;
+}
+.pick__art {
+  position: absolute; top: -16px; right: -16px; width: 104px; height: 104px; opacity: .2;
+}
+.pick__name {
+  position: relative; font-family: var(--display); font-weight: 800;
+  font-size: 24px; line-height: 1.02; letter-spacing: -.01em;
+}
+.pick__blurb { padding: 0 2px; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
 @media (hover: hover) {
-  .pick:hover { border-color: var(--game, var(--accent)); }
-  .pick:hover .pick__tile { transform: rotate(-6deg) scale(1.06); }
+  .pick:hover .pick__cover { background: color-mix(in srgb, var(--game, var(--ink)) 86%, #000); }
 }
-.pick:active { transform: translateY(1px); }
-.pick.is-active {
-  border-color: var(--game, var(--accent));
-  background: color-mix(in srgb, var(--game, var(--accent)) 7%, var(--card));
+.pick:active .pick__cover { transform: translateY(1px); }
+/* Focus and "this one's sheet is open" share one ring in the game's colour,
+   set off the cover by a gap of page colour. */
+.pick:focus-visible { outline: none; }
+.pick:focus-visible .pick__cover, .pick.is-active .pick__cover {
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--game, var(--ink));
 }
 .landing__card .btn--primary {
   background: var(--game, var(--accent)); border-color: var(--game, var(--accent));
@@ -606,21 +654,6 @@ button, input { font: inherit; color: inherit; }
 .landing__card .btn--primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--game, var(--accent)) 85%, #000);
 }
-
-/* --game is set per tile from GAME_ICONS. Doubled up so it outranks
-   `.pick span` inside a card, and still applies in the Create card's header. */
-.pick__tile, .pick .pick__tile {
-  display: grid; place-items: center; flex: none;
-  width: 48px; height: 48px; margin-bottom: 6px; border-radius: 14px;
-  color: var(--game, var(--ink));
-  background: color-mix(in srgb, var(--game, var(--ink)) 13%, var(--card));
-  transition: transform .15s ease;
-}
-.pick.is-active .pick__tile { color: #fff; background: var(--game, var(--accent)); }
-.pick__art { width: 26px; height: 26px; }
-.pick strong { font-family: var(--display); font-size: 15px; }
-.pick span { font-size: 11.5px; color: var(--ink-soft); line-height: 1.35; }
-.pick.is-active strong { color: var(--game, var(--accent)); }
 
 /* ---------------------------------------------------------------- create sheet */
 
@@ -637,15 +670,14 @@ button, input { font: inherit; color: inherit; }
   animation: sheet-pop .22s cubic-bezier(.2, .9, .3, 1.2);
 }
 .sheet__head { display: flex; align-items: center; gap: 12px; }
-.sheet__head .pick__tile { margin: 0; color: #fff; background: var(--game); }
-.sheet__titles { flex: 1; min-width: 0; }
-.sheet__kicker {
-  margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .08em; color: var(--ink-soft);
+.sheet__tile {
+  display: grid; place-items: center; flex: none; width: 48px; height: 48px;
+  border-radius: 12px; color: #fff; background: var(--game);
 }
+.sheet__tile svg { width: 26px; height: 26px; }
 .sheet__title {
-  margin: 0; font-family: var(--display); font-size: 22px; font-weight: 800;
-  line-height: 1.15; color: var(--game);
+  flex: 1; min-width: 0; margin: 0; font-family: var(--display); font-size: 24px;
+  font-weight: 800; line-height: 1.1; color: var(--game);
 }
 .sheet__close {
   display: grid; place-items: center; width: 34px; height: 34px; flex: none; align-self: flex-start;
@@ -653,7 +685,7 @@ button, input { font: inherit; color: inherit; }
 }
 .sheet__close:hover { color: var(--ink); }
 .sheet__close svg { width: 18px; height: 18px; }
-.sheet__blurb { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+.sheet__blurb { margin: 0; font-size: 15px; color: var(--ink-soft); }
 
 @keyframes sheet-fade { from { opacity: 0; } }
 @keyframes sheet-pop { from { opacity: 0; transform: translateY(12px) scale(.97); } }
@@ -784,13 +816,20 @@ button, input { font: inherit; color: inherit; }
 .seat__who { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0; }
 .seat__open { font-size: 13px; color: var(--ink-soft); font-style: italic; }
 
+@media (max-width: 1100px) {
+  .picker { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (max-width: 900px) {
-  .landing__cols { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'join' 'start'; gap: 20px; }
+  .landing__cols,
+  .landing--home .landing__cols { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'join' 'start'; gap: 28px; }
   .landing__join { width: 100%; max-width: 460px; margin: 0 auto; }
+  .landing--home .landing__join { position: static; }
+  .landing__intro .landing__title { font-size: 24px; }
 }
 @media (max-width: 560px) {
-  .picker { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .pick { padding: 12px 8px; }
+  .picker { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; }
+  .pick__name { font-size: 18px; }
+  .pick__art { width: 80px; height: 80px; }
 }
 
 .chess__side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }

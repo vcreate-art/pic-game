@@ -13,19 +13,20 @@ import { Route as rootRoute } from './__root.js';
 
 /** A Record rather than a lookup chain, so a new GameKind fails to compile
  *  until it has an icon and a color. Colors are spread around the wheel so
- *  neighbours in the grid don't blur together. */
+ *  neighbours in the grid don't blur together, and each one is dark enough
+ *  to carry white text (4.5:1 or better). */
 const GAME_ICONS: Record<GameKind, { icon: LucideIcon; color: string }> = {
-  skribbl: { icon: Pencil, color: '#db2777' },
-  kungfu: { icon: ChessKnight, color: '#0d9488' },
-  realms: { icon: Rocket, color: '#7c3aed' },
-  fight: { icon: Swords, color: '#dc2626' },
-  race: { icon: Footprints, color: '#ea580c' },
-  spies: { icon: VenetianMask, color: '#0284c7' },
-  bingo: { icon: Grid3x3, color: '#16a34a' },
-  cryptid: { icon: PawPrint, color: '#65a30d' },
-  flip7: { icon: Spade, color: '#c026d3' },
-  maze: { icon: Crosshair, color: '#2563eb' },
-  tourney: { icon: Trophy, color: '#ca8a04' },
+  skribbl: { icon: Pencil, color: '#b3245f' },
+  kungfu: { icon: ChessKnight, color: '#0f6e66' },
+  realms: { icon: Rocket, color: '#4b2fa8' },
+  fight: { icon: Swords, color: '#b8231f' },
+  race: { icon: Footprints, color: '#c4501a' },
+  spies: { icon: VenetianMask, color: '#1d4f86' },
+  bingo: { icon: Grid3x3, color: '#23803f' },
+  cryptid: { icon: PawPrint, color: '#5a6b1f' },
+  flip7: { icon: Spade, color: '#9a2a8f' },
+  maze: { icon: Crosshair, color: '#2b3fbf' },
+  tourney: { icon: Trophy, color: '#9a6a00' },
 };
 
 /** While a phone's on-screen keyboard is up, `top` and `bottom` that fit a
@@ -106,7 +107,7 @@ function Landing() {
   const join = (id: Identity) => {
     const wanted = code.trim().toUpperCase();
     if (!wanted) {
-      setError('Enter a room code, or pick a game below to start one.');
+      setError('Enter a room code, or pick a game to start one.');
       return;
     }
     setBusy(true);
@@ -131,15 +132,11 @@ function Landing() {
   const inset = useKeyboardInset(!!game);
 
   return (
-    <div className="landing">
-      <div className="landing__hero">
-        <h1 className="landing__title">Let's play.</h1>
-        <p className="landing__sub">Grab some friends. One link, everyone's in.</p>
-      </div>
+    <div className="landing landing--home">
 
       <div className="landing__cols">
         <section className="landing__section landing__join">
-          <h2 className="landing__heading">Join a room</h2>
+          <h2 className="landing__heading">Got a code?</h2>
           <div className="card landing__card">
             <JoinPanel
               submitLabel="Join room"
@@ -151,20 +148,36 @@ function Landing() {
             >
               <label className="field">
                 <span className="field__label">Room code</span>
-                <input
-                  className="field__input field__input--code"
-                  value={code}
-                  maxLength={6}
-                  placeholder="ABC123"
-                  onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-                />
+                {/* One real input does the typing, pasting and reading aloud;
+                    the six cells over it are only how it looks. */}
+                <span className="code">
+                  <input
+                    className="code__input"
+                    value={code}
+                    maxLength={6}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                  />
+                  <span className="code__cells" aria-hidden="true">
+                    {Array.from({ length: 6 }, (_, i) => (
+                      <span key={i} className={`code__cell ${i === Math.min(code.length, 5) ? 'is-next' : ''}`}>
+                        {code[i]}
+                      </span>
+                    ))}
+                  </span>
+                </span>
               </label>
             </JoinPanel>
           </div>
         </section>
 
         <section className="landing__section landing__start">
-          <h2 className="landing__heading">Start a new game</h2>
+          <div className="landing__intro">
+            <h1 className="landing__title">Pick a game</h1>
+            <p className="landing__sub">Start a room, then send friends the code.</p>
+          </div>
           <div className="picker">
             {PLAYABLE_KINDS.map((k) => {
               const { icon: Icon, color } = GAME_ICONS[k];
@@ -176,11 +189,11 @@ function Landing() {
                   onClick={() => open(k)}
                   style={{ '--game': color } as CSSProperties}
                 >
-                  <span className="pick__tile" aria-hidden="true">
-                    <Icon className="pick__art" strokeWidth={2} />
+                  <span className="pick__cover">
+                    <Icon className="pick__art" strokeWidth={1.75} aria-hidden="true" />
+                    <strong className="pick__name">{GAME_LABELS[k].name}</strong>
                   </span>
-                  <strong>{GAME_LABELS[k].name}</strong>
-                  <span>{GAME_LABELS[k].blurb}</span>
+                  <span className="pick__blurb">{GAME_LABELS[k].blurb}</span>
                 </button>
               );
             })}
@@ -199,13 +212,10 @@ function Landing() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sheet__head">
-              <span className="pick__tile" aria-hidden="true">
-                <picked.icon className="pick__art" strokeWidth={2} />
+              <span className="sheet__tile" aria-hidden="true">
+                <picked.icon strokeWidth={2} />
               </span>
-              <div className="sheet__titles">
-                <p className="sheet__kicker">New room</p>
-                <h2 id="create-title" className="sheet__title">{GAME_LABELS[game].name}</h2>
-              </div>
+              <h2 id="create-title" className="sheet__title">{GAME_LABELS[game].name}</h2>
               <button type="button" className="sheet__close" aria-label="Close" onClick={close}>
                 <X aria-hidden="true" />
               </button>

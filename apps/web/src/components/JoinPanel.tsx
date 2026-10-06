@@ -75,10 +75,10 @@ export function JoinPanel({
         <Avatar data={{ color, face }} size={76} />
         <div className="join__cycle">
           <button type="button" onClick={() => setColor((color + 1) % AVATAR_COLORS.length)}>
-            Colour
+            Next colour
           </button>
           <button type="button" onClick={() => setFace((face + 1) % AVATAR_FACES.length)}>
-            Face
+            Next face
           </button>
         </div>
       </div>
