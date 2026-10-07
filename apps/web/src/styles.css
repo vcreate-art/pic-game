@@ -806,8 +806,9 @@ button, input { font: inherit; color: inherit; }
   .game--skribbl .scores__row.is-drawing { background: #fef3c7; }
 
   /* Picking a word and the round's results cover the screen, not just the
-     board, so they never spill out of it. */
-  .game--skribbl .board__wrap > .overlay { position: fixed; z-index: 80; border-radius: 0; }
+     board, so they never spill out of it. Under the 3-2-1 and the pause
+     screen, which have to show over everything in the game. */
+  .game--skribbl .board__wrap > .overlay { position: fixed; z-index: 50; border-radius: 0; }
 }
 
 /* ---------------------------------- draw & guess on a phone: guessing */
