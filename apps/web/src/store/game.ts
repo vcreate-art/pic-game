@@ -57,6 +57,8 @@ interface GameStore {
   notice: string | null;
   /** Name of whoever removed us, set only when it happens. */
   kickedBy: string | null;
+  /** A newer tab of this browser took our seat. */
+  replaced: boolean;
   /** Our own Star Realms hand. Nobody else's ever arrives. */
   realmsHand: CardInstance[];
   realmsOwed: number;
@@ -116,6 +118,7 @@ interface GameStore {
   }) => void;
   chessOver: (winner: Side | null, reason: KungFuPublic['reason']) => void;
   setKickedBy: (name: string) => void;
+  setReplaced: (replaced: boolean) => void;
   reset: () => void;
 }
 
@@ -134,6 +137,7 @@ export const useGame = create<GameStore>((set) => ({
   final: null,
   notice: null,
   kickedBy: null,
+  replaced: false,
   realmsHand: [],
   realmsOwed: 0,
   spiesKey: null,
@@ -355,9 +359,10 @@ export const useGame = create<GameStore>((set) => ({
         : {},
     ),
   setKickedBy: (kickedBy) => set({ kickedBy }),
+  setReplaced: (replaced) => set({ replaced }),
 
   reset: () =>
-    set({ ...noGamePrivate(), me: null, room: null, messages: [], notice: null, kickedBy: null }),
+    set({ ...noGamePrivate(), me: null, room: null, messages: [], notice: null, kickedBy: null, replaced: false }),
 }));
 
 // ---- selectors ----

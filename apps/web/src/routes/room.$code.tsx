@@ -42,7 +42,8 @@ function RoomPage() {
     const onConnect = () => {
       const seat = loadSeat(code);
       const id = identity.current;
-      if (!seat || !id) return;
+      // Rejoining would take the seat back from the newer tab.
+      if (!seat || !id || useGame.getState().replaced) return;
       socket.emit('room:join', { code, name: id.name, avatar: id.avatar, token: seat.token }, (res) => {
         if (res.ok) {
           useGame.getState().setMe(res.playerId);
@@ -106,6 +107,43 @@ function RoomPage() {
     useGame.getState().setNotice(`${kickedBy} removed you from the room.`);
     void navigate({ to: '/' });
   }, [kickedBy, navigate]);
+
+  // A newer tab of this browser has the seat now. Playing here again takes
+  // it back, and that tab gets this screen instead.
+  const replaced = useGame((s) => s.replaced);
+  if (replaced) {
+    return (
+      <div className="landing landing--narrow">
+        <div className="landing__hero">
+          <h1 className="landing__title">Open in another tab</h1>
+          <p className="landing__sub">You're playing in room {code} from another tab. You can play from one tab at a time.</p>
+        </div>
+        <div className="card landing__card">
+          <button
+            className="btn btn--primary btn--lg"
+            type="button"
+            disabled={busy || !identity.current}
+            onClick={() => {
+              useGame.getState().setReplaced(false);
+              if (identity.current) joinRoom(identity.current, loadSeat(code)?.token, false);
+            }}
+          >
+            Play in this tab
+          </button>
+          <button
+            className="btn btn--ghost"
+            type="button"
+            onClick={() => {
+              useGame.getState().setReplaced(false);
+              void navigate({ to: '/' });
+            }}
+          >
+            Back to home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Arrived via an invite link with no seat yet — collect a name first.
   if (!me || !room) {

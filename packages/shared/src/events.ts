@@ -254,6 +254,8 @@ export interface ServerToClientEvents {
   'host:changed': (p: { hostId: string }) => void;
   /** Sent to the removed player's socket alone, just before they are dropped. */
   'kicked': (p: { by: string }) => void;
+  /** This tab's seat was taken over by a newer tab of the same browser. */
+  'room:replaced': () => void;
 
   'turn:choosing': (p: {
     drawerId: string;

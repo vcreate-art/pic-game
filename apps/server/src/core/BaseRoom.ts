@@ -22,8 +22,7 @@ export interface CorePlayer extends Player {
    *  Never sent to other players. */
   person: string | null;
   /** What the session files this seat's wins and games under: the person,
-   *  so they carry across a leave and rejoin, or the seat's id when there is
-   *  no person or another tab of theirs already holds it. */
+   *  so they carry across a leave and rejoin, or the seat's id without one. */
   record: string;
   socketId: string | null;
   disconnectedAt: number | null;
@@ -129,13 +128,11 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
 
   addPlayer(name: string, avatar: Avatar, socketId: string, person: string | null = null): P {
     const id = randomUUID();
-    // A second tab of someone already here is a second player, with its own record.
-    const shared = !!person && [...this.players.values()].some((p) => p.person === person);
     const player = this.createPlayer({
       id,
       token: randomUUID(),
       person,
-      record: person && !shared ? person : id,
+      record: person ?? id,
       name,
       avatar,
       score: 0,
@@ -168,6 +165,18 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   reclaimPerson(person: string, socketId: string): P | null {
     for (const p of this.players.values()) {
       if (p.person === person && !p.connected) return this.rebind(p, socketId);
+    }
+    return null;
+  }
+
+  /** A newer tab of someone already here takes their seat over, so one
+   *  person is one player. Returns the seat and the socket it was taken from,
+   *  which the caller tells to step back. */
+  takeOver(person: string, socketId: string): { seat: P; from: string | null } | null {
+    for (const p of this.players.values()) {
+      if (p.person !== person || !p.connected) continue;
+      const from = p.socketId;
+      return { seat: this.rebind(p, socketId), from: from === socketId ? null : from };
     }
     return null;
   }

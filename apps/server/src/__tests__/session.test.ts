@@ -203,13 +203,23 @@ describe('coming back to a room', () => {
     expect(room.meta().winsByGame).toEqual({ [again.id]: { flip7: 1 } });
   });
 
-  it('gives a second tab of the same browser its own record', () => {
+  it('lets a newer tab of the same browser take the seat over', () => {
     const { io } = fakeIO();
     const room = new TestRoom('ABCDEF', io);
     const a = room.addPlayer('Ana', { color: 0, face: 0 }, 's1', ME);
-    const b = room.addPlayer('Ana 2', { color: 1, face: 1 }, 's2', ME);
-    room.win([b.id]);
-    expect(room.meta().wins).toEqual({ [b.id]: 1 });
-    expect(a.record).not.toBe(b.record);
+    room.win([a.id]);
+    const took = room.takeOver(ME, 's2');
+    expect(took?.seat.id).toBe(a.id);
+    expect(took?.from).toBe('s1');
+    expect(a.socketId).toBe('s2');
+    expect(room.players.size).toBe(1);
+    expect(room.meta().wins).toEqual({ [a.id]: 1 });
+  });
+
+  it('takes over nothing for a browser that has no seat here', () => {
+    const { io } = fakeIO();
+    const room = new TestRoom('ABCDEF', io);
+    room.addPlayer('Ana', { color: 0, face: 0 }, 's1', ME);
+    expect(room.takeOver('22222222-2222-4222-8222-222222222222', 's2')).toBeNull();
   });
 });

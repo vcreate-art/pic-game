@@ -95,7 +95,10 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       code: null,
       get room() {
         const room = this.code ? rooms.get(this.code) : undefined;
-        return room && this.playerId && room.players.has(this.playerId) ? room : null;
+        // Only while this socket is still the seat's: a tab whose seat was
+        // taken over by a newer one can't act for it any more.
+        const seat = room && this.playerId ? room.players.get(this.playerId) : undefined;
+        return seat?.socketId === socket.id ? room! : null;
       },
       playerId: null,
       chat: new TokenBucket(CHAT_BUCKET.capacity, CHAT_BUCKET.refillPerSec),
@@ -208,10 +211,18 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       // A returning player reclaims their seat and score before any capacity check,
       // so a full room can never lock out someone who is already in it.
       // Without the tab's token, after closing it, the browser's person finds
-      // the seat they left away.
+      // the seat they left away. A newer tab of theirs takes the seat over
+      // from an open one, which is told and steps back.
       if (p.token || person) {
-        const reclaimed =
-          (p.token ? room.reclaim(p.token, socket.id) : null) ?? (person ? room.reclaimPerson(person, socket.id) : null);
+        let reclaimed = (p.token ? room.reclaim(p.token, socket.id) : null) ?? (person ? room.reclaimPerson(person, socket.id) : null);
+        if (!reclaimed && person) {
+          const took = room.takeOver(person, socket.id);
+          if (took?.from) {
+            io.sockets.sockets.get(took.from)?.leave(room.code);
+            io.to(took.from).emit('room:replaced');
+          }
+          reclaimed = took?.seat ?? null;
+        }
         if (reclaimed) {
           bind(room, reclaimed.id);
           cb({ ok: true, playerId: reclaimed.id, token: reclaimed.token, state: room.publicState() });
