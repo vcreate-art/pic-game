@@ -5,6 +5,7 @@ import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { SettingsTitle } from '../SettingsTitle.js';
+import { WinsByGame } from '../WinsByGame.js';
 
 const PACE: Record<ChaserPace, { name: string; blurb: string }> = {
   off: { name: 'Off', blurb: 'No wall. Take your time.' },
@@ -45,6 +46,7 @@ export function RaceLobby() {
               <li key={p.id} className="lobby__player">
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
+                <WinsByGame wins={room.meta.winsByGame[p.id]} />
                 {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
               </li>
             ))}

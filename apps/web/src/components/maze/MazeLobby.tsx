@@ -4,12 +4,12 @@ import {
 } from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectIsHost, selectMaze, useGame } from '../../store/game.js';
-import { WinCount } from '../WinCount.js';
 import { Avatar } from '../Avatar.js';
 import { InviteCard } from '../InviteCard.js';
 import { KickButton } from '../KickButton.js';
 import { CONTROL_HELP, ControlsPicker, useMazeControls } from './controls.js';
 import { SettingsTitle } from '../SettingsTitle.js';
+import { WinsByGame } from '../WinsByGame.js';
 
 const THEMES: { value: MazeThemeChoice; name: string }[] = [
   { value: 'random', name: 'Surprise me' },
@@ -43,8 +43,8 @@ export function MazeLobby() {
               <li key={p.id} className="lobby__player">
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
+                <WinsByGame wins={room.meta.winsByGame[p.id]} />
                 {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
-                <WinCount n={room.meta.wins[p.id]} />
               </li>
             ))}
           </ul>

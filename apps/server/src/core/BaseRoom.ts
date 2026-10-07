@@ -291,6 +291,8 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   meta(): RoomMeta {
     return {
       wins: this.session.winsOf(this.players.keys()),
+      winsByGame: this.session.winsByGameOf(this.players.keys()),
+      played: this.session.playedOf(this.players.keys()),
       games: this.session.games,
       stage: this.lifecycle(),
       paused: this.roomPause,
@@ -428,6 +430,15 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   /** The meta as last sent, to tell when it has changed. */
   private sentMeta = '';
 
+  /** Who was here when the current game went into play: the players it
+   *  counts as played for. Null until a game has started. */
+  private takingPart: Set<string> | null = null;
+
+  /** Notes who is taking part when play begins, however it was reached. */
+  private noteStage(stage: RoomStage): void {
+    if (stage === 'playing' && this.lastStage !== 'playing') this.takingPart = new Set(this.players.keys());
+  }
+
   /** Sends the room-level facts on their own. Most games broadcast only their
    *  own state, which doesn't carry them. */
   protected emitMeta(): void {
@@ -441,6 +452,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   broadcastSnapshot(): void {
     const state = this.publicState();
     this.sentMeta = JSON.stringify(state.meta);
+    this.noteStage(state.meta.stage);
     this.lastStage = state.meta.stage;
     this.io.to(this.code).emit('state:sync', state);
   }
@@ -456,16 +468,19 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     if (stage === 'playing' && this.lastStage !== 'playing' && this.pausable && !this.roomPause) {
       this.countIn('start');
     }
+    this.noteStage(stage);
     this.lastStage = stage;
     if (JSON.stringify(this.meta()) !== this.sentMeta) this.emitMeta();
   }
 
   /** Every game reports its result here, from wherever it ends. Ties give each
    *  winner a win; an empty list is a game nobody won. Players who have left
-   *  the room by now don't score. */
+   *  the room by now don't score. The game counts as played for whoever was
+   *  here when it started and still is; without a start seen, everyone here. */
   protected recordWin(ids: readonly (string | null | undefined)[]): void {
     const winners = ids.filter((id): id is string => !!id && this.players.has(id));
-    this.session.record(this.kind, winners);
+    const players = [...(this.takingPart ?? this.players.keys())].filter((id) => this.players.has(id));
+    this.session.record(this.kind, winners, players);
     this.emitMeta();
   }
 

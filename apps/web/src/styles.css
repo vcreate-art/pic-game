@@ -1582,7 +1582,14 @@ button, input { font: inherit; color: inherit; }
 
 .bingolobby__row { grid-template-columns: 1fr auto; }
 .bingolobby__check { width: 20px; height: 20px; accent-color: var(--accent); }
-.bingolobby__wins { font-size: 11px; font-weight: 700; color: var(--accent); }
+/* A player's wins this session, by game: the icon wears the game's colour,
+   the count stays in ink. */
+.winsby { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 2px 8px; }
+.winsby__game {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 12px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.winsby__game svg { width: 14px; height: 14px; color: var(--game); }
 
 .game--bingo { max-width: 1400px; }
 .bingo { display: grid; grid-template-columns: 240px minmax(0, 1fr) 300px; gap: 14px; align-items: start; }

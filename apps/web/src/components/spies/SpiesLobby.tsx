@@ -8,6 +8,7 @@ import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { SettingsTitle } from '../SettingsTitle.js';
+import { WinsByGame } from '../WinsByGame.js';
 
 export const TEAM_NAME: Record<SpyTeam, string> = { red: 'Red', blue: 'Blue' };
 
@@ -53,6 +54,7 @@ export function SpiesLobby() {
       <li className={`spyteam__member ${id === me ? 'is-me' : ''}`}>
         <Avatar data={p.avatar} size={26} host={p.id === room.hostId} />
         <span>{p.name}</span>
+        <WinsByGame wins={room.meta.winsByGame[p.id]} />
         {spy && <span className="spyteam__tag">Spymaster</span>}
         {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
       </li>

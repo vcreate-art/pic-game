@@ -297,6 +297,11 @@ export interface RoomMeta {
   countdown: RoomCountdown | null;
   /** Wins this session, by player id. Survives switching games. */
   wins: Record<string, number>;
+  /** The same wins split by game, by player id. */
+  winsByGame: Record<string, Partial<Record<GameKind, number>>>;
+  /** Games each player took part in this session, by player id. Someone who
+   *  joined late has played fewer than `games`. */
+  played: Record<string, number>;
   /** Games finished this session, including ones nobody won. */
   games: number;
   can: { pause: boolean; restart: boolean; toLobby: boolean; switch: boolean };

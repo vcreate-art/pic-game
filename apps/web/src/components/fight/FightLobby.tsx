@@ -10,6 +10,7 @@ import { InviteCard } from '../InviteCard.js';
 import { FighterCard } from './FighterCard.js';
 import { Controls, MoveList } from './MoveList.js';
 import { SettingsTitle } from '../SettingsTitle.js';
+import { WinsByGame } from '../WinsByGame.js';
 
 export const SIDE_LABEL: Record<FightSide, string> = { a: 'Player 1', b: 'Player 2' };
 
@@ -156,6 +157,7 @@ export function FightLobby() {
                 <li key={p.id} className="lobby__player">
                   <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                   <span>{p.name}</span>
+                  <WinsByGame wins={room.meta.winsByGame[p.id]} />
                   {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
                   {side && (
                     <span className={`seat__chip seat__chip--${side === 'a' ? 'p1' : 'p2'}`}>{SIDE_LABEL[side]}</span>
