@@ -172,9 +172,17 @@ export const GAME_KINDS: readonly GameKind[] = [
 ];
 
 /** The ones with a playable interface. A kind can exist on the server before
- *  it has a screen, and the picker should only offer what can be played. */
+ *  it has a screen, and the picker should only offer what can be played.
+ *  In the picker's order: the most finished games first, then those whose
+ *  rules are still moving, then the early ones. */
 export const PLAYABLE_KINDS: readonly GameKind[] = [
-  'skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies', 'bingo', 'cryptid', 'flip7', 'maze', 'tourney',
+  // Release candidates: rules settled.
+  'skribbl', 'bingo', 'kungfu', 'spies',
+  // Beta: rules still being worked on.
+  'cryptid',
+  // Alpha: logic and screens both need work. MK11 Tournament ('tourney') is
+  // hidden for now: it has a screen, but isn't offered.
+  'flip7', 'fight', 'realms', 'maze', 'race',
 ];
 
 export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
@@ -235,6 +243,25 @@ export const CATEGORY_LABELS: Record<GameCategory, string> = {
   turns: 'Turn-based',
   timed: 'Timed turns',
   live: 'Real-time',
+};
+
+/** How finished a game is. A release candidate's rules are settled and only
+ *  its screens need polish; a beta's rules are still moving; an alpha's
+ *  rules and screens both need real work. */
+export type GameStage = 'rc' | 'beta' | 'alpha';
+
+export const GAME_STAGE: Record<GameKind, GameStage> = {
+  skribbl: 'rc', bingo: 'rc', kungfu: 'rc', spies: 'rc',
+  cryptid: 'beta',
+  flip7: 'alpha', tourney: 'alpha', fight: 'alpha', realms: 'alpha', maze: 'alpha', race: 'alpha',
+};
+
+/** What a cover says about its stage. A release candidate says nothing:
+ *  to a player it's simply a game. */
+export const STAGE_LABELS: Record<GameStage, string | null> = {
+  rc: null,
+  beta: 'Beta',
+  alpha: 'Alpha',
 };
 
 /** Most seats each game can take. A room switching games has to fit the

@@ -1,19 +1,28 @@
+import type { CSSProperties } from 'react';
 import { Outlet, createRootRoute } from '@tanstack/react-router';
 import { Bug } from 'lucide-react';
 import { ProfileChip } from '../components/ProfileChip.js';
 import { CountdownOverlay } from '../components/CountdownOverlay.js';
 import { PausedOverlay } from '../components/PausedOverlay.js';
 import { RoomPanel } from '../components/RoomPanel.js';
+import { GAME_ICONS } from '../components/gameIcons.js';
 import { isPostHogEnabled } from '../lib/posthog.js';
 import { useGame } from '../store/game.js';
 
 function RootLayout() {
   const connected = useGame((s) => s.connected);
   const notice = useGame((s) => s.notice);
-  const inRoom = useGame((s) => !!s.room);
+  const kind = useGame((s) => s.room?.kind);
+  const inRoom = !!kind;
 
+  // In a room the whole screen wears the game's colour, the same one its
+  // cover wore on the front page.
   return (
-    <div className="app">
+    <div
+      className={inRoom ? 'app is-room' : 'app'}
+      data-game={kind}
+      style={kind ? ({ '--game': GAME_ICONS[kind].color } as CSSProperties) : undefined}
+    >
       <header className="topbar">
         {/* In a room, the room itself takes the brand's place. */}
         {inRoom ? (

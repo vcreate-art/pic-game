@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
-import { GAME_LABELS, PLAYABLE_KINDS, type GameKind } from '@pic-game/shared';
+import { GAME_LABELS, GAME_STAGE, PLAYABLE_KINDS, STAGE_LABELS, type GameKind } from '@pic-game/shared';
 import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { CategoryLabel } from './CategoryLabel.js';
 import { GAME_ICONS } from './gameIcons.js';
@@ -8,10 +8,33 @@ import { GAME_ICONS } from './gameIcons.js';
  *  point it came in and drains toward the point it left. Sliding from one
  *  cover to the next, it reads as one stroke passing between them. */
 function inkFrom(e: React.PointerEvent<HTMLButtonElement>) {
-  const cover = e.currentTarget.firstElementChild as HTMLElement;
-  const box = e.currentTarget.getBoundingClientRect();
-  cover.style.setProperty('--ex', `${((e.clientX - box.left) / cover.offsetWidth) * 100}%`);
-  cover.style.setProperty('--ey', `${((e.clientY - box.top) / cover.offsetHeight) * 100}%`);
+  const pick = e.currentTarget;
+  const cover = pick.firstElementChild as HTMLElement;
+  const box = pick.getBoundingClientRect();
+  const place = () => {
+    cover.style.setProperty('--ex', `${((e.clientX - box.left) / cover.offsetWidth) * 100}%`);
+    cover.style.setProperty('--ey', `${((e.clientY - box.top) / cover.offsetHeight) * 100}%`);
+  };
+  const ink = cover.firstElementChild as HTMLElement;
+  if (e.type === 'pointerleave') {
+    // Shrinking while it moves is what drains it toward where it left. Ink
+    // that has barely spread, from a pointer only passing over, shrinks where
+    // it is: dragged across the cover it would show as a stray dot.
+    const grown = parseFloat(/circle\(([\d.]+)%/.exec(getComputedStyle(ink).clipPath)?.[1] ?? '0');
+    if (grown > 20) place();
+    pick.classList.remove('is-inked');
+    return;
+  }
+  // Only a mouse inks: on touch the blurb sits under the cover instead.
+  if (e.pointerType !== 'mouse') return;
+  // The circle's centre and size animate together, so moving the centre as
+  // it grows would slide the ink in from wherever it last left. Move it while
+  // it's still empty, with no transition, then let it grow from there.
+  ink.style.transition = 'none';
+  place();
+  void getComputedStyle(ink).clipPath;
+  ink.style.transition = '';
+  pick.classList.add('is-inked');
 }
 
 /** How many columns the grid is laying covers out in right now. */
@@ -93,6 +116,7 @@ export function GameCovers({
       {PLAYABLE_KINDS.map((k, i) => {
         const { icon: Icon, color } = GAME_ICONS[k];
         const why = note?.(k) ?? null;
+        const stage = STAGE_LABELS[GAME_STAGE[k]];
         return (
           <button
             key={k}
@@ -108,6 +132,7 @@ export function GameCovers({
             <span className="pick__cover">
               <span className="pick__ink" aria-hidden="true" />
               <Icon className="pick__art" strokeWidth={1.75} aria-hidden="true" />
+              {stage && <span className="pick__stage">{stage}</span>}
               <span className="pick__text">
                 <strong className="pick__name">{GAME_LABELS[k].name}</strong>
                 {why ? (
