@@ -43,7 +43,7 @@ function RoomPage() {
       const seat = loadSeat(code);
       const id = identity.current;
       // Rejoining would take the seat back from the newer tab.
-      if (!seat || !id || useGame.getState().replaced) return;
+      if (!seat || !id || useGame.getState().replaced === code) return;
       socket.emit('room:join', { code, name: id.name, avatar: id.avatar, token: seat.token }, (res) => {
         if (res.ok) {
           useGame.getState().setMe(res.playerId);
@@ -71,6 +71,8 @@ function RoomPage() {
    *  a closed tab is handled by the socket disconnecting. */
   useEffect(() => {
     if (useGame.getState().me) return;
+    // Lost to a newer tab: coming back by Back or a reload asks first.
+    if (useGame.getState().replaced === code) return;
     const profile = loadProfile();
     if (!profile) return; // no nickname yet — the panel below collects one
     identity.current = profile;
@@ -110,7 +112,7 @@ function RoomPage() {
 
   // A newer tab of this browser has the seat now. Playing here again takes
   // it back, and that tab gets this screen instead.
-  const replaced = useGame((s) => s.replaced);
+  const replaced = useGame((s) => s.replaced === code);
   if (replaced) {
     return (
       <div className="landing landing--narrow">
@@ -124,7 +126,7 @@ function RoomPage() {
             type="button"
             disabled={busy || !identity.current}
             onClick={() => {
-              useGame.getState().setReplaced(false);
+              useGame.getState().setReplaced(null);
               if (identity.current) joinRoom(identity.current, loadSeat(code)?.token, false);
             }}
           >
@@ -133,10 +135,7 @@ function RoomPage() {
           <button
             className="btn btn--ghost"
             type="button"
-            onClick={() => {
-              useGame.getState().setReplaced(false);
-              void navigate({ to: '/' });
-            }}
+            onClick={() => void navigate({ to: '/' })}
           >
             Back to home
           </button>

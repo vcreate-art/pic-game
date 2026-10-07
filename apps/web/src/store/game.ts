@@ -5,6 +5,7 @@ import type {
   RealmsPublic, RealmsRoomState, RealmsSide, RoomMeta, RoomSettings, RoomState, Side,
   SkribblRoomState, WordOption,
 } from '@pic-game/shared';
+import { loadReplaced, saveReplaced } from '../net/socket.js';
 
 const MAX_MESSAGES = 200;
 
@@ -57,8 +58,8 @@ interface GameStore {
   notice: string | null;
   /** Name of whoever removed us, set only when it happens. */
   kickedBy: string | null;
-  /** A newer tab of this browser took our seat. */
-  replaced: boolean;
+  /** The room whose seat a newer tab of this browser took from this one. */
+  replaced: string | null;
   /** Our own Star Realms hand. Nobody else's ever arrives. */
   realmsHand: CardInstance[];
   realmsOwed: number;
@@ -118,7 +119,10 @@ interface GameStore {
   }) => void;
   chessOver: (winner: Side | null, reason: KungFuPublic['reason']) => void;
   setKickedBy: (name: string) => void;
-  setReplaced: (replaced: boolean) => void;
+  setReplaced: (code: string | null) => void;
+  /** Leaves the room behind after a newer tab took the seat, in one step so
+   *  nothing sees the room gone without knowing why. */
+  replacedHere: (code: string) => void;
   reset: () => void;
 }
 
@@ -137,7 +141,7 @@ export const useGame = create<GameStore>((set) => ({
   final: null,
   notice: null,
   kickedBy: null,
-  replaced: false,
+  replaced: loadReplaced(),
   realmsHand: [],
   realmsOwed: 0,
   spiesKey: null,
@@ -359,10 +363,17 @@ export const useGame = create<GameStore>((set) => ({
         : {},
     ),
   setKickedBy: (kickedBy) => set({ kickedBy }),
-  setReplaced: (replaced) => set({ replaced }),
+  setReplaced: (replaced) => {
+    saveReplaced(replaced);
+    set({ replaced });
+  },
+  replacedHere: (code) => {
+    saveReplaced(code);
+    set({ ...noGamePrivate(), me: null, room: null, messages: [], notice: null, kickedBy: null, replaced: code });
+  },
 
   reset: () =>
-    set({ ...noGamePrivate(), me: null, room: null, messages: [], notice: null, kickedBy: null, replaced: false }),
+    set({ ...noGamePrivate(), me: null, room: null, messages: [], notice: null, kickedBy: null }),
 }));
 
 // ---- selectors ----

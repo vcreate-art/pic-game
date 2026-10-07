@@ -89,6 +89,8 @@ function Landing() {
     }
     if (isPostHogEnabled) posthog.capture(event, { game_kind: res.state.kind, entry_point: 'landing' });
     logGameEntry(event === 'game_created' ? 'created' : 'joined', res.state.kind, 'landing');
+    // Joining a room by hand is choosing to play in it from this tab.
+    if (useGame.getState().replaced === res.state.code) useGame.getState().setReplaced(null);
     useGame.getState().setMe(res.playerId);
     useGame.getState().sync(res.state);
     saveSeat({ code: res.state.code, playerId: res.playerId, token: res.token });

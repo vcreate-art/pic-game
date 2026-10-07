@@ -41,7 +41,7 @@ let lobby: {
   room: { game_kind: string; player_count: number; is_host: boolean };
 } | null = null;
 
-type LobbyOutcome = 'game_started' | 'left_room' | 'kicked' | 'closed_page';
+type LobbyOutcome = 'game_started' | 'left_room' | 'kicked' | 'closed_page' | 'moved_tab';
 
 /** How long someone sat in a lobby, and what ended it. Every player reports
  *  their own wait, since each waits on their own clock. */
@@ -65,7 +65,8 @@ if (isPostHogEnabled) {
   useGame.subscribe((s, prev) => {
     const room = s.room;
     if (lobby && (!room || room.code !== lobby.code)) {
-      endLobby(s.kickedBy ? 'kicked' : 'left_room');
+      // A newer tab of theirs took the seat: they're still in the room.
+      endLobby(s.kickedBy ? 'kicked' : s.replaced === lobby.code ? 'moved_tab' : 'left_room');
     } else if (lobby && room && room.meta.stage !== 'lobby') {
       endLobby('game_started');
     }

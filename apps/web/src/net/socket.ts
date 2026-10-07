@@ -100,6 +100,28 @@ export function loadSeat(code: string): Seat | null {
   }
 }
 
+const REPLACED_KEY = 'pic-game:replaced';
+
+/** The room this tab lost its seat in to a newer tab, so coming back to it,
+ *  by Back or a reload, asks before taking the seat again. Per tab, like the
+ *  seat itself. */
+export function loadReplaced(): string | null {
+  try {
+    return sessionStorage.getItem(REPLACED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function saveReplaced(code: string | null): void {
+  try {
+    if (code) sessionStorage.setItem(REPLACED_KEY, code);
+    else sessionStorage.removeItem(REPLACED_KEY);
+  } catch {
+    /* without storage it lasts as long as the page */
+  }
+}
+
 export function clearSeat(): void {
   try {
     sessionStorage.removeItem(SEAT_KEY);
