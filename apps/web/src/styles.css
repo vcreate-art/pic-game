@@ -103,7 +103,7 @@ button, input { font: inherit; color: inherit; }
 .profile__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .profile__note { margin: 0; font-size: 12px; color: var(--ink-soft); }
 
-.profile__who { display: flex; align-items: flex-start; gap: 12px; }
+.profile__who { display: flex; align-items: center; gap: 12px; }
 .profile__whotext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .profile__whoname {
   font-family: var(--display); font-size: 18px; font-weight: 800; line-height: 1.25;

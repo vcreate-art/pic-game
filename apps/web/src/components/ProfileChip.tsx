@@ -84,9 +84,6 @@ export function ProfileChip() {
               <span className="profile__record">
                 {played ? `${played} played, ${won} won` : 'No games finished yet'}
               </span>
-              {stats.bestStreak > 1 && (
-                <span className="profile__record">Best run: {stats.bestStreak} wins</span>
-              )}
             </div>
             <button type="button" className="profile__edit" onClick={edit} title="Edit name and avatar">
               <Pencil aria-hidden="true" />
