@@ -9,7 +9,7 @@ import {
 } from '@pic-game/shared';
 import {
   CHOOSE_SECONDS, GAME_END_SECONDS, MAX_CHAT_LEN, MAX_OPS_PER_TURN,
-  RECONNECT_GRACE_MS, SUGGEST_SECONDS, TURN_END_SECONDS, EMPTY_ROOM_TTL_MS,
+  SUGGEST_SECONDS, TURN_END_SECONDS, EMPTY_ROOM_TTL_MS,
 } from '../../config.js';
 import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 import { topScorers } from '../../core/RoomSession.js';

@@ -5,6 +5,37 @@ export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 let socket: GameSocket | null = null;
 
+const PERSON_KEY = 'pic-game:person';
+
+/**
+ * This browser's lasting id: localStorage, so it outlives the tab. Rooms use
+ * it to know someone again after they close the tab or leave and come back,
+ * and keep their wins for them. Without storage it lasts only this visit.
+ */
+function personKey(): string {
+  try {
+    let key = localStorage.getItem(PERSON_KEY);
+    if (!key) {
+      key = uuid();
+      localStorage.setItem(PERSON_KEY, key);
+    }
+    return key;
+  } catch {
+    return uuid();
+  }
+}
+
+/** crypto.randomUUID is only there on https and localhost; a game over home
+ *  Wi-Fi by plain http still needs one. */
+function uuid(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6]! & 0x0f) | 0x40;
+  b[8] = (b[8]! & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 /** One connection per tab, created lazily. Socket.IO handles reconnect and
  *  backoff; our job is only to re-present the seat token afterwards. */
 export function getSocket(): GameSocket {
@@ -16,6 +47,7 @@ export function getSocket(): GameSocket {
       reconnectionDelay: 400,
       reconnectionDelayMax: 4000,
       transports: ['websocket', 'polling'],
+      auth: { person: personKey() },
     });
   }
   return socket;

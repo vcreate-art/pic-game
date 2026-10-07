@@ -61,6 +61,12 @@ function cleanAvatar(raw: unknown): Avatar {
   };
 }
 
+/** The browser's lasting id, from the handshake. A random UUID the client
+ *  made; anything else is ignored, and that browser just isn't known again. */
+function cleanPerson(raw: unknown): string | null {
+  return typeof raw === 'string' && /^[0-9a-f-]{36}$/i.test(raw) ? raw : null;
+}
+
 /** Colors and brush sizes are validated against the palette rather than accepted
  *  as free strings, which keeps arbitrary CSS out of every other player's canvas. */
 function cleanColor(raw: unknown): string {
@@ -84,6 +90,7 @@ export function allowedWhilePaused(event: string): boolean {
 
 export function attachSocket(io: IO, rooms: RoomManager): void {
   io.on('connection', (socket: Sock) => {
+    const person = cleanPerson((socket.handshake.auth as { person?: unknown } | undefined)?.person);
     const s: Session = {
       code: null,
       get room() {
@@ -161,7 +168,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       const asked = p?.game;
       const kind = GAME_KINDS.includes(asked as GameKind) ? (asked as GameKind) : 'skribbl';
       const room = rooms.create(kind);
-      const player = room.addPlayer(name, cleanAvatar(p?.avatar), socket.id);
+      const player = room.addPlayer(name, cleanAvatar(p?.avatar), socket.id, person);
       bind(room, player.id);
       cb({ ok: true, playerId: player.id, token: player.token, state: room.publicState() });
       room.systemMessage(`${name} created the room.`);
@@ -200,8 +207,11 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
 
       // A returning player reclaims their seat and score before any capacity check,
       // so a full room can never lock out someone who is already in it.
-      if (p.token) {
-        const reclaimed = room.reclaim(p.token, socket.id);
+      // Without the tab's token, after closing it, the browser's person finds
+      // the seat they left away.
+      if (p.token || person) {
+        const reclaimed =
+          (p.token ? room.reclaim(p.token, socket.id) : null) ?? (person ? room.reclaimPerson(person, socket.id) : null);
         if (reclaimed) {
           bind(room, reclaimed.id);
           cb({ ok: true, playerId: reclaimed.id, token: reclaimed.token, state: room.publicState() });
@@ -215,7 +225,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
         return cb({ ok: false, code: 'FULL', message: 'That room is full.' });
       }
 
-      const player = room.addPlayer(name, cleanAvatar(p?.avatar), socket.id);
+      const player = room.addPlayer(name, cleanAvatar(p?.avatar), socket.id, person);
       bind(room, player.id);
       cb({ ok: true, playerId: player.id, token: player.token, state: room.publicState() });
       socket.to(room.code).emit('player:joined', room.publicPlayers().find((x) => x.id === player.id)!);

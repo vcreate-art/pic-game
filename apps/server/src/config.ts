@@ -50,18 +50,16 @@ const envMs = (name: string, fallback: number) => {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 
-/** A reconnecting socket may reclaim its seat and score within this window.
- *  The env overrides exist so the integration tests can shorten them. */
-export const RECONNECT_GRACE_MS = envMs('RECONNECT_GRACE_MS', 60_000);
+// The env overrides exist so the integration tests can shorten these.
 /** An empty room is collected after this long. */
 export const EMPTY_ROOM_TTL_MS = envMs('EMPTY_ROOM_TTL_MS', 120_000);
-/** A tournament runs for an evening, from a host phone that sleeps between
- *  matches: its room, and its seats, are kept this long instead. */
 /** A paused game carries on by itself once its host has been away this long,
  *  so a host who drops out can't leave everyone else stuck. */
 export const PAUSE_HOST_AWAY_MS = envMs('PAUSE_HOST_AWAY_MS', 60_000);
 /** The 3-2-1 before a game starts and before a paused one carries on. */
 export const GAME_COUNTDOWN_MS = envMs('GAME_COUNTDOWN_MS', 3_000);
+/** A tournament runs for an evening, from a host phone that sleeps between
+ *  matches: its room is kept this long instead. */
 export const TOURNEY_KEEP_MS = envMs('TOURNEY_KEEP_MS', 8 * 60 * 60_000);
 
 export const MAX_NAME_LEN = 20;

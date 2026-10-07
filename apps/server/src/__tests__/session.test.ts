@@ -156,3 +156,60 @@ describe('BaseRoom.recordWin', () => {
     expect(room.publicState().meta.wins).toEqual({ [a.id]: 1 });
   });
 });
+
+describe('coming back to a room', () => {
+  const ME = '11111111-1111-4111-8111-111111111111';
+
+  it('reclaims a seat by its token however long it was away', () => {
+    const { io } = fakeIO();
+    const room = new TestRoom('ABCDEF', io);
+    const a = room.addPlayer('Ana', { color: 0, face: 0 }, 's1');
+    room.markDisconnected(a.id);
+    a.disconnectedAt = Date.now() - 60 * 60_000;
+    expect(room.reclaim(a.token, 's2')?.id).toBe(a.id);
+  });
+
+  it('finds an away seat by the browser after the tab was closed', () => {
+    const { io } = fakeIO();
+    const room = new TestRoom('ABCDEF', io);
+    const a = room.addPlayer('Ana', { color: 0, face: 0 }, 's1', ME);
+    room.win([a.id]);
+    room.markDisconnected(a.id);
+    const back = room.reclaimPerson(ME, 's2');
+    expect(back?.id).toBe(a.id);
+    expect(room.players.size).toBe(1);
+    expect(room.meta().wins).toEqual({ [a.id]: 1 });
+  });
+
+  it('never takes over a seat that is still connected', () => {
+    const { io } = fakeIO();
+    const room = new TestRoom('ABCDEF', io);
+    room.addPlayer('Ana', { color: 0, face: 0 }, 's1', ME);
+    expect(room.reclaimPerson(ME, 's2')).toBeNull();
+  });
+
+  it('keeps wins and games for someone who leaves and rejoins', () => {
+    const { io } = fakeIO();
+    const room = new TestRoom('ABCDEF', io);
+    const a = room.addPlayer('Ana', { color: 0, face: 0 }, 's1', ME);
+    room.addPlayer('Ben', { color: 1, face: 1 }, 's2');
+    room.win([a.id]);
+    room.removePlayer(a.id);
+
+    const again = room.addPlayer('Ana', { color: 0, face: 0 }, 's3', ME);
+    expect(again.id).not.toBe(a.id);
+    expect(room.meta().wins).toEqual({ [again.id]: 1 });
+    expect(room.meta().played[again.id]).toBe(1);
+    expect(room.meta().winsByGame).toEqual({ [again.id]: { flip7: 1 } });
+  });
+
+  it('gives a second tab of the same browser its own record', () => {
+    const { io } = fakeIO();
+    const room = new TestRoom('ABCDEF', io);
+    const a = room.addPlayer('Ana', { color: 0, face: 0 }, 's1', ME);
+    const b = room.addPlayer('Ana 2', { color: 1, face: 1 }, 's2', ME);
+    room.win([b.id]);
+    expect(room.meta().wins).toEqual({ [b.id]: 1 });
+    expect(a.record).not.toBe(b.record);
+  });
+});
