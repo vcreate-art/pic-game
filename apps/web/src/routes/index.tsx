@@ -6,6 +6,7 @@ import { CategoryLabel } from '../components/CategoryLabel.js';
 import { GameCovers } from '../components/GameCovers.js';
 import { GAME_ICONS } from '../components/gameIcons.js';
 import { JoinPanel, initialIdentity, type Identity } from '../components/JoinPanel.js';
+import { SleepingCat } from '../components/SleepingCat.js';
 import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { logGameEntry } from '../lib/posthogLogs.js';
 import { peekRoom } from '../api/client.js';
@@ -131,6 +132,7 @@ function Landing() {
 
         <section className="landing__section landing__join" aria-label="Join a room">
           <div className="card landing__card">
+            <SleepingCat />
             <JoinPanel
               submitLabel="Join room"
               busy={busy && !game}
