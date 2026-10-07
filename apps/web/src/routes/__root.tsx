@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
-import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
-import { Bug, Trophy } from 'lucide-react';
+import { Outlet, createRootRoute } from '@tanstack/react-router';
+import { Bug } from 'lucide-react';
 import { ProfileChip } from '../components/ProfileChip.js';
 import { CountdownOverlay } from '../components/CountdownOverlay.js';
 import { PausedOverlay } from '../components/PausedOverlay.js';
@@ -45,13 +45,6 @@ function RootLayout() {
               <Bug aria-hidden="true" />
               <span className="bugbtn__label">Report a bug</span>
             </button>
-          )}
-          {/* Following a link out of a room would leave it, so not from there. */}
-          {!inRoom && (
-            <Link to="/achievements" className="bugbtn" title="Your achievements">
-              <Trophy aria-hidden="true" />
-              <span className="bugbtn__label">Achievements</span>
-            </Link>
           )}
           <ProfileChip />
         </div>

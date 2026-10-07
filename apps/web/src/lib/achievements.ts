@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { PLAYABLE_KINDS, type GameKind } from '@pic-game/shared';
 import { useGame } from '../store/game.js';
 
@@ -45,6 +46,17 @@ function saveStats(s: Stats): void {
   window.dispatchEvent(new CustomEvent<Stats>(STATS_EVENT, { detail: s }));
 }
 
+/** The saved stats, kept current as games finish. */
+export function useStats(): Stats {
+  const [stats, setStats] = useState(loadStats);
+  useEffect(() => {
+    const on = (e: Event) => setStats((e as CustomEvent<Stats>).detail);
+    window.addEventListener(STATS_EVENT, on);
+    return () => window.removeEventListener(STATS_EVENT, on);
+  }, []);
+  return stats;
+}
+
 const sum = (r: Partial<Record<GameKind, number>>) => Object.values(r).reduce((a, b) => a + (b ?? 0), 0);
 const kinds = (r: Partial<Record<GameKind, number>>) => Object.values(r).filter((n) => (n ?? 0) > 0).length;
 
@@ -88,6 +100,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   { id: 'host', title: 'Game night host', description: 'Host 10 games to the end.', progress: (s) => s.hosted, goal: 10 },
   { id: 'crowd', title: 'Full house', description: 'Finish a game with 8 or more players.', progress: (s) => s.biggestRoom, goal: 8 },
 ];
+
+/** Earned first, newest at the top; then the rest, closest to done first. */
+export function byRelevance(s: Stats): Achievement[] {
+  return [...ACHIEVEMENTS].sort((a, b) => {
+    const ua = s.unlocked[a.id] ?? 0;
+    const ub = s.unlocked[b.id] ?? 0;
+    if (ua || ub) return ub - ua;
+    return b.progress(s) / b.goal - a.progress(s) / a.goal;
+  });
+}
 
 /** Marks anything newly earned and returns those, oldest-defined first. */
 function unlockNew(s: Stats): Achievement[] {

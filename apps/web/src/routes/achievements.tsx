@@ -1,20 +1,10 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { Lock, Trophy } from 'lucide-react';
 import { GAME_LABELS, PLAYABLE_KINDS } from '@pic-game/shared';
 import { GAME_ICONS } from '../components/gameIcons.js';
-import { ACHIEVEMENTS, STATS_EVENT, loadStats, totalPlayed, totalWon, type Stats } from '../lib/achievements.js';
+import { ACHIEVEMENTS, byRelevance, totalPlayed, totalWon, useStats } from '../lib/achievements.js';
 import { Route as rootRoute } from './__root.js';
-
-function useStats(): Stats {
-  const [stats, setStats] = useState(loadStats);
-  useEffect(() => {
-    const on = (e: Event) => setStats((e as CustomEvent<Stats>).detail);
-    window.addEventListener(STATS_EVENT, on);
-    return () => window.removeEventListener(STATS_EVENT, on);
-  }, []);
-  return stats;
-}
 
 const day = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -24,13 +14,7 @@ function Achievements() {
   const won = totalWon(stats);
   const earned = ACHIEVEMENTS.filter((a) => stats.unlocked[a.id]).length;
 
-  // Earned first, newest at the top; then the rest, closest to done first.
-  const list = [...ACHIEVEMENTS].sort((a, b) => {
-    const ua = stats.unlocked[a.id] ?? 0;
-    const ub = stats.unlocked[b.id] ?? 0;
-    if (ua || ub) return ub - ua;
-    return b.progress(stats) / b.goal - a.progress(stats) / a.goal;
-  });
+  const list = byRelevance(stats);
 
   const games = PLAYABLE_KINDS.map((k) => ({ kind: k, played: stats.played[k] ?? 0, won: stats.won[k] ?? 0 })).sort(
     (a, b) => b.played - a.played || b.won - a.won,

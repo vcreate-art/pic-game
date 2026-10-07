@@ -103,6 +103,49 @@ button, input { font: inherit; color: inherit; }
 .profile__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .profile__note { margin: 0; font-size: 12px; color: var(--ink-soft); }
 
+.profile__who { display: flex; align-items: center; gap: 12px; }
+.profile__whoname {
+  flex: 1; min-width: 0; font-family: var(--display); font-size: 17px; font-weight: 800;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.profile__edit {
+  flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  color: var(--ink-soft); cursor: pointer;
+}
+.profile__edit:hover { border-color: var(--accent); color: var(--ink); }
+.profile__edit:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.profile__edit svg { width: 15px; height: 15px; }
+
+.profile__stats { margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.profile__stats > div { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.profile__stats dt { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+.profile__stats dd { margin: 0; font-family: var(--display); font-size: 20px; font-weight: 800; }
+
+.profile__badges ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.profile__head {
+  margin: 0 0 8px; display: flex; justify-content: space-between;
+  font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft);
+}
+.profile__badges li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+.profile__badge {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: 999px; background: var(--paper); color: var(--ink-soft);
+}
+.profile__badges li.is-earned .profile__badge { background: var(--accent-soft); color: var(--accent); }
+.profile__badge svg { width: 14px; height: 14px; }
+.profile__badgename { flex: 1; min-width: 0; font-weight: 600; }
+.profile__badges li:not(.is-earned) .profile__badgename { color: var(--ink-soft); }
+.profile__badgeat { font-size: 12px; color: var(--ink-soft); }
+
+.profile__all {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding-top: 10px; border-top: 1px solid var(--line);
+  font-size: 13.5px; font-weight: 600; color: var(--accent); text-decoration: none;
+}
+.profile__all:hover { text-decoration: underline; }
+.profile__all svg { width: 16px; height: 16px; }
+
 .conn { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
 .conn.is-on { color: var(--ok); background: var(--ok-soft); }
 .conn.is-off { color: var(--warn); background: var(--warn-soft); }
@@ -2734,8 +2777,6 @@ button, input { font: inherit; color: inherit; }
 }
 
 /* ---------------------------------------------------------------- achievements */
-
-a.bugbtn { text-decoration: none; }
 
 .achv {
   margin: 0 auto; width: 100%; max-width: 960px;
