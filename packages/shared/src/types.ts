@@ -172,9 +172,17 @@ export const GAME_KINDS: readonly GameKind[] = [
 ];
 
 /** The ones with a playable interface. A kind can exist on the server before
- *  it has a screen, and the picker should only offer what can be played. */
+ *  it has a screen, and the picker should only offer what can be played.
+ *  In the picker's order: the most finished games first, then those whose
+ *  rules are still moving, then the early ones. */
 export const PLAYABLE_KINDS: readonly GameKind[] = [
-  'skribbl', 'kungfu', 'realms', 'fight', 'race', 'spies', 'bingo', 'cryptid', 'flip7', 'maze', 'tourney',
+  // Release candidates: rules settled.
+  'skribbl', 'bingo', 'kungfu', 'spies',
+  // Beta: rules still being worked on.
+  'cryptid',
+  // Alpha: logic and screens both need work. MK11 Tournament ('tourney') is
+  // hidden for now: it has a screen, but isn't offered.
+  'flip7', 'fight', 'realms', 'maze', 'race',
 ];
 
 export const GAME_LABELS: Record<GameKind, { name: string; blurb: string }> = {
