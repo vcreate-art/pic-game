@@ -12,6 +12,7 @@ import { peekRoom } from '../api/client.js';
 import { getSocket, saveSeat } from '../net/socket.js';
 import { useGame } from '../store/game.js';
 import { Route as rootRoute } from './__root.js';
+import vcreateLogo from '../assets/vcreate-logo.svg';
 
 /** While a phone's on-screen keyboard is up, `top` and `bottom` that fit a
  *  fixed overlay into the space above it. Mobile browsers don't shrink the
@@ -159,6 +160,13 @@ function Landing() {
           <GameCovers surface="landing" onPick={open} active={game} />
         </section>
       </div>
+
+      <footer className="landing__credit">
+        <a href="https://vcreate.art" target="_blank" rel="noopener noreferrer">
+          <span>Powered by</span>
+          <img src={vcreateLogo} alt="Vcreate.art" width={92} height={28} />
+        </a>
+      </footer>
 
       {game && picked && (
         <div className="sheet" style={inset} onClick={close}>

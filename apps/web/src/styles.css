@@ -203,6 +203,16 @@ button, input { font: inherit; color: inherit; }
   grid-template-areas: 'intro .' 'start join'; gap: 24px 48px;
 }
 .landing__intro { grid-area: intro; }
+/* A quiet credit under everything, never competing with the games. */
+.landing__credit { display: flex; justify-content: center; padding-top: 28px; }
+.landing__credit a {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px;
+  color: var(--ink-soft); font-size: 12.5px; font-weight: 500; text-decoration: none;
+  transition: background .15s ease;
+}
+.landing__credit a:hover { background: var(--card); }
+.landing__credit a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.landing__credit img { display: block; height: 28px; width: auto; }
 .landing--home .landing__join { position: sticky; top: 20px; }
 .landing--home .landing__section { margin-top: 0; }
 .landing__intro .landing__title { margin: 0; font-size: 40px; line-height: 1.05; }
