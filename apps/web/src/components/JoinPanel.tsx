@@ -3,6 +3,7 @@ import { AVATAR_COLORS, AVATAR_FACES } from '@pic-game/shared';
 import { MAX_NAME_LEN } from '../constants.js';
 import { PROFILE_EVENT, loadProfile, saveProfile, type Profile } from '../net/socket.js';
 import { Avatar } from './Avatar.js';
+import { noAutofill } from '../lib/noAutofill.js';
 
 export interface Identity {
   name: string;
@@ -92,6 +93,7 @@ export function JoinPanel({
           placeholder="Your name"
           onChange={(e) => setName(e.target.value)}
           autoFocus
+          {...noAutofill}
         />
       </label>
 

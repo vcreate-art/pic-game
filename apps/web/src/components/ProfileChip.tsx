@@ -9,6 +9,7 @@ import { useDismiss } from '../lib/useDismiss.js';
 import { ACHIEVEMENTS, byRelevance, totalPlayed, totalWon, useStats } from '../lib/achievements.js';
 import { Avatar } from './Avatar.js';
 import { PhoneHandoff } from './PhoneHandoff.js';
+import { noAutofill } from '../lib/noAutofill.js';
 
 /** How many badges the menu shows before handing over to the full page. */
 const PEEK = 3;
@@ -160,6 +161,7 @@ export function ProfileChip() {
               maxLength={MAX_NAME_LEN}
               autoFocus
               onChange={(e) => setName(e.target.value)}
+              {...noAutofill}
             />
           </label>
           <div className="profile__actions">

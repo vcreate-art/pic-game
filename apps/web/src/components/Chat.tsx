@@ -3,6 +3,7 @@ import { MAX_CHAT_LEN } from '../constants.js';
 import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { getSocket } from '../net/socket.js';
 import { selectHaveGuessed, selectIsDrawer, selectSkribbl, useGame } from '../store/game.js';
+import { noAutofill } from '../lib/noAutofill.js';
 
 /** Counts what the word mask counts: letters and digits, not spaces or hyphens,
  *  so "yo-yo" reads as 4 against 4 rather than 5. */
@@ -99,7 +100,8 @@ export function Chat() {
             placeholder={placeholder}
             onChange={(e) => setText(e.target.value)}
             aria-label={isSkribbl ? 'Your guess' : 'Your message'}
-            autoComplete="off"
+            enterKeyHint="send"
+            {...noAutofill}
           />
           {showCount && (
             <span
