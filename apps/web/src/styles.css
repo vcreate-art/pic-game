@@ -678,14 +678,17 @@ button, input { font: inherit; color: inherit; }
      surface instead, as a soft tint. */
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--game, var(--ink)) 12%, var(--card)); color: var(--ink);
-  transition: color .2s ease;
+  /* In step with the ink, so a quick pass doesn't flicker the text. */
+  transition: color .5s cubic-bezier(.55, 0, .25, 1);
 }
 /* Under the icon and the text, over the paper. */
 .pick__ink {
   position: absolute; inset: 0;
   background: color-mix(in srgb, var(--game, var(--ink)) 72%, #000);
   clip-path: circle(0% at var(--ex, 50%) var(--ey, 50%));
-  transition: clip-path .35s cubic-bezier(.3, .7, .3, 1);
+  /* The buttons' curve: it gathers before it spreads, so the pointer
+     sweeping across a row barely tints the covers it only passes over. */
+  transition: clip-path .5s cubic-bezier(.55, 0, .25, 1);
 }
 .pick__art {
   position: absolute; top: -4px; right: -18px; width: 72px; height: 72px;

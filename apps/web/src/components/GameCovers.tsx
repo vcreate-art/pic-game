@@ -15,9 +15,13 @@ function inkFrom(e: React.PointerEvent<HTMLButtonElement>) {
     cover.style.setProperty('--ex', `${((e.clientX - box.left) / cover.offsetWidth) * 100}%`);
     cover.style.setProperty('--ey', `${((e.clientY - box.top) / cover.offsetHeight) * 100}%`);
   };
+  const ink = cover.firstElementChild as HTMLElement;
   if (e.type === 'pointerleave') {
-    // Shrinking while it moves is what drains it toward where it left.
-    place();
+    // Shrinking while it moves is what drains it toward where it left. Ink
+    // that has barely spread, from a pointer only passing over, shrinks where
+    // it is: dragged across the cover it would show as a stray dot.
+    const grown = parseFloat(/circle\(([\d.]+)%/.exec(getComputedStyle(ink).clipPath)?.[1] ?? '0');
+    if (grown > 20) place();
     pick.classList.remove('is-inked');
     return;
   }
@@ -26,7 +30,6 @@ function inkFrom(e: React.PointerEvent<HTMLButtonElement>) {
   // The circle's centre and size animate together, so moving the centre as
   // it grows would slide the ink in from wherever it last left. Move it while
   // it's still empty, with no transition, then let it grow from there.
-  const ink = cover.firstElementChild as HTMLElement;
   ink.style.transition = 'none';
   place();
   void getComputedStyle(ink).clipPath;
