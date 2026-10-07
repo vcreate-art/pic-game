@@ -8,6 +8,7 @@ import { KickButton } from './KickButton.js';
 import { Settings, fewWords } from './Settings.js';
 import { SettingsTitle } from './SettingsTitle.js';
 import { WinsByGame } from './WinsByGame.js';
+import { Dots } from './Dots.js';
 
 export function Lobby() {
   const room = useGame((s) => s.room);
@@ -57,7 +58,7 @@ export function Lobby() {
             {!enough ? 'Need 2+ players' : short ? 'Add more of your words' : 'Start game'}
           </button>
         ) : (
-          <p className="settings__note">Waiting for the host to start…</p>
+          <p className="settings__note">Waiting for the host to start<Dots /></p>
         )}
       </div>
     </div>

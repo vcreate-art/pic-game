@@ -6,6 +6,7 @@ import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { getSocket } from '../net/socket.js';
 import { selectDrawer, selectIsDrawer, useGame } from '../store/game.js';
 import { Timer } from './Timer.js';
+import { Dots } from './Dots.js';
 
 /**
  * Shown over the canvas while the word is being settled. Four views: the drawer
@@ -36,7 +37,7 @@ export function WordChoice() {
       <div className="overlay">
         <div className="overlay__card">
           <p className="overlay__kicker">Your turn</p>
-          <h3 className="overlay__title">Waiting for words…</h3>
+          <h3 className="overlay__title">Waiting for words<Dots /></h3>
           <Tally count={suggest.count} expected={suggest.expected} />
           <p className="overlay__hint">
             {remaining === 0

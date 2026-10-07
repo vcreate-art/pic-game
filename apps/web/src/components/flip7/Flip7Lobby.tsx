@@ -6,6 +6,7 @@ import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { SettingsTitle } from '../SettingsTitle.js';
 import { WinsByGame } from '../WinsByGame.js';
+import { Dots } from '../Dots.js';
 
 const LENGTHS: Record<number, string> = { 100: 'Quick', 150: 'Short', 200: 'The box', 300: 'Long' };
 
@@ -80,7 +81,7 @@ export function Flip7Lobby() {
               {enough ? 'Shuffle and deal' : `Needs ${FLIP7_MIN_PLAYERS} players`}
             </button>
           ) : (
-            <p className="settings__note">Waiting for the host to start…</p>
+            <p className="settings__note">Waiting for the host to start<Dots /></p>
           )}
         </div>
       </div>

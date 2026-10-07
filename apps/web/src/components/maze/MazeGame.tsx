@@ -6,6 +6,7 @@ import { selectIsHost, selectMaze, useGame } from '../../store/game.js';
 import { Chat } from '../Chat.js';
 import { MazeLobby } from './MazeLobby.js';
 import { CONTROL_HELP, ControlsPicker, useMazeControls } from './controls.js';
+import { Dots } from '../Dots.js';
 
 const touchOnly = () =>
   typeof window !== 'undefined' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
@@ -72,7 +73,7 @@ export function MazeGame() {
                   <button type="button" className="btn" onClick={() => getSocket().emit('maze:toLobby')}>Back to the lobby</button>
                 </div>
               ) : (
-                <p>Waiting for the host…</p>
+                <p>Waiting for the host<Dots /></p>
               )}
             </div>
           )}

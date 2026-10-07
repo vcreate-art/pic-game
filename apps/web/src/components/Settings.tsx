@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CUSTOM_WORDS, SETTINGS_BOUNDS, WORDS_EN, type RoomSettings, type WordMode, type WordSource,
 } from '@pic-game/shared';
@@ -26,6 +26,15 @@ export function Settings() {
   const socket = getSocket();
   const saved = settings?.customWords ?? [];
   const [draft, setDraft] = useState(saved.join(', '));
+  // Said only when a guest reaches for a setting, not all the time.
+  const [told, setTold] = useState(false);
+  const toldTimer = useRef<ReturnType<typeof setTimeout>>();
+  const tell = () => {
+    setTold(true);
+    clearTimeout(toldTimer.current);
+    toldTimer.current = setTimeout(() => setTold(false), 2400);
+  };
+  useEffect(() => () => clearTimeout(toldTimer.current), []);
   // Pick up the saved list when it changes elsewhere (another host, a reload).
   useEffect(() => setDraft(saved.join(', ')), [saved.join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!settings) return null;
@@ -109,6 +118,7 @@ export function Settings() {
               className="wordbox__box"
               value={draft}
               readOnly={!isHost}
+              onFocus={isHost ? undefined : tell}
               placeholder="Your words, separated by commas or new lines: inside jokes, a theme, anything drawable."
               onChange={(e) => setDraft(e.target.value)}
               rows={4}
@@ -126,7 +136,15 @@ export function Settings() {
           </div>
         )}
       </div>
-      {!isHost && <p className="settings__note">Only the host can change these.</p>}
+      {/* Disabled controls swallow taps, so a guest's tap lands on this
+          instead, and gets told why nothing happens. The word list sits
+          above it, to scroll and read. */}
+      {!isHost && <div className={`settings__shield ${told ? 'is-on' : ''}`} aria-hidden="true" onClick={tell} />}
+      {!isHost && (
+        <p className={`settings__told ${told ? 'is-on' : ''}`} role="status">
+          {told ? 'Only the host can change these.' : ''}
+        </p>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { KickButton } from '../KickButton.js';
 import { CONTROL_HELP, ControlsPicker, useMazeControls } from './controls.js';
 import { SettingsTitle } from '../SettingsTitle.js';
 import { WinsByGame } from '../WinsByGame.js';
+import { Dots } from '../Dots.js';
 
 const THEMES: { value: MazeThemeChoice; name: string }[] = [
   { value: 'random', name: 'Surprise me' },
@@ -160,7 +161,7 @@ export function MazeLobby() {
               {enough ? 'Into the maze' : `Needs ${MAZE_MIN_PLAYERS} players`}
             </button>
           ) : (
-            <p className="settings__note">Waiting for the host to start…</p>
+            <p className="settings__note">Waiting for the host to start<Dots /></p>
           )}
         </div>
       </div>

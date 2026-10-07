@@ -9,6 +9,7 @@ import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { SettingsTitle } from '../SettingsTitle.js';
 import { WinsByGame } from '../WinsByGame.js';
+import { Dots } from '../Dots.js';
 
 export const TEAM_NAME: Record<SpyTeam, string> = { red: 'Red', blue: 'Blue' };
 
@@ -205,7 +206,7 @@ export function SpiesLobby() {
             </button>
           ) : (
             <p className="settings__note">
-              {spoken ? 'Waiting for the host to deal…' : 'Pick a team. The host deals when both are ready.'}
+              {spoken ? <>Waiting for the host to deal<Dots /></> : 'Pick a team. The host deals when both are ready.'}
             </p>
           )}
         </section>

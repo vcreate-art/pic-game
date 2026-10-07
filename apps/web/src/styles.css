@@ -428,7 +428,29 @@ button, input { font: inherit; color: inherit; }
   font-weight: 600; font-size: 13px; text-align: center; word-break: break-word;
 }
 
-.settings { display: flex; flex-direction: column; gap: 12px; }
+.settings { position: relative; display: flex; flex-direction: column; gap: 12px; }
+.settings__shield {
+  position: absolute; inset: -8px; z-index: 1; border-radius: 12px; cursor: not-allowed;
+  transition: background .2s ease, backdrop-filter .2s ease, -webkit-backdrop-filter .2s ease;
+}
+/* While the message shows, the settings blur behind it, word list and all. */
+.settings__shield.is-on {
+  z-index: 3; background: rgba(255, 255, 255, .4);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+}
+.settings .wordbox__box { position: relative; z-index: 2; }
+/* Floats in the middle of the settings for a moment, so saying it moves
+   nothing around. */
+.settings__told {
+  position: absolute; left: 50%; top: 50%; z-index: 4; margin: 0;
+  padding: 9px 16px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+  background: var(--ink); color: #fff; font-size: 13px; font-weight: 600;
+  opacity: 0; transform: translate(-50%, calc(-50% + 6px)); transition: opacity .2s ease, transform .2s ease;
+}
+.settings__told.is-on { opacity: 1; transform: translate(-50%, -50%); }
+@media (prefers-reduced-motion: reduce) {
+  .settings__told, .settings__shield { transition: none; }
+}
 .settings__row { display: grid; grid-template-columns: 1fr 1.4fr auto; align-items: center; gap: 12px; }
 .settings__label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .settings__row input[type='range'] { width: 100%; accent-color: var(--accent); }
@@ -792,6 +814,21 @@ button, input { font: inherit; color: inherit; }
 .leavebar {
   flex: 1; min-height: 72px;
   display: flex; align-items: center; justify-content: center;
+}
+
+/* "Waiting for the host…": the dots light up one after another, so the wait
+   reads as someone doing something. Each keeps its width, so nothing beside
+   them moves. */
+.dots { display: inline-flex; }
+.dots > span { animation: dots-wait 1.4s ease-in-out infinite; opacity: .25; }
+.dots > span:nth-child(2) { animation-delay: .2s; }
+.dots > span:nth-child(3) { animation-delay: .4s; }
+@keyframes dots-wait {
+  0%, 60%, 100% { opacity: .25; }
+  30% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dots > span { animation: none; opacity: 1; }
 }
 
 .visually-hidden {
