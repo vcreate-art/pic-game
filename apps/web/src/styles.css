@@ -690,6 +690,18 @@ button, input { font: inherit; color: inherit; }
      sweeping across a row barely tints the covers it only passes over. */
   transition: clip-path .5s cubic-bezier(.55, 0, .25, 1);
 }
+/* How finished the game is, in the corner opposite the icon. White, so it
+   reads the same on the tint and on the ink. */
+.pick__stage {
+  position: absolute; top: 10px; left: 10px;
+  padding: 2px 8px; border-radius: 999px; background: var(--card);
+  font-size: 10.5px; font-weight: 700; line-height: 1.5; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--game, var(--ink));
+  transition: opacity .2s ease;
+}
+.switchgrid .pick__stage { top: 7px; left: 7px; padding: 1px 6px; font-size: 9.5px; }
+/* No blurb opens in the lobby's grid, so there it stays put. */
+.switchgrid .pick:hover .pick__stage, .switchgrid .pick:focus-visible .pick__stage { opacity: 1; }
 .pick__art {
   position: absolute; top: -4px; right: -18px; width: 72px; height: 72px;
   color: var(--game, var(--ink)); opacity: .6;
@@ -733,6 +745,9 @@ button, input { font: inherit; color: inherit; }
 .pick:focus-visible .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
 .pick:focus-visible .pick__cover { color: #fff; }
 .pick:focus-visible .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
+/* The blurb slides up into the corner it sits in, so it steps aside with the
+   category. */
+.pick:focus-visible .pick__stage { opacity: 0; }
 .pick:focus-visible .pick__name { font-size: 17px; margin-bottom: 5px; }
 .pick:focus-visible .pick__more { grid-template-rows: 1fr; }
 .pick:focus-visible .pick__more > span { opacity: 1; transform: none; }
@@ -741,6 +756,7 @@ button, input { font: inherit; color: inherit; }
 @media (hover: hover) {
   .pick:hover .pick__cover { color: #fff; }
   .pick:hover .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
+  .pick:hover .pick__stage { opacity: 0; }
   .pick:hover .pick__name { font-size: 17px; margin-bottom: 5px; }
   .pick:hover .pick__more { grid-template-rows: 1fr; }
   .pick:hover .pick__more > span { opacity: 1; transform: none; }
@@ -748,7 +764,7 @@ button, input { font: inherit; color: inherit; }
   .picker { row-gap: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pick__cover, .pick__ink, .pick__name, .pick__more, .pick__more > span { transition: none; }
+  .pick__cover, .pick__ink, .pick__name, .pick__more, .pick__more > span, .pick__stage { transition: none; }
 }
 .pick:active .pick__cover { transform: translateY(1px); }
 /* Keyboard focus is a ring in the game's colour, set off the cover by a gap

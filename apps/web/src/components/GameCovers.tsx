@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
-import { GAME_LABELS, PLAYABLE_KINDS, type GameKind } from '@pic-game/shared';
+import { GAME_LABELS, GAME_STAGE, PLAYABLE_KINDS, STAGE_LABELS, type GameKind } from '@pic-game/shared';
 import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { CategoryLabel } from './CategoryLabel.js';
 import { GAME_ICONS } from './gameIcons.js';
@@ -116,6 +116,7 @@ export function GameCovers({
       {PLAYABLE_KINDS.map((k, i) => {
         const { icon: Icon, color } = GAME_ICONS[k];
         const why = note?.(k) ?? null;
+        const stage = STAGE_LABELS[GAME_STAGE[k]];
         return (
           <button
             key={k}
@@ -131,6 +132,7 @@ export function GameCovers({
             <span className="pick__cover">
               <span className="pick__ink" aria-hidden="true" />
               <Icon className="pick__art" strokeWidth={1.75} aria-hidden="true" />
+              {stage && <span className="pick__stage">{stage}</span>}
               <span className="pick__text">
                 <strong className="pick__name">{GAME_LABELS[k].name}</strong>
                 {why ? (
