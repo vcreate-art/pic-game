@@ -19,7 +19,7 @@ export function InviteCard() {
     <div className="lobby__invite card">
       <h2 className="card__title">Invite friends</h2>
       <div className="lobby__code">{code}</div>
-      <button type="button" className="btn btn--ghost" onClick={copy}>
+      <button type="button" className="btn btn--outline" onClick={copy}>
         {copyState === 'ok' ? 'Link copied' : copyState === 'failed' ? 'Copy it below' : 'Copy invite link'}
       </button>
       <p className="lobby__link">{link}</p>

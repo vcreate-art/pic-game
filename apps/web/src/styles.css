@@ -1,15 +1,27 @@
 :root {
-  --paper: #f6f4ef;
+  /* One set of cool neutrals everywhere, so colour belongs to the games. These
+     were the front page's; rooms used warmer ones and never matched it. */
+  --paper: #f1f2f4;
   --card: #ffffff;
-  --ink: #1f2233;
-  --ink-soft: #6b7089;
-  --line: #e4e0d6;
+  --ink: #1c1d26;
+  --ink-soft: #5e6275;
+  --line: #e0e2e8;
+  /* A card's own edge: firm enough that a flat card reads without a shadow,
+     the way the game covers do. */
+  --edge: #d3d6de;
   --accent: #5b4bdb;
   --accent-soft: #ede9ff;
   --ok: #16a34a;
+  --ok-soft: #dcfce7;
   --warn: #dc2626;
-  --radius: 16px;
+  --warn-soft: #fee2e2;
+  --warn-wash: #fef2f2;
+  --warn-edge: #fecaca;
+  /* The covers' corners, on every card and panel beside them. */
+  --radius: 12px;
+  --radius-control: 10px;
   --shadow: 0 1px 2px rgba(31, 34, 51, .06), 0 8px 24px rgba(31, 34, 51, .07);
+  --shadow-sheet: 0 20px 50px rgba(0, 0, 0, .25);
   --display: 'Baloo 2', system-ui, sans-serif;
   --ui: 'Inter', system-ui, -apple-system, sans-serif;
 }
@@ -31,6 +43,15 @@ body {
 button, input { font: inherit; color: inherit; }
 
 .app { display: flex; flex-direction: column; min-height: 100%; }
+/* In a room the game's colour takes the purple's place, so the room carries on
+   from the cover that opened it: its tint for what's selected or yours, its
+   full colour for what's primary. Every game colour holds white text at 4.5:1.
+   Word Spies keeps the purple: its teams are red and blue, and its own blue
+   would read as a team. */
+.app.is-room:not([data-game='spies']) {
+  --accent: var(--game);
+  --accent-soft: color-mix(in srgb, var(--game) 12%, var(--card));
+}
 
 /* ---------------------------------------------------------------- topbar */
 
@@ -83,8 +104,8 @@ button, input { font: inherit; color: inherit; }
 .profile__note { margin: 0; font-size: 12px; color: var(--ink-soft); }
 
 .conn { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
-.conn.is-on { color: var(--ok); background: #dcfce7; }
-.conn.is-off { color: var(--warn); background: #fee2e2; }
+.conn.is-on { color: var(--ok); background: var(--ok-soft); }
+.conn.is-off { color: var(--warn); background: var(--warn-soft); }
 
 .main { flex: 1; padding: 20px; display: flex; flex-direction: column; }
 
@@ -96,9 +117,10 @@ button, input { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- cards */
 
+/* Flat, like the covers: an edge, no lift. */
 .card {
-  background: var(--card); border: 1px solid var(--line);
-  border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px;
+  background: var(--card); border: 1px solid var(--edge);
+  border-radius: var(--radius); padding: 18px;
 }
 .card__title {
   margin: 0 0 12px; font-family: var(--display); font-size: 15px;
@@ -140,9 +162,16 @@ button, input { font: inherit; color: inherit; }
 }
 .btn--primary { --btn-ink: rgba(0, 0, 0, .22); background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn--ghost { background: transparent; }
+/* Coloured edge and label at rest; on hover the colour inks in and it
+   becomes a filled button. In a room that's the game's colour. */
+.btn--outline {
+  --btn-ink: var(--accent);
+  border-color: var(--accent); color: var(--accent);
+}
+.btn--outline:hover:not(:disabled) { color: #fff; }
 /* Leaving a room is destructive and hard to undo mid-game, so it reads as such
    rather than sitting quietly among the neutral buttons. */
-.btn--danger { --btn-ink: var(--warn); border-color: #fecaca; background: #fef2f2; color: var(--warn); }
+.btn--danger { --btn-ink: var(--warn); border-color: var(--warn-edge); background: var(--warn-wash); color: var(--warn); }
 .btn--danger:hover:not(:disabled) { border-color: var(--warn); color: #fff; }
 .btn--lg { padding: 13px 22px; font-size: 16px; width: 100%; }
 
@@ -162,15 +191,8 @@ button, input { font: inherit; color: inherit; }
 .landing__start { grid-area: start; }
 .landing__section { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 
-/* The front page. Colour belongs to the games, so the page around them is a
-   cool neutral and the join button is plain ink, purple only as it inks; the
-   app purple stays in the rooms. Overriding the tokens here reaches the
-   Create sheet too. */
-.landing--home {
-  --paper: #f1f2f4; --line: #e0e2e8; --ink: #1c1d26; --ink-soft: #5e6275;
-  max-width: 1000px; padding-top: 36px;
-}
-body:has(.landing--home) { background: #f1f2f4; }
+/* The front page. The join button is plain ink, purple only as it inks. */
+.landing--home { max-width: 1000px; padding-top: 36px; }
 /* Games take the room; joining is a narrow panel that stays put while the
    grid scrolls. */
 .landing--home .landing__cols {
@@ -180,9 +202,6 @@ body:has(.landing--home) { background: #f1f2f4; }
 .landing__intro { grid-area: intro; }
 .landing--home .landing__join { position: sticky; top: 20px; }
 .landing--home .landing__section { margin-top: 0; }
-/* Same corners as the covers and an edge firm enough to read, so its top
-   lines up with theirs by eye and not just by measurement. */
-.landing--home .landing__join .landing__card { box-shadow: none; border-radius: 12px; border-color: #d3d6de; }
 .landing__intro .landing__title { margin: 0; font-size: 40px; line-height: 1.05; }
 .landing__intro .landing__sub { margin-top: 6px; font-size: 15px; }
 /* One class deeper than `.landing__card .btn--primary`, which comes later. */
@@ -268,7 +287,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 
 .lobby__code {
   font-family: var(--display); font-size: 42px; font-weight: 800;
-  letter-spacing: .16em; color: var(--accent); margin-bottom: 12px;
+  letter-spacing: .16em; color: var(--game, var(--accent)); margin-bottom: 12px;
 }
 .lobby__link { font-size: 12px; color: var(--ink-soft); word-break: break-all; margin: 10px 0 0; }
 
@@ -298,8 +317,8 @@ body:has(.landing--home) { background: #f1f2f4; }
   grid-template-columns: 1fr auto 1fr;
   grid-template-areas: 'round word actions';
   align-items: center; gap: 12px; padding: 10px 18px;
-  background: var(--card); border: 1px solid var(--line);
-  border-radius: var(--radius); box-shadow: var(--shadow);
+  background: var(--card); border: 1px solid var(--edge);
+  border-radius: var(--radius);
 }
 .game__head-side { grid-area: round; display: flex; align-items: center; gap: 12px; min-width: 0; }
 .game__head-side--end { grid-area: actions; justify-content: flex-end; }
@@ -310,9 +329,9 @@ body:has(.landing--home) { background: #f1f2f4; }
 
 .board__wrap { position: relative; }
 .board {
-  position: relative; width: 100%; background: #fff;
-  border: 1px solid var(--line); border-radius: var(--radius);
-  overflow: hidden; box-shadow: var(--shadow);
+  position: relative; width: 100%; background: var(--card);
+  border: 1px solid var(--edge); border-radius: var(--radius);
+  overflow: hidden;
 }
 .board__canvas { display: block; width: 100%; height: 100%; cursor: not-allowed; }
 .board__canvas.is-drawable { cursor: crosshair; }
@@ -388,7 +407,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
   gap: 10px 12px;
   padding: 12px 14px; background: var(--card);
-  border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+  border: 1px solid var(--edge); border-radius: var(--radius);
 }
 .toolbar__palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
 .swatch {
@@ -414,7 +433,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 .tool:hover { border-color: var(--accent); }
 .tool.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .tool--danger:hover { border-color: var(--warn); color: var(--warn); }
-.tool--leave { border-color: #fecaca; background: #fef2f2; color: var(--warn); }
+.tool--leave { border-color: var(--warn-edge); background: var(--warn-wash); color: var(--warn); }
 .tool--leave:hover { background: var(--warn); border-color: var(--warn); color: #fff; }
 
 /* ---------------------------------------------------------------- scores */
@@ -428,7 +447,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 .scores__meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .scores__tags { display: flex; gap: 4px; flex-wrap: wrap; }
 .scores__tags:empty { display: none; }
-.scores__row.is-guessed { background: #dcfce7; }
+.scores__row.is-guessed { background: var(--ok-soft); }
 .scores__row.is-away { opacity: .5; }
 .scores__rank { font-family: var(--display); font-weight: 700; color: var(--ink-soft); font-size: 13px; }
 .scores__name {
@@ -456,7 +475,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 .msg { font-size: 13px; padding: 4px 8px; border-radius: 8px; word-break: break-word; }
 .msg__name { margin-right: 5px; }
 .msg--system { color: var(--ink-soft); font-style: italic; }
-.msg--correct { background: #dcfce7; color: #15803d; font-weight: 600; }
+.msg--correct { background: var(--ok-soft); color: #15803d; font-weight: 600; }
 .msg--close { background: #fef3c7; color: #b45309; font-weight: 600; }
 .msg--secret { background: var(--accent-soft); color: var(--accent); }
 .msg--divider {
@@ -482,7 +501,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   font-variant-numeric: tabular-nums;
 }
 /* Length alone never confirms a guess, so this reads as a nudge, not a verdict. */
-.chat__count.is-match { color: var(--ok); background: #dcfce7; border-color: #bbf7d0; }
+.chat__count.is-match { color: var(--ok); background: var(--ok-soft); border-color: #bbf7d0; }
 
 /* ---------------------------------------------------------------- overlays */
 
@@ -495,7 +514,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   background: var(--card); border-radius: var(--radius); padding: 26px;
   text-align: center; max-width: 420px; width: 100%;
   display: flex; flex-direction: column; gap: 14px; align-items: center;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, .25);
+  box-shadow: var(--shadow-sheet);
 }
 .overlay__card--wide { max-width: 520px; }
 .overlay__kicker {
@@ -618,7 +637,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   font-size: 13px; font-weight: 700; line-height: 1; cursor: pointer;
   transition: color .15s ease, border-color .15s ease, background .15s ease;
 }
-.kick:hover { border-color: var(--warn); color: var(--warn); background: #fef2f2; }
+.kick:hover { border-color: var(--warn); color: var(--warn); background: var(--warn-wash); }
 .kick.is-armed {
   background: var(--warn); border-color: var(--warn); color: #fff;
   font-size: 11px; letter-spacing: .02em;
@@ -751,7 +770,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 }
 .sheet__card {
   width: 100%; max-width: 440px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, .25); padding: 20px;
+  box-shadow: var(--shadow-sheet); padding: 20px;
   animation: sheet-pop .22s cubic-bezier(.2, .9, .3, 1.2);
 }
 .sheet__head { display: flex; align-items: center; gap: 12px; }
@@ -2243,7 +2262,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   transition: border-color .2s ease, background .2s ease;
 }
 .f7seat.is-me { background: var(--accent-soft); }
-.f7seat.is-turn { border-color: var(--accent); box-shadow: 0 0 0 3px oklch(0.6 0.2 285 / .18); }
+.f7seat.is-turn { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 .f7seat.is-bust { background: oklch(0.96 0.03 25); }
 .f7seat.is-bust .f7seat__cards { opacity: .55; filter: grayscale(.5); }
 .f7seat.is-flip7 { background: oklch(0.95 0.08 90); border-color: var(--f7-gold); }
@@ -2472,7 +2491,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   position: absolute; left: 0; top: calc(100% + 8px); z-index: 60; width: 340px;
   max-height: calc(100vh - 90px); overflow-y: auto;
   display: flex; flex-direction: column; gap: 16px; padding: 16px;
-  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  background: var(--card); border: 1px solid var(--edge); border-radius: var(--radius);
   box-shadow: 0 18px 40px -18px rgba(31, 34, 51, .35);
 }
 
@@ -2588,14 +2607,14 @@ body:has(.landing--home) { background: #f1f2f4; }
 .paused__line { margin: 10px 0 0; font-size: 15px; color: var(--ink-soft); }
 .paused__time { font-variant-numeric: tabular-nums; }
 .paused__resume {
-  margin-top: 26px; min-width: 220px; padding: 15px 36px; border: 0; border-radius: 14px; cursor: pointer;
+  margin-top: 26px; min-width: 220px; padding: 15px 36px; border: 0; border-radius: var(--radius); cursor: pointer;
   background: var(--game); color: #fff; font-size: 18px; font-weight: 700;
   box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--game) 80%, transparent);
 }
 .paused__resume { --btn-ink: rgba(0, 0, 0, .22); position: relative; overflow: hidden; isolation: isolate; }
 .paused__resume:focus-visible { outline: 3px solid var(--game); outline-offset: 3px; }
 .paused__wait {
-  margin: 26px 0 0; padding: 12px 22px; border-radius: 14px; font-size: 16px; font-weight: 600;
+  margin: 26px 0 0; padding: 12px 22px; border-radius: var(--radius); font-size: 16px; font-weight: 600;
   color: var(--game); background: color-mix(in srgb, var(--game) 10%, transparent);
 }
 /* Background reading while everyone waits: no card, a rule and small type. */
