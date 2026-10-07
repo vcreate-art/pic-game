@@ -8,10 +8,30 @@ import { GAME_ICONS } from './gameIcons.js';
  *  point it came in and drains toward the point it left. Sliding from one
  *  cover to the next, it reads as one stroke passing between them. */
 function inkFrom(e: React.PointerEvent<HTMLButtonElement>) {
-  const cover = e.currentTarget.firstElementChild as HTMLElement;
-  const box = e.currentTarget.getBoundingClientRect();
-  cover.style.setProperty('--ex', `${((e.clientX - box.left) / cover.offsetWidth) * 100}%`);
-  cover.style.setProperty('--ey', `${((e.clientY - box.top) / cover.offsetHeight) * 100}%`);
+  const pick = e.currentTarget;
+  const cover = pick.firstElementChild as HTMLElement;
+  const box = pick.getBoundingClientRect();
+  const place = () => {
+    cover.style.setProperty('--ex', `${((e.clientX - box.left) / cover.offsetWidth) * 100}%`);
+    cover.style.setProperty('--ey', `${((e.clientY - box.top) / cover.offsetHeight) * 100}%`);
+  };
+  if (e.type === 'pointerleave') {
+    // Shrinking while it moves is what drains it toward where it left.
+    place();
+    pick.classList.remove('is-inked');
+    return;
+  }
+  // Only a mouse inks: on touch the blurb sits under the cover instead.
+  if (e.pointerType !== 'mouse') return;
+  // The circle's centre and size animate together, so moving the centre as
+  // it grows would slide the ink in from wherever it last left. Move it while
+  // it's still empty, with no transition, then let it grow from there.
+  const ink = cover.firstElementChild as HTMLElement;
+  ink.style.transition = 'none';
+  place();
+  void getComputedStyle(ink).clipPath;
+  ink.style.transition = '';
+  pick.classList.add('is-inked');
 }
 
 /** How many columns the grid is laying covers out in right now. */

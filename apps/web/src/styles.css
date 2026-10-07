@@ -143,13 +143,16 @@ button, input { font: inherit; color: inherit; }
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background: var(--btn-ink);
   clip-path: circle(0% at var(--ex, 50%) var(--ey, 50%));
-  transition: clip-path .35s cubic-bezier(.3, .7, .3, 1);
+  /* Eases in rather than leaping: the shade gathers, then settles. */
+  transition: clip-path .5s cubic-bezier(.55, 0, .25, 1);
 }
-@media (hover: hover) {
-  .btn:hover:not(:disabled)::before, .room__ctl:hover::before, .paused__resume:hover::before {
-    clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%));
-  }
+/* buttonInk.ts sets is-inked once the circle sits, still empty, where the
+   pointer came in, so it grows from that point instead of sliding there.
+   Only a mouse sets it, so a tapped button never sticks inked. */
+.btn.is-inked:not(:disabled)::before, .room__ctl.is-inked::before, .paused__resume.is-inked::before {
+  clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%));
 }
+.ink-place::before { transition: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .btn::before, .room__ctl::before, .paused__resume::before { transition: none; }
 }
@@ -721,6 +724,9 @@ button, input { font: inherit; color: inherit; }
 .pick__blurb { padding: 0 2px; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
 /* 150% of the circle's reference length reaches the far corner from any
    point on the edge. */
+/* is-inked comes from inkFrom() once the circle sits, still empty, where the
+   pointer came in, so it grows from there instead of sliding in. */
+.pick.is-inked .pick__ink,
 .pick:focus-visible .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
 .pick:focus-visible .pick__cover { color: #fff; }
 .pick:focus-visible .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
@@ -730,7 +736,6 @@ button, input { font: inherit; color: inherit; }
 /* Only with a real pointer: on touch, :hover sticks to the last tapped card.
    There the blurb stays under the cover. */
 @media (hover: hover) {
-  .pick:hover .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
   .pick:hover .pick__cover { color: #fff; }
   .pick:hover .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
   .pick:hover .pick__name { font-size: 17px; margin-bottom: 5px; }
