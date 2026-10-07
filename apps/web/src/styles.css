@@ -142,15 +142,24 @@ button, input { font: inherit; color: inherit; }
 .profile__phone svg { width: 18px; height: 18px; }
 
 /* Moving the seat to a phone: the code, how long it lasts, and a way back. */
+.handoff__head { display: flex; align-items: center; gap: 8px; margin: -4px 0 0 -6px; }
+.handoff__back {
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 0; border-radius: 999px; background: none; color: var(--ink-soft); cursor: pointer;
+}
+.handoff__back:hover { background: var(--paper); color: var(--ink); }
+.handoff__back:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.handoff__back svg { width: 20px; height: 20px; }
 .handoff__title { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 800; }
 .handoff__qr {
   display: grid; place-items: center; aspect-ratio: 1; width: 100%;
   border: 1px solid var(--line); border-radius: 12px; background: #fff; overflow: hidden;
 }
 .handoff__qr svg { display: block; width: 100%; height: 100%; }
-.handoff__qr.is-expired svg { opacity: .15; }
 .handoff__wait { font-size: 13px; color: var(--ink-soft); }
-.handoff__note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
+.handoff__note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-soft); text-align: center; }
+.handoff__expiry { white-space: nowrap; }
+.handoff__clock { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
 
 .conn { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
 .conn.is-on { color: var(--ok); background: var(--ok-soft); }
