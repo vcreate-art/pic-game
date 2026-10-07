@@ -20,6 +20,7 @@ import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { logGameEntry } from '../lib/posthogLogs.js';
 import { clearSeat, getSocket, loadProfile, loadSeat, saveSeat } from '../net/socket.js';
 import { useGame } from '../store/game.js';
+import { Dots } from '../components/Dots.js';
 import { Route as rootRoute } from './__root.js';
 
 function RoomPage() {
@@ -52,6 +53,8 @@ function RoomPage() {
         } else {
           clearSeat();
           useGame.getState().reset();
+          // Says why, and brings back the form to join afresh.
+          setError(res.message);
         }
       });
     };
@@ -145,6 +148,22 @@ function RoomPage() {
           >
             Back to home
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // With a name already picked, the page joins by itself on arrival (a
+  // reload, a link, the front page): say so while it does, rather than
+  // flashing the nickname form meant for someone who has no name yet.
+  if ((!me || !room) && identity.current && !error) {
+    return (
+      <div className="landing landing--narrow">
+        <div className="landing__hero">
+          <p className="landing__sub" role="status">
+            Joining room {code}
+            <Dots />
+          </p>
         </div>
       </div>
     );
