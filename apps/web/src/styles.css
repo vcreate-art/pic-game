@@ -1,15 +1,27 @@
 :root {
-  --paper: #f6f4ef;
+  /* One set of cool neutrals everywhere, so colour belongs to the games. These
+     were the front page's; rooms used warmer ones and never matched it. */
+  --paper: #f1f2f4;
   --card: #ffffff;
-  --ink: #1f2233;
-  --ink-soft: #6b7089;
-  --line: #e4e0d6;
+  --ink: #1c1d26;
+  --ink-soft: #5e6275;
+  --line: #e0e2e8;
+  /* A card's own edge: firm enough that a flat card reads without a shadow,
+     the way the game covers do. */
+  --edge: #d3d6de;
   --accent: #5b4bdb;
   --accent-soft: #ede9ff;
   --ok: #16a34a;
+  --ok-soft: #dcfce7;
   --warn: #dc2626;
-  --radius: 16px;
+  --warn-soft: #fee2e2;
+  --warn-wash: #fef2f2;
+  --warn-edge: #fecaca;
+  /* The covers' corners, on every card and panel beside them. */
+  --radius: 12px;
+  --radius-control: 10px;
   --shadow: 0 1px 2px rgba(31, 34, 51, .06), 0 8px 24px rgba(31, 34, 51, .07);
+  --shadow-sheet: 0 20px 50px rgba(0, 0, 0, .25);
   --display: 'Baloo 2', system-ui, sans-serif;
   --ui: 'Inter', system-ui, -apple-system, sans-serif;
 }
@@ -31,6 +43,15 @@ body {
 button, input { font: inherit; color: inherit; }
 
 .app { display: flex; flex-direction: column; min-height: 100%; }
+/* In a room the game's colour takes the purple's place, so the room carries on
+   from the cover that opened it: its tint for what's selected or yours, its
+   full colour for what's primary. Every game colour holds white text at 4.5:1.
+   Word Spies keeps the purple: its teams are red and blue, and its own blue
+   would read as a team. */
+.app.is-room:not([data-game='spies']) {
+  --accent: var(--game);
+  --accent-soft: color-mix(in srgb, var(--game) 12%, var(--card));
+}
 
 /* ---------------------------------------------------------------- topbar */
 
@@ -83,8 +104,8 @@ button, input { font: inherit; color: inherit; }
 .profile__note { margin: 0; font-size: 12px; color: var(--ink-soft); }
 
 .conn { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
-.conn.is-on { color: var(--ok); background: #dcfce7; }
-.conn.is-off { color: var(--warn); background: #fee2e2; }
+.conn.is-on { color: var(--ok); background: var(--ok-soft); }
+.conn.is-off { color: var(--warn); background: var(--warn-soft); }
 
 .main { flex: 1; padding: 20px; display: flex; flex-direction: column; }
 
@@ -96,9 +117,10 @@ button, input { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- cards */
 
+/* Flat, like the covers: an edge, no lift. */
 .card {
-  background: var(--card); border: 1px solid var(--line);
-  border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px;
+  background: var(--card); border: 1px solid var(--edge);
+  border-radius: var(--radius); padding: 18px;
 }
 .card__title {
   margin: 0 0 12px; font-family: var(--display); font-size: 15px;
@@ -121,13 +143,16 @@ button, input { font: inherit; color: inherit; }
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background: var(--btn-ink);
   clip-path: circle(0% at var(--ex, 50%) var(--ey, 50%));
-  transition: clip-path .35s cubic-bezier(.3, .7, .3, 1);
+  /* Eases in rather than leaping: the shade gathers, then settles. */
+  transition: clip-path .5s cubic-bezier(.55, 0, .25, 1);
 }
-@media (hover: hover) {
-  .btn:hover:not(:disabled)::before, .room__ctl:hover::before, .paused__resume:hover::before {
-    clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%));
-  }
+/* buttonInk.ts sets is-inked once the circle sits, still empty, where the
+   pointer came in, so it grows from that point instead of sliding there.
+   Only a mouse sets it, so a tapped button never sticks inked. */
+.btn.is-inked:not(:disabled)::before, .room__ctl.is-inked::before, .paused__resume.is-inked::before {
+  clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%));
 }
+.ink-place::before { transition: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .btn::before, .room__ctl::before, .paused__resume::before { transition: none; }
 }
@@ -140,9 +165,16 @@ button, input { font: inherit; color: inherit; }
 }
 .btn--primary { --btn-ink: rgba(0, 0, 0, .22); background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn--ghost { background: transparent; }
+/* Coloured edge and label at rest; on hover the colour inks in and it
+   becomes a filled button. In a room that's the game's colour. */
+.btn--outline {
+  --btn-ink: var(--accent);
+  border-color: var(--accent); color: var(--accent);
+}
+.btn--outline:hover:not(:disabled) { color: #fff; }
 /* Leaving a room is destructive and hard to undo mid-game, so it reads as such
    rather than sitting quietly among the neutral buttons. */
-.btn--danger { --btn-ink: var(--warn); border-color: #fecaca; background: #fef2f2; color: var(--warn); }
+.btn--danger { --btn-ink: var(--warn); border-color: var(--warn-edge); background: var(--warn-wash); color: var(--warn); }
 .btn--danger:hover:not(:disabled) { border-color: var(--warn); color: #fff; }
 .btn--lg { padding: 13px 22px; font-size: 16px; width: 100%; }
 
@@ -162,15 +194,8 @@ button, input { font: inherit; color: inherit; }
 .landing__start { grid-area: start; }
 .landing__section { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 
-/* The front page. Colour belongs to the games, so the page around them is a
-   cool neutral and the join button is plain ink, purple only as it inks; the
-   app purple stays in the rooms. Overriding the tokens here reaches the
-   Create sheet too. */
-.landing--home {
-  --paper: #f1f2f4; --line: #e0e2e8; --ink: #1c1d26; --ink-soft: #5e6275;
-  max-width: 1000px; padding-top: 36px;
-}
-body:has(.landing--home) { background: #f1f2f4; }
+/* The front page. The join button is plain ink, purple only as it inks. */
+.landing--home { max-width: 1000px; padding-top: 36px; }
 /* Games take the room; joining is a narrow panel that stays put while the
    grid scrolls. */
 .landing--home .landing__cols {
@@ -178,11 +203,69 @@ body:has(.landing--home) { background: #f1f2f4; }
   grid-template-areas: 'intro .' 'start join'; gap: 24px 48px;
 }
 .landing__intro { grid-area: intro; }
+/* A quiet credit under everything, never competing with the games. */
+.landing__credit { display: flex; justify-content: center; padding-top: 28px; }
+.landing__credit a {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px;
+  color: var(--ink-soft); font-size: 12.5px; font-weight: 500; text-decoration: none;
+  transition: background .15s ease;
+}
+.landing__credit a:hover { background: var(--card); }
+.landing__credit a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.landing__credit img { display: block; height: 28px; width: auto; }
 .landing--home .landing__join { position: sticky; top: 20px; }
+/* The card's top lines up with the covers', whose grid starts .25em down.
+   When the cat is there, room above the card for it, taken back with a
+   negative margin so the card stays in line; sticky, that room keeps the cat
+   from being cut off at the top of the window. */
+.landing--home .landing__section.landing__join { padding-top: .25em; }
+.landing--home .landing__section.landing__join.has-cat { padding-top: calc(44px + .25em); margin-top: -44px; }
+.landing__join .landing__card { position: relative; }
+
+/* ---------------------------------------------------------------- cat */
+
+/* y = 56 of its 120×80 grid is the card's top edge (see SleepingCat.tsx). */
+.cat {
+  position: absolute; top: -56px; right: 26px; width: 120px; height: 80px;
+  overflow: visible; pointer-events: none;
+}
+.cat__fur { fill: var(--ink); }
+.cat__inner { fill: #f2b8c6; }
+.cat__eye { fill: none; stroke: #9a9eb0; stroke-width: 1.4; stroke-linecap: round; }
+.cat__tail {
+  fill: none; stroke: var(--ink); stroke-width: 5.5; stroke-linecap: round;
+  transform-origin: 103px 52px; animation: cat-sway 6s ease-in-out infinite;
+}
+/* Slow breaths that lift the back more than the head. */
+.cat__breath { transform-origin: 70px 56px; animation: cat-breathe 4s ease-in-out infinite; }
+.cat__z {
+  fill: var(--ink-soft); font-family: var(--display); font-weight: 800; font-size: 14px;
+  opacity: 0; animation: cat-z 4.5s ease-out infinite;
+}
+.cat__z:nth-of-type(2) { font-size: 17px; animation-delay: 1.5s; }
+.cat__z:nth-of-type(3) { font-size: 12px; animation-delay: 3s; }
+/* Only the cat itself answers the pointer; an ear flicks, then settles. */
+.cat__breath { pointer-events: auto; }
+.cat__ear--left { transform-box: fill-box; transform-origin: 70% 100%; }
+.cat__breath:hover .cat__ear--left { animation: cat-twitch .5s ease-in-out; }
+
+@keyframes cat-breathe { 50% { transform: scale(1.02, 1.05); } }
+@keyframes cat-sway { 50% { transform: rotate(7deg); } }
+@keyframes cat-z {
+  0% { opacity: 0; transform: translate(0, 0); }
+  20% { opacity: .9; }
+  100% { opacity: 0; transform: translate(-10px, -26px); }
+}
+@keyframes cat-twitch {
+  25% { transform: rotate(-14deg); }
+  50% { transform: rotate(6deg); }
+  75% { transform: rotate(-6deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat__tail, .cat__breath, .cat__z, .cat__breath:hover .cat__ear--left { animation: none; }
+  .cat__z:first-of-type { opacity: .7; }
+}
 .landing--home .landing__section { margin-top: 0; }
-/* Same corners as the covers and an edge firm enough to read, so its top
-   lines up with theirs by eye and not just by measurement. */
-.landing--home .landing__join .landing__card { box-shadow: none; border-radius: 12px; border-color: #d3d6de; }
 .landing__intro .landing__title { margin: 0; font-size: 40px; line-height: 1.05; }
 .landing__intro .landing__sub { margin-top: 6px; font-size: 15px; }
 /* One class deeper than `.landing__card .btn--primary`, which comes later. */
@@ -268,7 +351,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 
 .lobby__code {
   font-family: var(--display); font-size: 42px; font-weight: 800;
-  letter-spacing: .16em; color: var(--accent); margin-bottom: 12px;
+  letter-spacing: .16em; color: var(--game, var(--accent)); margin-bottom: 12px;
 }
 .lobby__link { font-size: 12px; color: var(--ink-soft); word-break: break-all; margin: 10px 0 0; }
 
@@ -298,8 +381,8 @@ body:has(.landing--home) { background: #f1f2f4; }
   grid-template-columns: 1fr auto 1fr;
   grid-template-areas: 'round word actions';
   align-items: center; gap: 12px; padding: 10px 18px;
-  background: var(--card); border: 1px solid var(--line);
-  border-radius: var(--radius); box-shadow: var(--shadow);
+  background: var(--card); border: 1px solid var(--edge);
+  border-radius: var(--radius);
 }
 .game__head-side { grid-area: round; display: flex; align-items: center; gap: 12px; min-width: 0; }
 .game__head-side--end { grid-area: actions; justify-content: flex-end; }
@@ -310,9 +393,9 @@ body:has(.landing--home) { background: #f1f2f4; }
 
 .board__wrap { position: relative; }
 .board {
-  position: relative; width: 100%; background: #fff;
-  border: 1px solid var(--line); border-radius: var(--radius);
-  overflow: hidden; box-shadow: var(--shadow);
+  position: relative; width: 100%; background: var(--card);
+  border: 1px solid var(--edge); border-radius: var(--radius);
+  overflow: hidden;
 }
 .board__canvas { display: block; width: 100%; height: 100%; cursor: not-allowed; }
 .board__canvas.is-drawable { cursor: crosshair; }
@@ -388,7 +471,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
   gap: 10px 12px;
   padding: 12px 14px; background: var(--card);
-  border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+  border: 1px solid var(--edge); border-radius: var(--radius);
 }
 .toolbar__palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
 .swatch {
@@ -414,7 +497,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 .tool:hover { border-color: var(--accent); }
 .tool.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .tool--danger:hover { border-color: var(--warn); color: var(--warn); }
-.tool--leave { border-color: #fecaca; background: #fef2f2; color: var(--warn); }
+.tool--leave { border-color: var(--warn-edge); background: var(--warn-wash); color: var(--warn); }
 .tool--leave:hover { background: var(--warn); border-color: var(--warn); color: #fff; }
 
 /* ---------------------------------------------------------------- scores */
@@ -428,7 +511,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 .scores__meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .scores__tags { display: flex; gap: 4px; flex-wrap: wrap; }
 .scores__tags:empty { display: none; }
-.scores__row.is-guessed { background: #dcfce7; }
+.scores__row.is-guessed { background: var(--ok-soft); }
 .scores__row.is-away { opacity: .5; }
 .scores__rank { font-family: var(--display); font-weight: 700; color: var(--ink-soft); font-size: 13px; }
 .scores__name {
@@ -456,7 +539,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 .msg { font-size: 13px; padding: 4px 8px; border-radius: 8px; word-break: break-word; }
 .msg__name { margin-right: 5px; }
 .msg--system { color: var(--ink-soft); font-style: italic; }
-.msg--correct { background: #dcfce7; color: #15803d; font-weight: 600; }
+.msg--correct { background: var(--ok-soft); color: #15803d; font-weight: 600; }
 .msg--close { background: #fef3c7; color: #b45309; font-weight: 600; }
 .msg--secret { background: var(--accent-soft); color: var(--accent); }
 .msg--divider {
@@ -482,7 +565,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   font-variant-numeric: tabular-nums;
 }
 /* Length alone never confirms a guess, so this reads as a nudge, not a verdict. */
-.chat__count.is-match { color: var(--ok); background: #dcfce7; border-color: #bbf7d0; }
+.chat__count.is-match { color: var(--ok); background: var(--ok-soft); border-color: #bbf7d0; }
 
 /* ---------------------------------------------------------------- overlays */
 
@@ -495,7 +578,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   background: var(--card); border-radius: var(--radius); padding: 26px;
   text-align: center; max-width: 420px; width: 100%;
   display: flex; flex-direction: column; gap: 14px; align-items: center;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, .25);
+  box-shadow: var(--shadow-sheet);
 }
 .overlay__card--wide { max-width: 520px; }
 .overlay__kicker {
@@ -618,7 +701,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   font-size: 13px; font-weight: 700; line-height: 1; cursor: pointer;
   transition: color .15s ease, border-color .15s ease, background .15s ease;
 }
-.kick:hover { border-color: var(--warn); color: var(--warn); background: #fef2f2; }
+.kick:hover { border-color: var(--warn); color: var(--warn); background: var(--warn-wash); }
 .kick.is-armed {
   background: var(--warn); border-color: var(--warn); color: #fff;
   font-size: 11px; letter-spacing: .02em;
@@ -656,15 +739,30 @@ body:has(.landing--home) { background: #f1f2f4; }
      surface instead, as a soft tint. */
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--game, var(--ink)) 12%, var(--card)); color: var(--ink);
-  transition: color .2s ease;
+  /* In step with the ink, so a quick pass doesn't flicker the text. */
+  transition: color .5s cubic-bezier(.55, 0, .25, 1);
 }
 /* Under the icon and the text, over the paper. */
 .pick__ink {
   position: absolute; inset: 0;
   background: color-mix(in srgb, var(--game, var(--ink)) 72%, #000);
   clip-path: circle(0% at var(--ex, 50%) var(--ey, 50%));
-  transition: clip-path .35s cubic-bezier(.3, .7, .3, 1);
+  /* The buttons' curve: it gathers before it spreads, so the pointer
+     sweeping across a row barely tints the covers it only passes over. */
+  transition: clip-path .5s cubic-bezier(.55, 0, .25, 1);
 }
+/* How finished the game is, in the corner opposite the icon. White, so it
+   reads the same on the tint and on the ink. */
+.pick__stage {
+  position: absolute; top: 10px; left: 10px;
+  padding: 2px 8px; border-radius: 999px; background: var(--card);
+  font-size: 10.5px; font-weight: 700; line-height: 1.5; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--game, var(--ink));
+  transition: opacity .2s ease;
+}
+.switchgrid .pick__stage { top: 7px; left: 7px; padding: 1px 6px; font-size: 9.5px; }
+/* No blurb opens in the lobby's grid, so there it stays put. */
+.switchgrid .pick:hover .pick__stage, .switchgrid .pick:focus-visible .pick__stage { opacity: 1; }
 .pick__art {
   position: absolute; top: -4px; right: -18px; width: 72px; height: 72px;
   color: var(--game, var(--ink)); opacity: .6;
@@ -702,18 +800,24 @@ body:has(.landing--home) { background: #f1f2f4; }
 .pick__blurb { padding: 0 2px; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
 /* 150% of the circle's reference length reaches the far corner from any
    point on the edge. */
+/* is-inked comes from inkFrom() once the circle sits, still empty, where the
+   pointer came in, so it grows from there instead of sliding in. */
+.pick.is-inked .pick__ink,
 .pick:focus-visible .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
 .pick:focus-visible .pick__cover { color: #fff; }
 .pick:focus-visible .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
+/* The blurb slides up into the corner it sits in, so it steps aside with the
+   category. */
+.pick:focus-visible .pick__stage { opacity: 0; }
 .pick:focus-visible .pick__name { font-size: 17px; margin-bottom: 5px; }
 .pick:focus-visible .pick__more { grid-template-rows: 1fr; }
 .pick:focus-visible .pick__more > span { opacity: 1; transform: none; }
 /* Only with a real pointer: on touch, :hover sticks to the last tapped card.
    There the blurb stays under the cover. */
 @media (hover: hover) {
-  .pick:hover .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
   .pick:hover .pick__cover { color: #fff; }
   .pick:hover .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
+  .pick:hover .pick__stage { opacity: 0; }
   .pick:hover .pick__name { font-size: 17px; margin-bottom: 5px; }
   .pick:hover .pick__more { grid-template-rows: 1fr; }
   .pick:hover .pick__more > span { opacity: 1; transform: none; }
@@ -721,7 +825,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   .picker { row-gap: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pick__cover, .pick__ink, .pick__name, .pick__more, .pick__more > span { transition: none; }
+  .pick__cover, .pick__ink, .pick__name, .pick__more, .pick__more > span, .pick__stage { transition: none; }
 }
 .pick:active .pick__cover { transform: translateY(1px); }
 /* Keyboard focus is a ring in the game's colour, set off the cover by a gap
@@ -751,7 +855,7 @@ body:has(.landing--home) { background: #f1f2f4; }
 }
 .sheet__card {
   width: 100%; max-width: 440px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, .25); padding: 20px;
+  box-shadow: var(--shadow-sheet); padding: 20px;
   animation: sheet-pop .22s cubic-bezier(.2, .9, .3, 1.2);
 }
 .sheet__head { display: flex; align-items: center; gap: 12px; }
@@ -920,7 +1024,10 @@ body:has(.landing--home) { background: #f1f2f4; }
     grid-template-columns: minmax(0, 1fr); grid-template-areas: 'join' 'intro' 'start'; gap: 24px;
   }
   .landing__join { width: 100%; max-width: 460px; margin: 0 auto; }
-  .landing--home .landing__join { position: static; }
+  /* Stacked, the card has no covers beside it to line up with: just room
+     for the cat and its z's under the header. */
+  .landing--home .landing__section.landing__join { position: static; margin-top: 0; padding-top: 0; }
+  .landing--home .landing__section.landing__join.has-cat { margin-top: 0; padding-top: 36px; }
   .landing__intro .landing__title { font-size: 24px; }
 }
 @media (max-width: 560px) {
@@ -2243,7 +2350,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   transition: border-color .2s ease, background .2s ease;
 }
 .f7seat.is-me { background: var(--accent-soft); }
-.f7seat.is-turn { border-color: var(--accent); box-shadow: 0 0 0 3px oklch(0.6 0.2 285 / .18); }
+.f7seat.is-turn { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 .f7seat.is-bust { background: oklch(0.96 0.03 25); }
 .f7seat.is-bust .f7seat__cards { opacity: .55; filter: grayscale(.5); }
 .f7seat.is-flip7 { background: oklch(0.95 0.08 90); border-color: var(--f7-gold); }
@@ -2472,7 +2579,7 @@ body:has(.landing--home) { background: #f1f2f4; }
   position: absolute; left: 0; top: calc(100% + 8px); z-index: 60; width: 340px;
   max-height: calc(100vh - 90px); overflow-y: auto;
   display: flex; flex-direction: column; gap: 16px; padding: 16px;
-  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  background: var(--card); border: 1px solid var(--edge); border-radius: var(--radius);
   box-shadow: 0 18px 40px -18px rgba(31, 34, 51, .35);
 }
 
@@ -2588,14 +2695,14 @@ body:has(.landing--home) { background: #f1f2f4; }
 .paused__line { margin: 10px 0 0; font-size: 15px; color: var(--ink-soft); }
 .paused__time { font-variant-numeric: tabular-nums; }
 .paused__resume {
-  margin-top: 26px; min-width: 220px; padding: 15px 36px; border: 0; border-radius: 14px; cursor: pointer;
+  margin-top: 26px; min-width: 220px; padding: 15px 36px; border: 0; border-radius: var(--radius); cursor: pointer;
   background: var(--game); color: #fff; font-size: 18px; font-weight: 700;
   box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--game) 80%, transparent);
 }
 .paused__resume { --btn-ink: rgba(0, 0, 0, .22); position: relative; overflow: hidden; isolation: isolate; }
 .paused__resume:focus-visible { outline: 3px solid var(--game); outline-offset: 3px; }
 .paused__wait {
-  margin: 26px 0 0; padding: 12px 22px; border-radius: 14px; font-size: 16px; font-weight: 600;
+  margin: 26px 0 0; padding: 12px 22px; border-radius: var(--radius); font-size: 16px; font-weight: 600;
   color: var(--game); background: color-mix(in srgb, var(--game) 10%, transparent);
 }
 /* Background reading while everyone waits: no card, a rule and small type. */

@@ -10,6 +10,7 @@ import { Route as roomRoute } from './routes/room.$code.js';
 import './lib/posthog.js';
 import './lib/posthogGames.js';
 import './lib/achievements.js';
+import './lib/posthogCat.js';
 import './lib/buttonInk.js';
 import './styles.css';
 
