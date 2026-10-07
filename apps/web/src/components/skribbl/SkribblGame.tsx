@@ -20,7 +20,7 @@ export function SkribblGame() {
   const phase = room.phase;
 
   return (
-    <div className="game">
+    <div className="game game--skribbl">
       {/* Three tracks, with the word in the middle one, so it centres against
           the header itself rather than against whatever space is left over. */}
       <div className="game__head">

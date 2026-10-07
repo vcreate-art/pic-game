@@ -52,7 +52,7 @@ export function Chat() {
   };
 
   return (
-    <section className="chat card">
+    <section className={`chat card ${locked ? 'is-locked' : ''}`}>
       <h2 className="card__title">Chat</h2>
       <div className="chat__list" ref={listRef}>
         {messages.map((m) => m.kind === 'divider' ? (

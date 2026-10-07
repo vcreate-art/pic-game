@@ -560,6 +560,7 @@ button, input { font: inherit; color: inherit; }
 .tool:hover { border-color: var(--accent); }
 .tool.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .tool--danger:hover { border-color: var(--warn); color: var(--warn); }
+.tool__icon { display: none; width: 18px; height: 18px; }
 .tool--leave { border-color: var(--warn-edge); background: var(--warn-wash); color: var(--warn); }
 .tool--leave:hover { background: var(--warn); border-color: var(--warn); color: #fff; }
 
@@ -700,6 +701,85 @@ button, input { font: inherit; color: inherit; }
   .wordmask { justify-self: center; }
   .wordmask__slot { width: 15px; height: 22px; font-size: 16px; }
   .toolbar { gap: 8px 10px; }
+}
+
+/* ------------------------------------------------ draw & guess on a phone */
+
+/* Canvas first, and everything a turn needs within one screen: a slim
+   header, the board, then the guesses and guess box (or the drawer's tools)
+   right under it, and the players as a strip at the end. */
+@media (max-width: 640px) {
+  .game--skribbl { gap: 10px; }
+  .game--skribbl .game__head { padding: 8px 12px; gap: 4px 8px; }
+  .game--skribbl .game__round { font-size: 14px; }
+  .game--skribbl .wordmask { min-height: 0; }
+  .game--skribbl .wordmask__label { display: none; }
+  .game--skribbl .wordmask__word { font-size: 22px; }
+  .game--skribbl .timer { width: 38px; height: 38px; }
+  .game--skribbl .timer__num { font-size: 14px; }
+  .game--skribbl .reactions { margin-left: 0; gap: 4px; }
+
+  .game--skribbl .game__body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'stage' 'chat' 'scores';
+    gap: 10px;
+  }
+  .game--skribbl .game__stage { grid-area: stage; gap: 10px; }
+  .game--skribbl .chat { grid-area: chat; }
+  .game--skribbl .scores { grid-area: scores; }
+
+  /* The guesses: a few lines, newest at the bottom, the box right under. */
+  .game--skribbl .chat { height: auto; padding: 10px 12px; }
+  .game--skribbl .chat .card__title { display: none; }
+  .game--skribbl .chat__list { max-height: 92px; min-height: 46px; }
+  .game--skribbl .chat__form { margin-top: 8px; }
+  /* The drawer can't guess, so the box goes; the guesses stay to watch. */
+  .game--skribbl .chat.is-locked .chat__form { display: none; }
+  .game--skribbl .chat__input { font-size: 16px; }
+
+  /* The drawer's tools: colours swipe sideways in one row, and the nine
+     buttons under them (sizes, tools, undo, clear) are icons on one row. */
+  .game--skribbl .toolbar {
+    display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); justify-items: center;
+    gap: 8px 4px; padding: 10px 12px;
+  }
+  .game--skribbl .toolbar__group { display: contents; }
+  .game--skribbl .toolbar__palette {
+    grid-column: 1 / -1; justify-self: stretch;
+    display: flex; gap: 6px; overflow-x: auto; padding: 3px 2px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .game--skribbl .toolbar__palette::-webkit-scrollbar { display: none; }
+  .game--skribbl .swatch { flex: none; width: 30px; height: 30px; border-radius: 8px; }
+  .game--skribbl .brush, .game--skribbl .tool { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; }
+  .game--skribbl .tool__icon { display: block; }
+  .game--skribbl .tool__label {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+
+  /* Players as a strip: avatar, name and points, green once guessed. Removing
+     someone is done from the room panel here. */
+  .game--skribbl .scores { padding: 10px 12px; }
+  .game--skribbl .scores .card__title { display: none; }
+  .game--skribbl .scores__list {
+    flex-direction: row; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  }
+  .game--skribbl .scores__list::-webkit-scrollbar { display: none; }
+  .game--skribbl .scores__row,
+  .game--skribbl .scores__list.is-host .scores__row {
+    flex: none; width: 72px; grid-template-columns: 1fr; justify-items: center; gap: 2px; padding: 6px 4px;
+  }
+  .game--skribbl .scores__rank, .game--skribbl .scores__tags, .game--skribbl .scores .kick,
+  .game--skribbl .scores .kick-slot { display: none; }
+  .game--skribbl .scores__meta { align-items: center; width: 100%; }
+  .game--skribbl .scores__name { max-width: 100%; font-size: 12px; text-align: center; }
+  .game--skribbl .scores__name em { display: none; }
+  .game--skribbl .scores__pts { font-size: 14px; }
+  .game--skribbl .scores__row.is-drawing { background: #fef3c7; }
+
+  /* Picking a word and the round's results cover the screen, not just the
+     board, so they never spill out of it. */
+  .game--skribbl .board__wrap > .overlay { position: fixed; z-index: 80; border-radius: 0; }
 }
 
 /* Cards stay put at the top; the Leave button sits in the middle of whatever
