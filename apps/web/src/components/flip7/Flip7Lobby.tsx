@@ -1,11 +1,11 @@
 import { FLIP7_BONUS, FLIP7_MAX_PLAYERS, FLIP7_MIN_PLAYERS, FLIP7_TARGETS } from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectFlip7, selectIsHost, useGame } from '../../store/game.js';
-import { WinCount } from '../WinCount.js';
 import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { SettingsTitle } from '../SettingsTitle.js';
+import { WinsByGame } from '../WinsByGame.js';
 
 const LENGTHS: Record<number, string> = { 100: 'Quick', 150: 'Short', 200: 'The box', 300: 'Long' };
 
@@ -30,8 +30,8 @@ export function Flip7Lobby() {
               <li key={p.id} className="lobby__player">
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
+                <WinsByGame wins={room.meta.winsByGame[p.id]} />
                 {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
-                <WinCount n={room.meta.wins[p.id]} />
               </li>
             ))}
           </ul>

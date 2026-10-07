@@ -7,6 +7,7 @@ import {
 import {
   CHAT_BUCKET, DRAW_BUCKET, FIGHT_INPUT_BUCKET, MAX_NAME_LEN, MAZE_INPUT_BUCKET, RACE_POS_BUCKET, SUGGEST_BUCKET,
 } from '../config.js';
+import type { CorePlayer, Moved } from '../core/BaseRoom.js';
 import type { AnyRoom, RoomManager } from '../core/RoomManager.js';
 import type { FightRoom } from '../games/fight/FightRoom.js';
 import type { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
@@ -61,6 +62,16 @@ function cleanAvatar(raw: unknown): Avatar {
   };
 }
 
+/** The browser's lasting id, from the handshake. A random UUID the client
+ *  made; anything else is ignored, and that browser just isn't known again. */
+/** The most achievement data a handoff carries: far beyond what a player's
+ *  stats come to, a few kilobytes even after years of play. */
+const MAX_HANDOFF_STATS = 64 * 1024;
+
+function cleanPerson(raw: unknown): string | null {
+  return typeof raw === 'string' && /^[0-9a-f-]{36}$/i.test(raw) ? raw : null;
+}
+
 /** Colors and brush sizes are validated against the palette rather than accepted
  *  as free strings, which keeps arbitrary CSS out of every other player's canvas. */
 function cleanColor(raw: unknown): string {
@@ -75,7 +86,7 @@ function cleanSize(raw: unknown): number {
  *  and the host's controls. Every game move is held back. */
 const ALLOWED_WHILE_PAUSED = new Set<string>([
   'time:ping', 'room:create', 'room:join', 'room:leave', 'room:switch', 'room:pause', 'room:resume',
-  'game:restart', 'game:toLobby', 'chat:guess', 'player:rename', 'player:kick',
+  'game:restart', 'game:toLobby', 'chat:guess', 'player:rename', 'player:kick', 'seat:handoff', 'seat:pickup',
 ]);
 
 export function allowedWhilePaused(event: string): boolean {
@@ -84,11 +95,15 @@ export function allowedWhilePaused(event: string): boolean {
 
 export function attachSocket(io: IO, rooms: RoomManager): void {
   io.on('connection', (socket: Sock) => {
+    const person = cleanPerson((socket.handshake.auth as { person?: unknown } | undefined)?.person);
     const s: Session = {
       code: null,
       get room() {
         const room = this.code ? rooms.get(this.code) : undefined;
-        return room && this.playerId && room.players.has(this.playerId) ? room : null;
+        // Only while this socket is still the seat's: a tab whose seat was
+        // taken over by a newer one can't act for it any more.
+        const seat = room && this.playerId ? room.players.get(this.playerId) : undefined;
+        return seat?.socketId === socket.id ? room! : null;
       },
       playerId: null,
       chat: new TokenBucket(CHAT_BUCKET.capacity, CHAT_BUCKET.refillPerSec),
@@ -111,6 +126,13 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.code = room.code;
       s.playerId = playerId;
       socket.join(room.code);
+    };
+
+    /** Tells the socket a seat was taken from to step back. */
+    const stepBack = (room: AnyRoom, moved: Moved<CorePlayer>) => {
+      if (!moved.from) return;
+      io.sockets.sockets.get(moved.from)?.leave(room.code);
+      io.to(moved.from).emit('room:replaced', { to: moved.to });
     };
 
     /** The room this socket is in, if it is the drawing game. */
@@ -161,7 +183,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       const asked = p?.game;
       const kind = GAME_KINDS.includes(asked as GameKind) ? (asked as GameKind) : 'skribbl';
       const room = rooms.create(kind);
-      const player = room.addPlayer(name, cleanAvatar(p?.avatar), socket.id);
+      const player = room.addPlayer(name, cleanAvatar(p?.avatar), socket.id, person);
       bind(room, player.id);
       cb({ ok: true, playerId: player.id, token: player.token, state: room.publicState() });
       room.systemMessage(`${name} created the room.`);
@@ -200,8 +222,16 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
 
       // A returning player reclaims their seat and score before any capacity check,
       // so a full room can never lock out someone who is already in it.
-      if (p.token) {
-        const reclaimed = room.reclaim(p.token, socket.id);
+      // Without the tab's token, after closing it, the browser's person finds
+      // the seat they left away. A newer tab of theirs takes the seat over
+      // from an open one, which is told and steps back.
+      if (p.token || person) {
+        let reclaimed = (p.token ? room.reclaim(p.token, socket.id) : null) ?? (person ? room.reclaimPerson(person, socket.id) : null);
+        if (!reclaimed && person) {
+          const took = room.takeOver(person, socket.id);
+          if (took) stepBack(room, took);
+          reclaimed = took?.seat ?? null;
+        }
         if (reclaimed) {
           bind(room, reclaimed.id);
           cb({ ok: true, playerId: reclaimed.id, token: reclaimed.token, state: room.publicState() });
@@ -215,7 +245,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
         return cb({ ok: false, code: 'FULL', message: 'That room is full.' });
       }
 
-      const player = room.addPlayer(name, cleanAvatar(p?.avatar), socket.id);
+      const player = room.addPlayer(name, cleanAvatar(p?.avatar), socket.id, person);
       bind(room, player.id);
       cb({ ok: true, playerId: player.id, token: player.token, state: room.publicState() });
       socket.to(room.code).emit('player:joined', room.publicPlayers().find((x) => x.id === player.id)!);
@@ -797,6 +827,37 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       const kind = p?.kind;
       if (!GAME_KINDS.includes(kind as GameKind)) return reply({ ok: false, message: 'Pick a game.' });
       reply(rooms.switchKind(s.room.code, kind as GameKind, s.playerId));
+    });
+
+    // Scanned from another device: that seat moves here, name and all.
+    socket.on('seat:pickup', (p, cb) => {
+      if (typeof cb !== 'function') return;
+      const token = typeof p?.token === 'string' ? p.token : '';
+      const room = token ? rooms.byHandoff(token) : undefined;
+      const moved = room?.useHandoff(token, person, socket.id);
+      if (!room || !moved) {
+        return cb({ ok: false, code: 'HANDOFF', message: 'This code has run out. Make a new one on your other device.' });
+      }
+      // Seated as someone else already, here or elsewhere: that seat goes.
+      if (s.room && s.playerId && s.playerId !== moved.seat.id) {
+        const prev = s.room;
+        socket.leave(prev.code);
+        prev.removePlayer(s.playerId);
+      }
+      stepBack(room, moved);
+      bind(room, moved.seat.id);
+      cb({ ok: true, playerId: moved.seat.id, token: moved.seat.token, state: room.publicState(), stats: moved.stats });
+      io.to(room.code).emit('player:updated', room.publicPlayers().find((x) => x.id === moved.seat.id)!);
+      if (room.kind === 'skribbl') room.resendSecretIfDrawer(moved.seat.id);
+    });
+
+    socket.on('seat:handoff', (p, cb) => {
+      if (typeof cb !== 'function') return;
+      const room = s.room;
+      // Only carried, never read; capped so a code can't hold the server's memory.
+      const stats = typeof p?.stats === 'string' && p.stats.length <= MAX_HANDOFF_STATS ? p.stats : null;
+      const h = room && s.playerId ? room.issueHandoff(s.playerId, stats) : null;
+      cb(h ? { ok: true, ...h } : { ok: false });
     });
 
     socket.on('room:leave', () => {

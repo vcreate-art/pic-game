@@ -34,19 +34,21 @@ export function RoomPanel() {
 
   if (!room || !me) return null;
   const { kind, players, hostId, meta } = room;
-  const { can, paused, wins, games } = meta;
+  const { can, paused, wins, played, games } = meta;
   const { icon: Icon, color } = GAME_ICONS[kind];
   const name = GAME_LABELS[kind].name;
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'The host';
   const playing = meta.stage === 'playing';
   // The lobby lists everyone already, so here it's only the standings: who
-  // has won what. Mid-game, when the screen is the game, it's everyone.
+  // has played tonight, and how it went. Mid-game, when the screen is the
+  // game, it's everyone.
   const inLobby = meta.stage === 'lobby';
 
-  // Most wins first; otherwise the order people arrived in.
+  // Most wins first, then the same wins from fewer games; otherwise the
+  // order people arrived in.
   const ranked = [...players]
-    .sort((a, b) => (wins[b.id] ?? 0) - (wins[a.id] ?? 0))
-    .filter((p) => !inLobby || (wins[p.id] ?? 0) > 0);
+    .sort((a, b) => (wins[b.id] ?? 0) - (wins[a.id] ?? 0) || (played[a.id] ?? 0) - (played[b.id] ?? 0))
+    .filter((p) => !inLobby || (played[p.id] ?? 0) > 0);
 
   const send = (event: 'room:pause' | 'room:resume' | 'game:restart' | 'game:toLobby') => {
     getSocket().emit(event);
@@ -143,6 +145,8 @@ export function RoomPanel() {
                 <ol className="room__people">
                   {ranked.map((p) => {
                     const n = wins[p.id] ?? 0;
+                    // Out of the games they were here for: some arrive late.
+                    const of = played[p.id] ?? 0;
                     return (
                       <li key={p.id} className={p.connected ? '' : 'is-away'}>
                         <Avatar data={p.avatar} size={28} host={p.id === hostId} />
@@ -151,8 +155,14 @@ export function RoomPanel() {
                           {p.id === me && <em> (you)</em>}
                           {!p.connected && <span className="room__away">away</span>}
                         </span>
-                        {n > 0 && <span className="room__wins">{n} {n === 1 ? 'win' : 'wins'}</span>}
-                        {isHost && p.id !== hostId && <KickButton playerId={p.id} name={p.name} />}
+                        {of > 0 && <span className="room__wins">{n} of {of} won</span>}
+                        {isHost &&
+                          (p.id !== hostId ? (
+                            <KickButton playerId={p.id} name={p.name} />
+                          ) : (
+                            // Holds the button's place, so the host's count lines up.
+                            <span className="kick is-spacer" aria-hidden="true">×</span>
+                          ))}
                       </li>
                     );
                   })}

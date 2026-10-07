@@ -4,7 +4,7 @@ import type {
   Avatar, ChatMessage, ClientToServerEvents, GameKind, Player, RoomCountdown, RoomMeta, RoomPause, RoomState,
   RoomStage, RoomStateBase, ServerToClientEvents,
 } from '@pic-game/shared';
-import { EMPTY_ROOM_TTL_MS, GAME_COUNTDOWN_MS, PAUSE_HOST_AWAY_MS, RECONNECT_GRACE_MS } from '../config.js';
+import { EMPTY_ROOM_TTL_MS, GAME_COUNTDOWN_MS, PAUSE_HOST_AWAY_MS } from '../config.js';
 import { RoomSession } from './RoomSession.js';
 
 export type IO = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -13,10 +13,29 @@ export type IO = Server<ClientToServerEvents, ServerToClientEvents>;
  *  ready, in the middle of one, or looking at the result. */
 export type RoomLifecycle = RoomStage;
 
+/** A seat moved to a new socket, and where from: the socket that had it, to
+ *  be told, and whether that was another tab of the same browser or another
+ *  device. */
+export interface Moved<P> {
+  seat: P;
+  from: string | null;
+  to: 'tab' | 'device';
+}
+
 /** What every game needs to know about a seat, whatever the game is. */
 export interface CorePlayer extends Player {
   /** Secret bearer token; proves seat ownership across reconnects. */
   token: string;
+  /** The browser's own lasting id, from the handshake: it outlives the tab,
+   *  so the same person can be known again after closing it or leaving.
+   *  Never sent to other players. This is the browser holding the seat now. */
+  person: string | null;
+  /** Every browser this seat may come back to: the one it was taken in, and
+   *  any it was handed to by QR code, so each can take it back. */
+  persons: string[];
+  /** What the session files this seat's wins and games under: the person,
+   *  so they carry across a leave and rejoin, or the seat's id without one. */
+  record: string;
   socketId: string | null;
   disconnectedAt: number | null;
 }
@@ -104,10 +123,6 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   protected get emptyTtlMs(): number {
     return EMPTY_ROOM_TTL_MS;
   }
-  /** How long a dropped player may come back and reclaim their seat. */
-  protected get reconnectGraceMs(): number {
-    return RECONNECT_GRACE_MS;
-  }
   protected onDestroy(): void {}
 
   /** Whether this game can pause at all. Games turn it on as their pause
@@ -123,10 +138,14 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
 
   // ------------------------------------------------------------------ players
 
-  addPlayer(name: string, avatar: Avatar, socketId: string): P {
+  addPlayer(name: string, avatar: Avatar, socketId: string, person: string | null = null): P {
+    const id = randomUUID();
     const player = this.createPlayer({
-      id: randomUUID(),
+      id,
       token: randomUUID(),
+      person,
+      persons: person ? [person] : [],
+      record: person ?? id,
       name,
       avatar,
       score: 0,
@@ -138,6 +157,8 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     this.order.push(player.id);
     if (!this.hostId) this.hostId = player.id;
     this.cancelEmptyCollection();
+    // Someone back after leaving brings their record with them.
+    this.sendMetaIfChanged();
     return player;
   }
 
@@ -148,16 +169,70 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     for (const p of this.players.values()) {
       if (p.token !== token) continue;
       if (p.connected) return null; // token in use by a live socket
-      if (p.disconnectedAt && Date.now() - p.disconnectedAt > this.reconnectGraceMs) return null;
-      p.socketId = socketId;
-      p.connected = true;
-      p.disconnectedAt = null;
-      if (p.id === this.hostId) this.clearPauseAway();
-      this.onPlayerReconnected(p);
-      this.cancelEmptyCollection();
-      return p;
+      return this.rebind(p, socketId);
     }
     return null;
+  }
+
+  /** The same, for someone back without their tab's token, after closing it:
+   *  their browser's person finds the seat they left away. Never a seat that
+   *  is still connected, which would be another tab of theirs. */
+  reclaimPerson(person: string, socketId: string): P | null {
+    for (const p of this.players.values()) {
+      if (!p.persons.includes(person) || p.connected) continue;
+      p.person = person;
+      return this.rebind(p, socketId);
+    }
+    return null;
+  }
+
+  /** A newer tab of someone already here takes their seat over, so one
+   *  person is one player; so does a device the seat was handed to before.
+   *  Returns the seat, the socket it was taken from, which the caller tells to
+   *  step back, and whether that was this browser's other tab or a device. */
+  takeOver(person: string, socketId: string): Moved<P> | null {
+    for (const p of this.players.values()) {
+      if (!p.persons.includes(person) || !p.connected) continue;
+      return this.moveSeat(p, person, socketId);
+    }
+    return null;
+  }
+
+  /** Lets this seat be picked up on another device: a code for its QR link,
+   *  good once, for a few minutes. */
+  issueHandoff(playerId: string, stats: string | null = null): { token: string; ms: number } | null {
+    if (!this.players.has(playerId)) return null;
+    return this.session.issueHandoff(playerId, stats);
+  }
+
+  /** Moves a seat to the device that scanned its code, and remembers that
+   *  device's browser so it can take the seat back again later. Hands back
+   *  the stats the other device sent with the code. */
+  useHandoff(token: string, person: string | null, socketId: string): (Moved<P> & { stats: string | null }) | null {
+    const h = this.session.useHandoff(token);
+    const p = h ? this.players.get(h.playerId) : undefined;
+    if (!h || !p) return null;
+    if (person && !p.persons.includes(person)) p.persons.push(person);
+    return { ...this.moveSeat(p, person, socketId), stats: h.stats };
+  }
+
+  private moveSeat(p: P, person: string | null, socketId: string): Moved<P> {
+    const from = p.connected && p.socketId !== socketId ? p.socketId : null;
+    const to = person && p.person === person ? 'tab' : 'device';
+    p.person = person;
+    return { seat: this.rebind(p, socketId), from, to };
+  }
+
+  /** A seat stays reclaimable for as long as it exists: an away seat that
+   *  refused its owner would sit in the room beside their new one. */
+  private rebind(p: P, socketId: string): P {
+    p.socketId = socketId;
+    p.connected = true;
+    p.disconnectedAt = null;
+    if (p.id === this.hostId) this.clearPauseAway();
+    this.onPlayerReconnected(p);
+    this.cancelEmptyCollection();
+    return p;
   }
 
   markDisconnected(playerId: string): void {
@@ -196,6 +271,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     }
 
     this.onPlayerRemoved(playerId);
+    this.sendMetaIfChanged();
     if (this.players.size < this.minPlayers && !this.isLobby()) this.onTooFewPlayers();
     if (this.activeCount() === 0) this.scheduleEmptyCollection();
   }
@@ -290,7 +366,9 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   /** Room-level facts every game's state carries. */
   meta(): RoomMeta {
     return {
-      wins: this.session.winsOf(this.players.keys()),
+      wins: this.perPlayer((r) => this.session.wins.get(r)),
+      winsByGame: this.perPlayer((r) => this.session.winsByGame.get(r)),
+      played: this.perPlayer((r) => this.session.played.get(r)),
       games: this.session.games,
       stage: this.lifecycle(),
       paused: this.roomPause,
@@ -418,7 +496,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     for (const id of this.order) {
       const p = old.players.get(id)!;
       this.players.set(id, this.createPlayer({
-        id: p.id, token: p.token, name: p.name, avatar: p.avatar, score: 0,
+        id: p.id, token: p.token, person: p.person, persons: p.persons, record: p.record, name: p.name, avatar: p.avatar, score: 0,
         connected: p.connected, socketId: p.socketId, disconnectedAt: p.disconnectedAt,
       }));
     }
@@ -427,6 +505,15 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
 
   /** The meta as last sent, to tell when it has changed. */
   private sentMeta = '';
+
+  /** Who was here when the current game went into play: the players it
+   *  counts as played for. Null until a game has started. */
+  private takingPart: Set<string> | null = null;
+
+  /** Notes who is taking part when play begins, however it was reached. */
+  private noteStage(stage: RoomStage): void {
+    if (stage === 'playing' && this.lastStage !== 'playing') this.takingPart = new Set(this.players.keys());
+  }
 
   /** Sends the room-level facts on their own. Most games broadcast only their
    *  own state, which doesn't carry them. */
@@ -441,8 +528,15 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   broadcastSnapshot(): void {
     const state = this.publicState();
     this.sentMeta = JSON.stringify(state.meta);
+    this.noteStage(state.meta.stage);
     this.lastStage = state.meta.stage;
     this.io.to(this.code).emit('state:sync', state);
+  }
+
+  /** Sends the meta if it differs from what clients last had, for changes
+   *  that aren't a game's own, like who is seated. */
+  private sendMetaIfChanged(): void {
+    if (JSON.stringify(this.meta()) !== this.sentMeta) this.emitMeta();
   }
 
   /** Sends the meta if it differs from what clients last had: a game starting
@@ -456,17 +550,32 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     if (stage === 'playing' && this.lastStage !== 'playing' && this.pausable && !this.roomPause) {
       this.countIn('start');
     }
+    this.noteStage(stage);
     this.lastStage = stage;
-    if (JSON.stringify(this.meta()) !== this.sentMeta) this.emitMeta();
+    this.sendMetaIfChanged();
   }
 
   /** Every game reports its result here, from wherever it ends. Ties give each
    *  winner a win; an empty list is a game nobody won. Players who have left
-   *  the room by now don't score. */
+   *  the room by now don't score. The game counts as played for whoever was
+   *  here when it started and still is; without a start seen, everyone here. */
   protected recordWin(ids: readonly (string | null | undefined)[]): void {
     const winners = ids.filter((id): id is string => !!id && this.players.has(id));
-    this.session.record(this.kind, winners);
+    const players = [...(this.takingPart ?? this.players.keys())].filter((id) => this.players.has(id));
+    const rec = (id: string) => this.players.get(id)!.record;
+    this.session.record(this.kind, winners.map(rec), players.map(rec));
     this.emitMeta();
+  }
+
+  /** A session tally for each seated player, by player id, leaving out
+   *  anyone with nothing. The session keeps it by record. */
+  private perPlayer<T>(get: (record: string) => T | undefined): Record<string, T> {
+    const out: Record<string, T> = {};
+    for (const p of this.players.values()) {
+      const v = get(p.record);
+      if (v) out[p.id] = v;
+    }
+    return out;
   }
 
   /** Takes back the last recorded result, for a host undoing a game's end. */

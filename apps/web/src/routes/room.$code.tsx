@@ -42,7 +42,8 @@ function RoomPage() {
     const onConnect = () => {
       const seat = loadSeat(code);
       const id = identity.current;
-      if (!seat || !id) return;
+      // Rejoining would take the seat back from the newer tab.
+      if (!seat || !id || useGame.getState().replaced === code) return;
       socket.emit('room:join', { code, name: id.name, avatar: id.avatar, token: seat.token }, (res) => {
         if (res.ok) {
           useGame.getState().setMe(res.playerId);
@@ -70,6 +71,8 @@ function RoomPage() {
    *  a closed tab is handled by the socket disconnecting. */
   useEffect(() => {
     if (useGame.getState().me) return;
+    // Lost to a newer tab: coming back by Back or a reload asks first.
+    if (useGame.getState().replaced === code) return;
     const profile = loadProfile();
     if (!profile) return; // no nickname yet — the panel below collects one
     identity.current = profile;
@@ -106,6 +109,46 @@ function RoomPage() {
     useGame.getState().setNotice(`${kickedBy} removed you from the room.`);
     void navigate({ to: '/' });
   }, [kickedBy, navigate]);
+
+  // A newer tab of this browser has the seat now. Playing here again takes
+  // it back, and that tab gets this screen instead.
+  const replaced = useGame((s) => s.replaced === code);
+  const replacedTo = useGame((s) => s.replacedTo);
+  if (replaced) {
+    const device = replacedTo === 'device';
+    return (
+      <div className="landing landing--narrow">
+        <div className="landing__hero">
+          <h1 className="landing__title">{device ? 'Playing on another device' : 'Open in another tab'}</h1>
+          <p className="landing__sub">
+            {device
+              ? `Your seat in room ${code} moved to the device that scanned the code. You can play from one place at a time.`
+              : `You're playing in room ${code} from another tab. You can play from one tab at a time.`}
+          </p>
+        </div>
+        <div className="card landing__card">
+          <button
+            className="btn btn--primary btn--lg"
+            type="button"
+            disabled={busy || !identity.current}
+            onClick={() => {
+              useGame.getState().setReplaced(null);
+              if (identity.current) joinRoom(identity.current, loadSeat(code)?.token, false);
+            }}
+          >
+            {device ? 'Play here instead' : 'Play in this tab'}
+          </button>
+          <button
+            className="btn btn--ghost"
+            type="button"
+            onClick={() => void navigate({ to: '/' })}
+          >
+            Back to home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Arrived via an invite link with no seat yet — collect a name first.
   if (!me || !room) {

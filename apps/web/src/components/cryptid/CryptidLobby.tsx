@@ -1,11 +1,11 @@
 import { CRYPTID_MAX_PLAYERS, CRYPTID_MIN_PLAYERS } from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectCryptid, selectIsHost, useGame } from '../../store/game.js';
-import { WinCount } from '../WinCount.js';
 import { Avatar } from '../Avatar.js';
 import { InviteCard } from '../InviteCard.js';
 import { KickButton } from '../KickButton.js';
 import { SettingsTitle } from '../SettingsTitle.js';
+import { WinsByGame } from '../WinsByGame.js';
 
 const MODES = [
   { advanced: false, name: 'Standard', blurb: 'Every clue says where the creature could be. Six structures in three colours.' },
@@ -38,7 +38,7 @@ export function CryptidLobby() {
               <li key={p.id} className="lobby__player">
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
-                <WinCount n={room.meta.wins[p.id]} />
+                <WinsByGame wins={room.meta.winsByGame[p.id]} />
                 {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
               </li>
             ))}

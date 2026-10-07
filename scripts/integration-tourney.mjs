@@ -2,7 +2,7 @@ import { io } from 'socket.io-client';
 
 // Run against a server started with short lifetimes, so the keep-alive checks
 // do not take minutes:
-//   EMPTY_ROOM_TTL_MS=1500 RECONNECT_GRACE_MS=1000 PORT=3099 npx tsx apps/server/src/index.ts
+//   EMPTY_ROOM_TTL_MS=1500 PORT=3099 npx tsx apps/server/src/index.ts
 const URL = process.env.PIC_GAME_URL ?? 'http://localhost:3001';
 const SHORT = process.env.SHORT_TTLS === '1';
 const pass = [], fail = [];

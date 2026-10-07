@@ -3,16 +3,19 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createRouter } from '@tanstack/react-router';
 import { Route as rootRoute } from './routes/__root.js';
+import { Route as achievementsRoute } from './routes/achievements.js';
 import { Route as backstageRoute } from './routes/backstage.js';
+import { Route as handoffRoute } from './routes/handoff.$token.js';
 import { Route as indexRoute } from './routes/index.js';
 import { Route as roomRoute } from './routes/room.$code.js';
 import './lib/posthog.js';
 import './lib/posthogGames.js';
+import './lib/achievements.js';
 import './lib/posthogCat.js';
 import './lib/buttonInk.js';
 import './styles.css';
 
-const routeTree = rootRoute.addChildren([indexRoute, roomRoute, backstageRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, roomRoute, backstageRoute, achievementsRoute, handoffRoute]);
 const router = createRouter({ routeTree });
 
 declare module '@tanstack/react-router' {

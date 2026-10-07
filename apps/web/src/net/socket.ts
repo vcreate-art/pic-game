@@ -1,9 +1,56 @@
 import { io, type Socket } from 'socket.io-client';
 import type { ClientToServerEvents, ServerToClientEvents } from '@pic-game/shared';
+import { uid } from '../lib/uid.js';
 
 export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 let socket: GameSocket | null = null;
+
+const PERSON_KEY = 'pic-game:person';
+
+/**
+ * This browser's lasting id: localStorage, so it outlives the tab. Rooms use
+ * it to know someone again after they close the tab or leave and come back,
+ * and keep their wins for them. Without storage it lasts only this visit.
+ */
+function personKey(): string {
+  // For trying a game with several players from one browser: each tab opened
+  // with ?newplayer is someone else.
+  if (new URLSearchParams(location.search).has('newplayer')) return tabPerson();
+  return browserKey();
+}
+
+/** This browser's lasting id, whatever the tab. Also names this device's
+ *  share of the achievement stats. */
+export function browserKey(): string {
+  try {
+    let key = localStorage.getItem(PERSON_KEY);
+    if (!key) {
+      key = uid();
+      localStorage.setItem(PERSON_KEY, key);
+    }
+    return key;
+  } catch {
+    return (memoryKey ??= uid());
+  }
+}
+
+/** Without storage, one id for as long as the page lasts. */
+let memoryKey: string | null = null;
+
+/** A person for this tab alone, kept across its refreshes. */
+function tabPerson(): string {
+  try {
+    let key = sessionStorage.getItem(PERSON_KEY);
+    if (!key) {
+      key = uid();
+      sessionStorage.setItem(PERSON_KEY, key);
+    }
+    return key;
+  } catch {
+    return uid();
+  }
+}
 
 /** One connection per tab, created lazily. Socket.IO handles reconnect and
  *  backoff; our job is only to re-present the seat token afterwards. */
@@ -16,6 +63,7 @@ export function getSocket(): GameSocket {
       reconnectionDelay: 400,
       reconnectionDelayMax: 4000,
       transports: ['websocket', 'polling'],
+      auth: { person: personKey() },
     });
   }
   return socket;
@@ -29,8 +77,9 @@ export interface Seat {
 
 const SEAT_KEY = 'pic-game:seat';
 
-/** sessionStorage, not localStorage: two tabs should be two players, but a
- *  refresh in one tab should keep its seat. */
+/** sessionStorage, not localStorage: the seat token is this tab's, so a
+ *  refresh keeps the seat. A second tab finds the seat by the browser's
+ *  person instead, and takes it over. */
 export function saveSeat(seat: Seat): void {
   try {
     sessionStorage.setItem(SEAT_KEY, JSON.stringify(seat));
@@ -47,6 +96,28 @@ export function loadSeat(code: string): Seat | null {
     return seat.code === code ? seat : null;
   } catch {
     return null;
+  }
+}
+
+const REPLACED_KEY = 'pic-game:replaced';
+
+/** The room this tab lost its seat in to a newer tab, so coming back to it,
+ *  by Back or a reload, asks before taking the seat again. Per tab, like the
+ *  seat itself. */
+export function loadReplaced(): string | null {
+  try {
+    return sessionStorage.getItem(REPLACED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function saveReplaced(code: string | null): void {
+  try {
+    if (code) sessionStorage.setItem(REPLACED_KEY, code);
+    else sessionStorage.removeItem(REPLACED_KEY);
+  } catch {
+    /* without storage it lasts as long as the page */
   }
 }
 

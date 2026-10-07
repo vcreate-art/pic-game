@@ -8,6 +8,7 @@ import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { SettingsTitle } from '../SettingsTitle.js';
+import { WinsByGame } from '../WinsByGame.js';
 
 /** Every piece, shortest rest first, so the slider means something concrete. */
 const PIECE_ROWS: Array<[PieceType, string]> = [
@@ -42,6 +43,7 @@ export function KungFuLobby() {
                 <li key={p.id} className="lobby__player">
                   <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                   <span>{p.name}</span>
+                  <WinsByGame wins={room.meta.winsByGame[p.id]} />
                   {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
                   {side && (
                     <span className={`seat__chip seat__chip--${side}`}>{sideLabel(spec, side)}</span>

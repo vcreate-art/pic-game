@@ -52,6 +52,11 @@ export function bindSocket(engine: CanvasEngine): () => void {
     g().setMeta(m);
   });
   socket.on('kicked', ({ by }) => g().setKickedBy(by));
+  // The room is the other tab's now: drop it here and say so.
+  socket.on('room:replaced', ({ to }) => {
+    const code = g().room?.code;
+    if (code) g().replacedHere(code, to);
+  });
 
   socket.on('turn:choosing', (p) => {
     g().beginChoosing(p);
@@ -148,7 +153,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
     socket.off('disconnect', onDisconnect);
     for (const ev of [
       'state:sync', 'player:joined', 'player:updated', 'player:left',
-      'room:settings', 'room:meta', 'host:changed', 'kicked', 'turn:choosing', 'turn:clock', 'word:secret', 'suggest:state',
+      'room:settings', 'room:meta', 'host:changed', 'kicked', 'room:replaced', 'turn:choosing', 'turn:clock', 'word:secret', 'suggest:state',
       'turn:drawing', 'hint:reveal', 'turn:end', 'game:end', 'draw:reactions',
       'draw:start', 'draw:append', 'draw:end', 'draw:fill',
       'canvas:undone', 'canvas:cleared', 'chat:message', 'guess:correct', 'error',

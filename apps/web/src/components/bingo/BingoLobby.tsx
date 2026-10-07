@@ -1,11 +1,11 @@
 import type { BingoMode, BingoPattern } from '@pic-game/shared';
 import { getSocket } from '../../net/socket.js';
 import { selectBingo, selectIsHost, useGame } from '../../store/game.js';
-import { WinCount } from '../WinCount.js';
 import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { SettingsTitle } from '../SettingsTitle.js';
+import { WinsByGame } from '../WinsByGame.js';
 
 const MODES: { value: BingoMode; name: string; blurb: string }[] = [
   { value: 'turns', name: '5×5, take turns', blurb: 'Write 1–25 on your grid. Call numbers in turn; five lines spells BINGO.' },
@@ -42,8 +42,8 @@ export function BingoLobby() {
               <li key={p.id} className="lobby__player">
                 <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                 <span>{p.name}</span>
+                <WinsByGame wins={room.meta.winsByGame[p.id]} />
                 {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
-                <WinCount n={room.meta.wins[p.id]} />
               </li>
             ))}
           </ul>

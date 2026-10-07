@@ -5,6 +5,7 @@ import { Avatar } from '../Avatar.js';
 import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { SettingsTitle } from '../SettingsTitle.js';
+import { WinsByGame } from '../WinsByGame.js';
 
 const SEAT_LABEL: Record<RealmsSide, string> = { a: 'First player', b: 'Second player' };
 
@@ -34,6 +35,7 @@ export function RealmsLobby() {
                 <li key={p.id} className="lobby__player">
                   <Avatar data={p.avatar} size={44} host={p.id === room.hostId} />
                   <span>{p.name}</span>
+                  <WinsByGame wins={room.meta.winsByGame[p.id]} />
                   {isHost && p.id !== room.hostId && <KickButton playerId={p.id} name={p.name} />}
                   {side && <span className="seat__chip seat__chip--w">{SEAT_LABEL[side]}</span>}
                 </li>

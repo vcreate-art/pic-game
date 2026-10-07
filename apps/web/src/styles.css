@@ -103,6 +103,64 @@ button, input { font: inherit; color: inherit; }
 .profile__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .profile__note { margin: 0; font-size: 12px; color: var(--ink-soft); }
 
+.profile__who { display: flex; align-items: center; gap: 12px; }
+.profile__whotext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.profile__whoname {
+  font-family: var(--display); font-size: 18px; font-weight: 800; line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.profile__record { font-size: 13px; color: var(--ink-soft); }
+.profile__edit {
+  flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  color: var(--ink-soft); cursor: pointer;
+}
+.profile__edit:hover { border-color: var(--accent); color: var(--ink); }
+.profile__edit:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.profile__edit svg { width: 15px; height: 15px; }
+
+.profile__badges { padding-top: 6px; }
+.profile__badges ul { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.profile__count { margin: 0 0 6px; font-family: var(--display); font-size: 15px; font-weight: 800; }
+.profile__shelf { display: flex; gap: 3px; }
+.profile__shelf span { flex: 1; height: 8px; border-radius: 2px; background: var(--paper); }
+.profile__shelf span:first-child { border-radius: 999px 2px 2px 999px; }
+.profile__shelf span:last-child { border-radius: 2px 999px 999px 2px; }
+.profile__shelf span.is-earned { background: var(--accent); }
+.profile__badges li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+.profile__badge {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: 999px; background: var(--paper); color: var(--ink-soft);
+}
+.profile__badges li.is-earned .profile__badge { background: var(--accent-soft); color: var(--accent); }
+.profile__badge svg { width: 14px; height: 14px; }
+.profile__badgename { flex: 1; min-width: 0; font-weight: 600; }
+.profile__badges li:not(.is-earned) .profile__badgename { color: var(--ink-soft); }
+.profile__badgeat { font-size: 12px; color: var(--ink-soft); }
+.profile__pop > a.btn { text-align: center; text-decoration: none; }
+.profile__phone { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.profile__phone svg { width: 18px; height: 18px; }
+
+/* Moving the seat to a phone: the code, how long it lasts, and a way back. */
+.handoff__head { display: flex; align-items: center; gap: 8px; margin: -4px 0 0 -6px; }
+.handoff__back {
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 0; border-radius: 999px; background: none; color: var(--ink-soft); cursor: pointer;
+}
+.handoff__back:hover { background: var(--paper); color: var(--ink); }
+.handoff__back:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.handoff__back svg { width: 20px; height: 20px; }
+.handoff__title { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 800; }
+.handoff__qr {
+  display: grid; place-items: center; aspect-ratio: 1; width: 100%;
+  border: 1px solid var(--line); border-radius: 12px; background: #fff; overflow: hidden;
+}
+.handoff__qr svg { display: block; width: 100%; height: 100%; }
+.handoff__wait { font-size: 13px; color: var(--ink-soft); }
+.handoff__note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-soft); text-align: center; }
+.handoff__expiry { white-space: nowrap; }
+.handoff__clock { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+
 .conn { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
 .conn.is-on { color: var(--ok); background: var(--ok-soft); }
 .conn.is-off { color: var(--warn); background: var(--warn-soft); }
@@ -342,6 +400,11 @@ button, input { font: inherit; color: inherit; }
   align-content: start;
 }
 .lobby__invite { grid-area: invite; text-align: center; }
+/* Stays put when pressed and as its label changes. */
+.invite__copy:active:not(:disabled) { transform: none; }
+.invite__labels { display: inline-grid; }
+.invite__labels > span { grid-area: 1 / 1; visibility: hidden; }
+.invite__labels > .is-on { visibility: visible; }
 .lobby__players { grid-area: players; }
 .lobby__settings { grid-area: settings; display: flex; flex-direction: column; gap: 16px; }
 /* The card stretches to the column height, so an auto margin drops the action to
@@ -701,6 +764,7 @@ button, input { font: inherit; color: inherit; }
   font-size: 13px; font-weight: 700; line-height: 1; cursor: pointer;
   transition: color .15s ease, border-color .15s ease, background .15s ease;
 }
+.kick.is-spacer { visibility: hidden; }
 .kick:hover { border-color: var(--warn); color: var(--warn); background: var(--warn-wash); }
 .kick.is-armed {
   background: var(--warn); border-color: var(--warn); color: #fff;
@@ -1546,7 +1610,14 @@ button, input { font: inherit; color: inherit; }
 
 .bingolobby__row { grid-template-columns: 1fr auto; }
 .bingolobby__check { width: 20px; height: 20px; accent-color: var(--accent); }
-.bingolobby__wins { font-size: 11px; font-weight: 700; color: var(--accent); }
+/* A player's wins this session, by game: the icon wears the game's colour,
+   the count stays in ink. */
+.winsby { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 2px 8px; }
+.winsby__game {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 12px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.winsby__game svg { width: 14px; height: 14px; color: var(--game); }
 
 .game--bingo { max-width: 1400px; }
 .bingo { display: grid; grid-template-columns: 240px minmax(0, 1fr) 300px; gap: 14px; align-items: start; }
@@ -2732,3 +2803,87 @@ button, input { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .paused, .room__panel, .countdown__n { animation: none; }
 }
+
+/* ---------------------------------------------------------------- achievements */
+
+.achv {
+  margin: 0 auto; width: 100%; max-width: 1040px;
+  display: flex; flex-direction: column; gap: 28px; padding: 28px 0 40px;
+}
+.achv__head { display: flex; flex-direction: column; gap: 8px; }
+.achv__title { margin: 0; font-family: var(--display); font-size: 40px; font-weight: 800; line-height: 1.05; }
+.achv__record { margin: 0; max-width: 40em; font-size: 17px; line-height: 1.5; color: var(--ink-soft); }
+.achv__note { margin: 0; font-size: 13px; color: var(--ink-soft); }
+
+.achv__progress { display: flex; flex-direction: column; gap: 10px; }
+.achv__count { margin: 0; font-family: var(--display); font-size: 24px; font-weight: 800; line-height: 1.1; }
+.achv__shelf { display: flex; gap: 4px; }
+.achv__shelf span { flex: 1; height: 14px; border-radius: 3px; background: var(--line); }
+.achv__shelf span:first-child { border-radius: 999px 3px 3px 999px; }
+.achv__shelf span:last-child { border-radius: 3px 999px 999px 3px; }
+.achv__shelf span.is-earned { background: var(--accent); }
+
+/* Badges on the left, your games beside them; stacked when narrow. */
+.achv__cols { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; }
+.achv__main { display: flex; flex-direction: column; gap: 28px; }
+.achv__aside { position: sticky; top: 20px; }
+@media (max-width: 860px) {
+  .achv__cols { grid-template-columns: minmax(0, 1fr); }
+  .achv__aside { position: static; }
+}
+.achv__section { display: flex; flex-direction: column; gap: 12px; }
+.achv__heading { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 800; }
+
+.achv__list {
+  list-style: none; margin: 0; padding: 0;
+  background: var(--card); border: 1px solid var(--edge); border-radius: var(--radius);
+}
+.achv-row { display: flex; align-items: center; gap: 14px; padding: 14px 18px; }
+.achv-row + .achv-row { border-top: 1px solid var(--line); }
+.achv-row__icon {
+  flex: none; display: grid; place-items: center; width: 36px; height: 36px;
+  border-radius: 999px; background: var(--paper); color: var(--ink-soft);
+}
+.achv-row.is-earned .achv-row__icon { background: var(--accent-soft); color: var(--accent); }
+.achv-row__icon svg { width: 18px; height: 18px; }
+.achv-row__body { flex: 1; min-width: 0; }
+.achv-row__title { margin: 0; font-weight: 700; }
+.achv-row__desc { margin: 2px 0 0; font-size: 13.5px; color: var(--ink-soft); }
+.achv-row__side {
+  flex: none; width: 110px; margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+  font-size: 13px; color: var(--ink-soft);
+}
+.achv-row.is-earned .achv-row__side { color: var(--accent); font-weight: 600; }
+.achv-row__bar { position: relative; width: 100%; height: 6px; border-radius: 999px; background: var(--paper); overflow: hidden; }
+/* Quieter than the shelf above, which is the page's one strong colour. */
+.achv-row__bar span { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: color-mix(in srgb, var(--accent) 45%, var(--card)); }
+/* Narrow screens give the description the width and put progress under it. */
+@media (max-width: 520px) {
+  .achv-row { flex-wrap: wrap; align-items: flex-start; }
+  .achv-row__body { flex-basis: calc(100% - 50px); }
+  .achv-row__side { width: auto; flex: 1; margin-left: 50px; align-items: stretch; flex-direction: row-reverse; justify-content: flex-end; align-items: center; gap: 10px; }
+  .achv-row__bar { flex: 1; }
+  /* A game's chart is narrow enough to stay beside its name. */
+  .achv-row.achv-game { flex-wrap: nowrap; align-items: center; }
+  .achv-game .achv-row__body { flex-basis: auto; }
+}
+
+/* Games are badge rows too, so they line up with the lists beside them,
+   in the game's own colour. */
+.achv-game .achv-row__icon,
+.achv-games__untried .achv-row__icon { background: color-mix(in srgb, var(--game) 14%, var(--card)); color: var(--game); }
+/* A game's last nights, one column each: wins at the foot in its colour,
+   losses paler above, a 2px gap between. Empty nights keep a stub so the
+   seven slots always show. */
+.achv-nights { flex: none; display: flex; align-items: stretch; gap: 4px; height: 32px; }
+.achv-nights__col { width: 8px; display: flex; flex-direction: column-reverse; gap: 2px; }
+.achv-nights__col > span { flex-basis: 0; min-height: 2px; border-radius: 2px; }
+.achv-nights__col .is-won { background: var(--game); }
+.achv-nights__col .is-lost { background: color-mix(in srgb, var(--game) 30%, var(--card)); }
+.achv-nights__col .achv-nights__room { min-height: 0; margin-bottom: -2px; }
+.achv-nights__col.is-empty { justify-content: flex-start; }
+.achv__key { margin: -4px 0 0; font-size: 13px; color: var(--ink-soft); }
+.achv-nights__col.is-empty::after { content: ''; height: 2px; border-radius: 2px; background: var(--line); }
+.achv-games__untried { flex-direction: column; align-items: stretch; gap: 10px; }
+.achv-games__untried .achv-row__desc { margin: 0; }
+.achv-games__untried ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }

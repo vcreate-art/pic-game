@@ -74,10 +74,6 @@ export class TourneyRoom extends BaseRoom<CorePlayer> {
     return TOURNEY_KEEP_MS;
   }
 
-  protected override get reconnectGraceMs(): number {
-    return TOURNEY_KEEP_MS;
-  }
-
   protected createPlayer(base: CorePlayer): CorePlayer {
     return base;
   }
