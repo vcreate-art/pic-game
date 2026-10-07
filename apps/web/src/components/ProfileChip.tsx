@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { ChevronRight, Lock, Pencil, Trophy } from 'lucide-react';
+import { Lock, Pencil, Trophy } from 'lucide-react';
 import { AVATAR_COLORS, AVATAR_FACES } from '@pic-game/shared';
 import { MAX_NAME_LEN } from '../constants.js';
 import { PROFILE_EVENT, getSocket, loadProfile, saveProfile, type Profile } from '../net/socket.js';
@@ -79,24 +79,29 @@ export function ProfileChip() {
         <div className="profile__pop card">
           <div className="profile__who">
             <Avatar data={profile.avatar} size={44} />
-            <span className="profile__whoname">{profile.name}</span>
+            <div className="profile__whotext">
+              <span className="profile__whoname">{profile.name}</span>
+              <span className="profile__record">
+                {played ? `${played} played, ${won} won` : 'No games finished yet'}
+              </span>
+              {stats.bestStreak > 1 && (
+                <span className="profile__record">Best run: {stats.bestStreak} wins</span>
+              )}
+            </div>
             <button type="button" className="profile__edit" onClick={edit} title="Edit name and avatar">
               <Pencil aria-hidden="true" />
               <span className="visually-hidden">Edit name and avatar</span>
             </button>
           </div>
 
-          <dl className="profile__stats">
-            <div><dt>Games</dt><dd>{played}</dd></div>
-            <div><dt>Wins</dt><dd>{won}</dd></div>
-            <div><dt>Streak</dt><dd>{stats.bestStreak}</dd></div>
-          </dl>
-
           <div className="profile__badges">
-            <p className="profile__head">
-              <span>Achievements</span>
-              <span>{earned}/{ACHIEVEMENTS.length}</span>
-            </p>
+            <p className="profile__count">{earned} of {ACHIEVEMENTS.length} achievements</p>
+            {/* One segment per achievement, so the bar is the whole shelf. */}
+            <div className="profile__shelf" aria-hidden="true">
+              {ACHIEVEMENTS.map((a, i) => (
+                <span key={a.id} className={i < earned ? 'is-earned' : ''} />
+              ))}
+            </div>
             <ul>
               {byRelevance(stats).slice(0, PEEK).map((a) => {
                 const at = stats.unlocked[a.id];
@@ -105,7 +110,7 @@ export function ProfileChip() {
                   <li key={a.id} className={at ? 'is-earned' : ''}>
                     <span className="profile__badge" aria-hidden="true">{at ? <Trophy /> : <Lock />}</span>
                     <span className="profile__badgename">{a.title}</span>
-                    {!at && <span className="profile__badgeat">{n}/{a.goal}</span>}
+                    {!at && a.goal > 1 && <span className="profile__badgeat">{n} of {a.goal}</span>}
                   </li>
                 );
               })}
@@ -114,10 +119,10 @@ export function ProfileChip() {
 
           {/* Following a link out of a room would leave it, so not from there. */}
           {inRoom ? (
-            <p className="profile__note">See all your achievements once you're back on the front page.</p>
+            <p className="profile__note">The full list is on the front page, once this game is over.</p>
           ) : (
-            <Link to="/achievements" className="profile__all" onClick={() => setOpen(false)}>
-              All achievements <ChevronRight aria-hidden="true" />
+            <Link to="/achievements" className="btn btn--outline" onClick={() => setOpen(false)}>
+              See all achievements
             </Link>
           )}
         </div>
