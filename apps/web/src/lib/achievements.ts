@@ -19,14 +19,27 @@ export interface Stats {
   bestStreak: number;
   /** Achievement id → when it was first earned (epoch ms). */
   unlocked: Record<string, number>;
+  /** Each game's last few nights it was played, oldest first. */
+  nights: Partial<Record<GameKind, Night[]>>;
 }
+
+/** One local day's games of one kind. */
+export interface Night {
+  /** YYYY-MM-DD, in the player's own time zone. */
+  day: string;
+  played: number;
+  won: number;
+}
+
+/** How many nights each game keeps. */
+export const NIGHTS = 7;
 
 const STATS_KEY = 'pic-game:stats';
 
 /** Fired on every save, so an open achievements page keeps up. */
 export const STATS_EVENT = 'pic-game:stats';
 
-const empty = (): Stats => ({ played: {}, won: {}, hosted: 0, biggestRoom: 0, streak: 0, bestStreak: 0, unlocked: {} });
+const empty = (): Stats => ({ played: {}, won: {}, hosted: 0, biggestRoom: 0, streak: 0, bestStreak: 0, unlocked: {}, nights: {} });
 
 export function loadStats(): Stats {
   try {
@@ -111,6 +124,21 @@ export function byRelevance(s: Stats): Achievement[] {
   });
 }
 
+const today = () => new Date().toLocaleDateString('en-CA');
+
+function addNight(s: Stats, kind: GameKind, won: boolean) {
+  const nights = s.nights[kind] ?? [];
+  const day = today();
+  let last = nights[nights.length - 1];
+  if (last?.day !== day) {
+    last = { day, played: 0, won: 0 };
+    nights.push(last);
+  }
+  last.played += 1;
+  if (won) last.won += 1;
+  s.nights[kind] = nights.slice(-NIGHTS);
+}
+
 /** Marks anything newly earned and returns those, oldest-defined first. */
 function unlockNew(s: Stats): Achievement[] {
   const fresh = ACHIEVEMENTS.filter((a) => !s.unlocked[a.id] && a.progress(s) >= a.goal);
@@ -159,6 +187,7 @@ useGame.subscribe((st, prev) => {
   if (won) s.won[room.kind] = (s.won[room.kind] ?? 0) + 1;
   if (room.hostId === me) s.hosted += 1;
   s.biggestRoom = Math.max(s.biggestRoom, room.players.length);
+  addNight(s, room.kind, won);
   s.streak = won ? s.streak + 1 : 0;
   s.bestStreak = Math.max(s.bestStreak, s.streak);
   const earned = unlockNew(s);

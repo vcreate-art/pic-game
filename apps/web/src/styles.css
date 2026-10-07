@@ -2828,14 +2828,27 @@ button, input { font: inherit; color: inherit; }
   .achv-row__body { flex-basis: calc(100% - 50px); }
   .achv-row__side { width: auto; flex: 1; margin-left: 50px; align-items: stretch; flex-direction: row-reverse; justify-content: flex-end; align-items: center; gap: 10px; }
   .achv-row__bar { flex: 1; }
+  /* A game's chart is narrow enough to stay beside its name. */
+  .achv-row.achv-game { flex-wrap: nowrap; align-items: center; }
+  .achv-game .achv-row__body { flex-basis: auto; }
 }
 
 /* Games are badge rows too, so they line up with the lists beside them,
    in the game's own colour. */
 .achv-game .achv-row__icon,
 .achv-games__untried .achv-row__icon { background: color-mix(in srgb, var(--game) 14%, var(--card)); color: var(--game); }
-.achv-game > .achv-row__bar { flex: none; width: 56px; }
-.achv-game .achv-row__bar span { background: color-mix(in srgb, var(--game) 45%, var(--card)); }
+/* A game's last nights, one column each: wins at the foot in its colour,
+   losses paler above, a 2px gap between. Empty nights keep a stub so the
+   seven slots always show. */
+.achv-nights { flex: none; display: flex; align-items: stretch; gap: 4px; height: 32px; }
+.achv-nights__col { width: 8px; display: flex; flex-direction: column-reverse; gap: 2px; }
+.achv-nights__col > span { flex-basis: 0; min-height: 2px; border-radius: 2px; }
+.achv-nights__col .is-won { background: var(--game); }
+.achv-nights__col .is-lost { background: color-mix(in srgb, var(--game) 30%, var(--card)); }
+.achv-nights__col .achv-nights__room { min-height: 0; margin-bottom: -2px; }
+.achv-nights__col.is-empty { justify-content: flex-start; }
+.achv__key { margin: -4px 0 0; font-size: 13px; color: var(--ink-soft); }
+.achv-nights__col.is-empty::after { content: ''; height: 2px; border-radius: 2px; background: var(--line); }
 .achv-games__untried { flex-direction: column; align-items: stretch; gap: 10px; }
 .achv-games__untried .achv-row__desc { margin: 0; }
 .achv-games__untried ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }

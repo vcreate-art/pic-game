@@ -3,10 +3,37 @@ import { createRoute } from '@tanstack/react-router';
 import { Lock, Trophy } from 'lucide-react';
 import { GAME_LABELS, PLAYABLE_KINDS } from '@pic-game/shared';
 import { GAME_ICONS } from '../components/gameIcons.js';
-import { ACHIEVEMENTS, byRelevance, totalPlayed, totalWon, useStats } from '../lib/achievements.js';
+import { ACHIEVEMENTS, NIGHTS, byRelevance, totalPlayed, totalWon, useStats, type Night } from '../lib/achievements.js';
 import { Route as rootRoute } from './__root.js';
 
 const day = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+const shortDay = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
+
+/** A game's last nights: wins in its colour, losses paler above them. */
+function NightsChart({ nights, most }: { nights: Night[]; most: number }) {
+  const label = (n: Night) => `${shortDay.format(new Date(`${n.day}T12:00`))}: ${n.played} played, ${n.won} won`;
+  // Empty slots first, so the newest night is always on the right.
+  const slots: (Night | null)[] = [...Array(NIGHTS - nights.length).fill(null), ...nights];
+  return (
+    <span
+      className="achv-nights"
+      role="img"
+      aria-label={nights.length ? `Last ${nights.length} nights. ${nights.map(label).join('. ')}.` : 'No nights recorded yet'}
+    >
+      {slots.map((n, i) =>
+        n ? (
+          <span key={n.day} className="achv-nights__col" title={label(n)}>
+            {n.won > 0 && <span className="is-won" style={{ flexGrow: n.won }} />}
+            {n.played > n.won && <span className="is-lost" style={{ flexGrow: n.played - n.won }} />}
+            <span className="achv-nights__room" style={{ flexGrow: most - n.played }} />
+          </span>
+        ) : (
+          <span key={`empty-${i}`} className="achv-nights__col is-empty" />
+        ),
+      )}
+    </span>
+  );
+}
 
 function Achievements() {
   const stats = useStats();
@@ -19,6 +46,8 @@ function Achievements() {
   const games = PLAYABLE_KINDS.map((k) => ({ kind: k, played: stats.played[k] ?? 0, won: stats.won[k] ?? 0 }));
   const tried = games.filter((g) => g.played).sort((a, b) => b.played - a.played || b.won - a.won);
   const untried = games.filter((g) => !g.played);
+  // One scale for every game, so a big night looks big in any row.
+  const most = Math.max(1, ...tried.flatMap((g) => (stats.nights[g.kind] ?? []).map((n) => n.played)));
 
   return (
     <div className="achv">
@@ -112,10 +141,7 @@ function Achievements() {
                     <p className="achv-row__title">{GAME_LABELS[g.kind].name}</p>
                     <p className="achv-row__desc">{g.played} played, {g.won} won</p>
                   </div>
-                  {/* How much of what you played there, you won. */}
-                  <span className="achv-row__bar" aria-hidden="true">
-                    <span style={{ width: `${(g.won / g.played) * 100}%` }} />
-                  </span>
+                  <NightsChart nights={stats.nights[g.kind] ?? []} most={most} />
                 </li>
               );
             })}
@@ -137,6 +163,7 @@ function Achievements() {
               </li>
             )}
           </ul>
+          {tried.length > 0 && <p className="achv__key">Last {NIGHTS} nights you played: wins solid, losses pale.</p>}
         </section>
       </div>
 
