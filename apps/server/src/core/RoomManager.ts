@@ -98,6 +98,12 @@ export class RoomManager {
     return this.rooms.get(code.toUpperCase());
   }
 
+  /** The room a seat's handoff code belongs to, so the code alone is enough. */
+  byHandoff(token: string): AnyRoom | undefined {
+    for (const room of this.rooms.values()) if (room.session.hasHandoff(token)) return room;
+    return undefined;
+  }
+
   private collect(room: BaseRoom<CorePlayer>): void {
     // A game swapped out by switchKind no longer owns the code.
     if (this.rooms.get(room.code) !== room) return;

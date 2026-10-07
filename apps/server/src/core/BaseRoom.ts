@@ -13,14 +13,26 @@ export type IO = Server<ClientToServerEvents, ServerToClientEvents>;
  *  ready, in the middle of one, or looking at the result. */
 export type RoomLifecycle = RoomStage;
 
+/** A seat moved to a new socket, and where from: the socket that had it, to
+ *  be told, and whether that was another tab of the same browser or another
+ *  device. */
+export interface Moved<P> {
+  seat: P;
+  from: string | null;
+  to: 'tab' | 'device';
+}
+
 /** What every game needs to know about a seat, whatever the game is. */
 export interface CorePlayer extends Player {
   /** Secret bearer token; proves seat ownership across reconnects. */
   token: string;
   /** The browser's own lasting id, from the handshake: it outlives the tab,
    *  so the same person can be known again after closing it or leaving.
-   *  Never sent to other players. */
+   *  Never sent to other players. This is the browser holding the seat now. */
   person: string | null;
+  /** Every browser this seat may come back to: the one it was taken in, and
+   *  any it was handed to by QR code, so each can take it back. */
+  persons: string[];
   /** What the session files this seat's wins and games under: the person,
    *  so they carry across a leave and rejoin, or the seat's id without one. */
   record: string;
@@ -132,6 +144,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
       id,
       token: randomUUID(),
       person,
+      persons: person ? [person] : [],
       record: person ?? id,
       name,
       avatar,
@@ -166,21 +179,47 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
    *  is still connected, which would be another tab of theirs. */
   reclaimPerson(person: string, socketId: string): P | null {
     for (const p of this.players.values()) {
-      if (p.person === person && !p.connected) return this.rebind(p, socketId);
+      if (!p.persons.includes(person) || p.connected) continue;
+      p.person = person;
+      return this.rebind(p, socketId);
     }
     return null;
   }
 
   /** A newer tab of someone already here takes their seat over, so one
-   *  person is one player. Returns the seat and the socket it was taken from,
-   *  which the caller tells to step back. */
-  takeOver(person: string, socketId: string): { seat: P; from: string | null } | null {
+   *  person is one player; so does a device the seat was handed to before.
+   *  Returns the seat, the socket it was taken from, which the caller tells to
+   *  step back, and whether that was this browser's other tab or a device. */
+  takeOver(person: string, socketId: string): Moved<P> | null {
     for (const p of this.players.values()) {
-      if (p.person !== person || !p.connected) continue;
-      const from = p.socketId;
-      return { seat: this.rebind(p, socketId), from: from === socketId ? null : from };
+      if (!p.persons.includes(person) || !p.connected) continue;
+      return this.moveSeat(p, person, socketId);
     }
     return null;
+  }
+
+  /** Lets this seat be picked up on another device: a code for its QR link,
+   *  good once, for a few minutes. */
+  issueHandoff(playerId: string): { token: string; ms: number } | null {
+    if (!this.players.has(playerId)) return null;
+    return this.session.issueHandoff(playerId);
+  }
+
+  /** Moves a seat to the device that scanned its code, and remembers that
+   *  device's browser so it can take the seat back again later. */
+  useHandoff(token: string, person: string | null, socketId: string): Moved<P> | null {
+    const playerId = this.session.useHandoff(token);
+    const p = playerId ? this.players.get(playerId) : undefined;
+    if (!p) return null;
+    if (person && !p.persons.includes(person)) p.persons.push(person);
+    return this.moveSeat(p, person, socketId);
+  }
+
+  private moveSeat(p: P, person: string | null, socketId: string): Moved<P> {
+    const from = p.connected && p.socketId !== socketId ? p.socketId : null;
+    const to = person && p.person === person ? 'tab' : 'device';
+    p.person = person;
+    return { seat: this.rebind(p, socketId), from, to };
   }
 
   /** A seat stays reclaimable for as long as it exists: an away seat that
@@ -456,7 +495,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     for (const id of this.order) {
       const p = old.players.get(id)!;
       this.players.set(id, this.createPlayer({
-        id: p.id, token: p.token, person: p.person, record: p.record, name: p.name, avatar: p.avatar, score: 0,
+        id: p.id, token: p.token, person: p.person, persons: p.persons, record: p.record, name: p.name, avatar: p.avatar, score: 0,
         connected: p.connected, socketId: p.socketId, disconnectedAt: p.disconnectedAt,
       }));
     }

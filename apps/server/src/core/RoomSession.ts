@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import type { GameKind } from '@pic-game/shared';
 
 /** One finished game, kept so a session can be looked back over. */
@@ -10,6 +11,8 @@ export interface GameResult {
 }
 
 const HISTORY_KEPT = 20;
+/** How long a QR code for moving a seat to another device works. */
+export const HANDOFF_MS = 5 * 60_000;
 
 /** Everyone tied on the highest score, for games won on points. Nobody wins
  *  if the best score is zero. */
@@ -41,6 +44,9 @@ export class RoomSession {
    * behind the same router, which is how this gets played over home Wi-Fi.
    */
   readonly banned = new Set<string>();
+  /** Codes for moving a seat to another device, each good once until it
+   *  runs out: code → seat. */
+  private readonly handoffs = new Map<string, { playerId: string; until: number }>();
   /** Games finished, including ones nobody won. */
   games = 0;
   history: GameResult[] = [];
@@ -86,6 +92,30 @@ export class RoomSession {
     }
     this.games = Math.max(0, this.games - 1);
     this.history = this.history.slice(0, -1);
+  }
+
+  issueHandoff(playerId: string): { token: string; ms: number } {
+    const now = Date.now();
+    for (const [k, h] of this.handoffs) if (h.until <= now || h.playerId === playerId) this.handoffs.delete(k);
+    // Short, so the QR code stays easy to scan; 72 random bits, used once
+    // within minutes, is plenty.
+    const token = randomBytes(9).toString('base64url');
+    const until = now + HANDOFF_MS;
+    this.handoffs.set(token, { playerId, until });
+    return { token, ms: HANDOFF_MS };
+  }
+
+  /** Whether this session issued a code that still works. */
+  hasHandoff(token: string): boolean {
+    const h = this.handoffs.get(token);
+    return !!h && h.until > Date.now();
+  }
+
+  /** The seat a code moves, using the code up. Null once used or run out. */
+  useHandoff(token: string): string | null {
+    const h = this.handoffs.get(token);
+    this.handoffs.delete(token);
+    return h && h.until > Date.now() ? h.playerId : null;
   }
 
   /** Wins for the given players, leaving out anyone with none. */

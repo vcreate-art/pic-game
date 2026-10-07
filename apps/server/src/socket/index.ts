@@ -7,6 +7,7 @@ import {
 import {
   CHAT_BUCKET, DRAW_BUCKET, FIGHT_INPUT_BUCKET, MAX_NAME_LEN, MAZE_INPUT_BUCKET, RACE_POS_BUCKET, SUGGEST_BUCKET,
 } from '../config.js';
+import type { CorePlayer, Moved } from '../core/BaseRoom.js';
 import type { AnyRoom, RoomManager } from '../core/RoomManager.js';
 import type { FightRoom } from '../games/fight/FightRoom.js';
 import type { KungFuRoom } from '../games/kungfu/KungFuRoom.js';
@@ -81,7 +82,7 @@ function cleanSize(raw: unknown): number {
  *  and the host's controls. Every game move is held back. */
 const ALLOWED_WHILE_PAUSED = new Set<string>([
   'time:ping', 'room:create', 'room:join', 'room:leave', 'room:switch', 'room:pause', 'room:resume',
-  'game:restart', 'game:toLobby', 'chat:guess', 'player:rename', 'player:kick',
+  'game:restart', 'game:toLobby', 'chat:guess', 'player:rename', 'player:kick', 'seat:handoff', 'seat:pickup',
 ]);
 
 export function allowedWhilePaused(event: string): boolean {
@@ -121,6 +122,13 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       s.code = room.code;
       s.playerId = playerId;
       socket.join(room.code);
+    };
+
+    /** Tells the socket a seat was taken from to step back. */
+    const stepBack = (room: AnyRoom, moved: Moved<CorePlayer>) => {
+      if (!moved.from) return;
+      io.sockets.sockets.get(moved.from)?.leave(room.code);
+      io.to(moved.from).emit('room:replaced', { to: moved.to });
     };
 
     /** The room this socket is in, if it is the drawing game. */
@@ -217,10 +225,7 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
         let reclaimed = (p.token ? room.reclaim(p.token, socket.id) : null) ?? (person ? room.reclaimPerson(person, socket.id) : null);
         if (!reclaimed && person) {
           const took = room.takeOver(person, socket.id);
-          if (took?.from) {
-            io.sockets.sockets.get(took.from)?.leave(room.code);
-            io.to(took.from).emit('room:replaced');
-          }
+          if (took) stepBack(room, took);
           reclaimed = took?.seat ?? null;
         }
         if (reclaimed) {
@@ -818,6 +823,35 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       const kind = p?.kind;
       if (!GAME_KINDS.includes(kind as GameKind)) return reply({ ok: false, message: 'Pick a game.' });
       reply(rooms.switchKind(s.room.code, kind as GameKind, s.playerId));
+    });
+
+    // Scanned from another device: that seat moves here, name and all.
+    socket.on('seat:pickup', (p, cb) => {
+      if (typeof cb !== 'function') return;
+      const token = typeof p?.token === 'string' ? p.token : '';
+      const room = token ? rooms.byHandoff(token) : undefined;
+      const moved = room?.useHandoff(token, person, socket.id);
+      if (!room || !moved) {
+        return cb({ ok: false, code: 'HANDOFF', message: 'This code has run out. Make a new one on your other device.' });
+      }
+      // Seated as someone else already, here or elsewhere: that seat goes.
+      if (s.room && s.playerId && s.playerId !== moved.seat.id) {
+        const prev = s.room;
+        socket.leave(prev.code);
+        prev.removePlayer(s.playerId);
+      }
+      stepBack(room, moved);
+      bind(room, moved.seat.id);
+      cb({ ok: true, playerId: moved.seat.id, token: moved.seat.token, state: room.publicState() });
+      io.to(room.code).emit('player:updated', room.publicPlayers().find((x) => x.id === moved.seat.id)!);
+      if (room.kind === 'skribbl') room.resendSecretIfDrawer(moved.seat.id);
+    });
+
+    socket.on('seat:handoff', (cb) => {
+      if (typeof cb !== 'function') return;
+      const room = s.room;
+      const h = room && s.playerId ? room.issueHandoff(s.playerId) : null;
+      cb(h ? { ok: true, ...h } : { ok: false });
     });
 
     socket.on('room:leave', () => {

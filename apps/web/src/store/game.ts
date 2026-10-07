@@ -60,6 +60,8 @@ interface GameStore {
   kickedBy: string | null;
   /** The room whose seat a newer tab of this browser took from this one. */
   replaced: string | null;
+  /** Where it went: another tab here, or another device by QR code. */
+  replacedTo: 'tab' | 'device';
   /** Our own Star Realms hand. Nobody else's ever arrives. */
   realmsHand: CardInstance[];
   realmsOwed: number;
@@ -122,7 +124,7 @@ interface GameStore {
   setReplaced: (code: string | null) => void;
   /** Leaves the room behind after a newer tab took the seat, in one step so
    *  nothing sees the room gone without knowing why. */
-  replacedHere: (code: string) => void;
+  replacedHere: (code: string, to: 'tab' | 'device') => void;
   reset: () => void;
 }
 
@@ -142,6 +144,7 @@ export const useGame = create<GameStore>((set) => ({
   notice: null,
   kickedBy: null,
   replaced: loadReplaced(),
+  replacedTo: 'tab',
   realmsHand: [],
   realmsOwed: 0,
   spiesKey: null,
@@ -367,9 +370,9 @@ export const useGame = create<GameStore>((set) => ({
     saveReplaced(replaced);
     set({ replaced });
   },
-  replacedHere: (code) => {
+  replacedHere: (code, to) => {
     saveReplaced(code);
-    set({ ...noGamePrivate(), me: null, room: null, messages: [], notice: null, kickedBy: null, replaced: code });
+    set({ ...noGamePrivate(), me: null, room: null, messages: [], notice: null, kickedBy: null, replaced: code, replacedTo: to });
   },
 
   reset: () =>

@@ -53,9 +53,9 @@ export function bindSocket(engine: CanvasEngine): () => void {
   });
   socket.on('kicked', ({ by }) => g().setKickedBy(by));
   // The room is the other tab's now: drop it here and say so.
-  socket.on('room:replaced', () => {
+  socket.on('room:replaced', ({ to }) => {
     const code = g().room?.code;
-    if (code) g().replacedHere(code);
+    if (code) g().replacedHere(code, to);
   });
 
   socket.on('turn:choosing', (p) => {

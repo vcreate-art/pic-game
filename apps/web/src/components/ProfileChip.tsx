@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Lock, Pencil, Trophy } from 'lucide-react';
+import { Lock, Pencil, Smartphone, Trophy } from 'lucide-react';
 import { AVATAR_COLORS, AVATAR_FACES } from '@pic-game/shared';
 import { MAX_NAME_LEN } from '../constants.js';
 import { PROFILE_EVENT, getSocket, loadProfile, saveProfile, type Profile } from '../net/socket.js';
@@ -8,6 +8,7 @@ import { useGame } from '../store/game.js';
 import { useDismiss } from '../lib/useDismiss.js';
 import { ACHIEVEMENTS, byRelevance, totalPlayed, totalWon, useStats } from '../lib/achievements.js';
 import { Avatar } from './Avatar.js';
+import { PhoneHandoff } from './PhoneHandoff.js';
 
 /** How many badges the menu shows before handing over to the full page. */
 const PEEK = 3;
@@ -22,6 +23,7 @@ export function ProfileChip() {
   const [profile, setProfile] = useState<Profile | null>(() => loadProfile());
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [phone, setPhone] = useState(false);
   const stats = useStats();
   const [name, setName] = useState('');
   const [color, setColor] = useState(0);
@@ -38,11 +40,20 @@ export function ProfileChip() {
 
   useDismiss(box, open, close);
 
+  // Once the seat has moved to the phone, this tab has nothing to hand over.
+  useEffect(() => {
+    if (!inRoom && phone) {
+      setPhone(false);
+      setOpen(false);
+    }
+  }, [inRoom, phone]);
+
   // Nothing to show until a name has been picked on the landing page.
   if (!profile) return null;
 
   const toggle = () => {
     setEditing(false);
+    setPhone(false);
     setOpen((o) => !o);
   };
 
@@ -75,7 +86,7 @@ export function ProfileChip() {
         <span className="visually-hidden">(your profile and achievements)</span>
       </button>
 
-      {open && !editing && (
+      {open && !editing && !phone && (
         <div className="profile__pop card">
           <div className="profile__who">
             <Avatar data={profile.avatar} size={44} />
@@ -116,7 +127,12 @@ export function ProfileChip() {
 
           {/* Following a link out of a room would leave it, so not from there. */}
           {inRoom ? (
-            <p className="profile__note">The full list is on the front page, once this game is over.</p>
+            <>
+              <button type="button" className="btn btn--outline profile__phone" onClick={() => setPhone(true)}>
+                <Smartphone aria-hidden="true" /> Play on your phone
+              </button>
+              <p className="profile__note">The full list of achievements is on the front page, once this game is over.</p>
+            </>
           ) : (
             <Link to="/achievements" className="btn btn--outline" onClick={() => setOpen(false)}>
               See all achievements
@@ -124,6 +140,8 @@ export function ProfileChip() {
           )}
         </div>
       )}
+
+      {open && phone && <PhoneHandoff onBack={() => setPhone(false)} />}
 
       {open && editing && (
         <form className="profile__pop card" onSubmit={save}>

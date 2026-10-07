@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { RoomState } from '@pic-game/shared';
 import { BaseRoom, type CorePlayer } from '../core/BaseRoom.js';
-import { RoomSession, topScorers } from '../core/RoomSession.js';
+import { HANDOFF_MS, RoomSession, topScorers } from '../core/RoomSession.js';
 import { fakeIO } from './fakeIO.js';
 
 describe('RoomSession', () => {
@@ -234,5 +234,65 @@ describe('coming back to a room', () => {
     const room = new TestRoom('ABCDEF', io);
     room.addPlayer('Ana', { color: 0, face: 0 }, 's1', ME);
     expect(room.takeOver('22222222-2222-4222-8222-222222222222', 's2')).toBeNull();
+  });
+});
+
+describe('handing a seat to another device', () => {
+  const DESK = '11111111-1111-4111-8111-111111111111';
+  const PHONE = '33333333-3333-4333-8333-333333333333';
+
+  it('moves the seat, wins and all, to the device with the code', () => {
+    const { io } = fakeIO();
+    const room = new TestRoom('ABCDEF', io);
+    const a = room.addPlayer('Ana', { color: 0, face: 0 }, 'desk', DESK);
+    room.win([a.id]);
+    const { token } = room.issueHandoff(a.id)!;
+    const moved = room.useHandoff(token, PHONE, 'phone');
+    expect(moved).toMatchObject({ from: 'desk', to: 'device' });
+    expect(moved?.seat.id).toBe(a.id);
+    expect(a.socketId).toBe('phone');
+    expect(room.meta().wins).toEqual({ [a.id]: 1 });
+  });
+
+  it('works once', () => {
+    const { io } = fakeIO();
+    const room = new TestRoom('ABCDEF', io);
+    const a = room.addPlayer('Ana', { color: 0, face: 0 }, 'desk', DESK);
+    const { token } = room.issueHandoff(a.id)!;
+    room.useHandoff(token, PHONE, 'phone');
+    expect(room.useHandoff(token, PHONE, 'phone2')).toBeNull();
+  });
+
+  it('runs out', () => {
+    vi.useFakeTimers();
+    try {
+      const { io } = fakeIO();
+      const room = new TestRoom('ABCDEF', io);
+      const a = room.addPlayer('Ana', { color: 0, face: 0 }, 'desk', DESK);
+      const { token } = room.issueHandoff(a.id)!;
+      vi.advanceTimersByTime(HANDOFF_MS + 1);
+      expect(room.useHandoff(token, PHONE, 'phone')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('lets the first device take the seat back, and the phone after that', () => {
+    const { io } = fakeIO();
+    const room = new TestRoom('ABCDEF', io);
+    const a = room.addPlayer('Ana', { color: 0, face: 0 }, 'desk', DESK);
+    room.useHandoff(room.issueHandoff(a.id)!.token, PHONE, 'phone');
+    expect(room.takeOver(DESK, 'desk2')).toMatchObject({ from: 'phone', to: 'device' });
+    expect(room.takeOver(PHONE, 'phone2')).toMatchObject({ from: 'desk2', to: 'device' });
+    expect(room.players.size).toBe(1);
+  });
+
+  it('keeps only the newest code for a seat', () => {
+    const { io } = fakeIO();
+    const room = new TestRoom('ABCDEF', io);
+    const a = room.addPlayer('Ana', { color: 0, face: 0 }, 'desk', DESK);
+    const first = room.issueHandoff(a.id)!.token;
+    room.issueHandoff(a.id);
+    expect(room.useHandoff(first, PHONE, 'phone')).toBeNull();
   });
 });

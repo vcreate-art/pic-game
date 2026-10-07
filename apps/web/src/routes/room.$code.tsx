@@ -113,12 +113,18 @@ function RoomPage() {
   // A newer tab of this browser has the seat now. Playing here again takes
   // it back, and that tab gets this screen instead.
   const replaced = useGame((s) => s.replaced === code);
+  const replacedTo = useGame((s) => s.replacedTo);
   if (replaced) {
+    const device = replacedTo === 'device';
     return (
       <div className="landing landing--narrow">
         <div className="landing__hero">
-          <h1 className="landing__title">Open in another tab</h1>
-          <p className="landing__sub">You're playing in room {code} from another tab. You can play from one tab at a time.</p>
+          <h1 className="landing__title">{device ? 'Playing on another device' : 'Open in another tab'}</h1>
+          <p className="landing__sub">
+            {device
+              ? `Your seat in room ${code} moved to the device that scanned the code. You can play from one place at a time.`
+              : `You're playing in room ${code} from another tab. You can play from one tab at a time.`}
+          </p>
         </div>
         <div className="card landing__card">
           <button
@@ -130,7 +136,7 @@ function RoomPage() {
               if (identity.current) joinRoom(identity.current, loadSeat(code)?.token, false);
             }}
           >
-            Play in this tab
+            {device ? 'Play here instead' : 'Play in this tab'}
           </button>
           <button
             className="btn btn--ghost"

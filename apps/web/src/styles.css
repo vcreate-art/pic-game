@@ -138,6 +138,19 @@ button, input { font: inherit; color: inherit; }
 .profile__badges li:not(.is-earned) .profile__badgename { color: var(--ink-soft); }
 .profile__badgeat { font-size: 12px; color: var(--ink-soft); }
 .profile__pop > a.btn { text-align: center; text-decoration: none; }
+.profile__phone { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.profile__phone svg { width: 18px; height: 18px; }
+
+/* Moving the seat to a phone: the code, how long it lasts, and a way back. */
+.handoff__title { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 800; }
+.handoff__qr {
+  display: grid; place-items: center; aspect-ratio: 1; width: 100%;
+  border: 1px solid var(--line); border-radius: 12px; background: #fff; overflow: hidden;
+}
+.handoff__qr svg { display: block; width: 100%; height: 100%; }
+.handoff__qr.is-expired svg { opacity: .15; }
+.handoff__wait { font-size: 13px; color: var(--ink-soft); }
+.handoff__note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
 
 .conn { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
 .conn.is-on { color: var(--ok); background: var(--ok-soft); }
