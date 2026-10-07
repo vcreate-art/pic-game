@@ -737,6 +737,7 @@ button, input { font: inherit; color: inherit; }
   font-size: 13px; font-weight: 700; line-height: 1; cursor: pointer;
   transition: color .15s ease, border-color .15s ease, background .15s ease;
 }
+.kick.is-spacer { visibility: hidden; }
 .kick:hover { border-color: var(--warn); color: var(--warn); background: var(--warn-wash); }
 .kick.is-armed {
   background: var(--warn); border-color: var(--warn); color: #fff;

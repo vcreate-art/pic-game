@@ -156,7 +156,13 @@ export function RoomPanel() {
                           {!p.connected && <span className="room__away">away</span>}
                         </span>
                         {of > 0 && <span className="room__wins">{n} of {of} won</span>}
-                        {isHost && p.id !== hostId && <KickButton playerId={p.id} name={p.name} />}
+                        {isHost &&
+                          (p.id !== hostId ? (
+                            <KickButton playerId={p.id} name={p.name} />
+                          ) : (
+                            // Holds the button's place, so the host's count lines up.
+                            <span className="kick is-spacer" aria-hidden="true">×</span>
+                          ))}
                       </li>
                     );
                   })}
