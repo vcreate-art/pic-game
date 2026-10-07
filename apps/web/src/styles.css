@@ -2772,56 +2772,54 @@ button, input { font: inherit; color: inherit; }
 /* ---------------------------------------------------------------- achievements */
 
 .achv {
-  margin: 0 auto; width: 100%; max-width: 960px;
-  display: flex; flex-direction: column; gap: 24px; padding: 28px 0 40px;
+  margin: 0 auto; width: 100%; max-width: 760px;
+  display: flex; flex-direction: column; gap: 28px; padding: 28px 0 40px;
 }
-.achv__head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.achv__head { display: flex; flex-direction: column; gap: 8px; }
 .achv__title { margin: 0; font-family: var(--display); font-size: 40px; font-weight: 800; line-height: 1.05; }
+.achv__record { margin: 0; max-width: 40em; font-size: 17px; line-height: 1.5; color: var(--ink-soft); }
 .achv__note { margin: 0; font-size: 13px; color: var(--ink-soft); }
-.achv__empty {
-  margin: 0; padding: 28px; text-align: center; color: var(--ink-soft);
-  border: 1px dashed var(--line); border-radius: 12px;
-}
+
+.achv__progress { display: flex; flex-direction: column; gap: 10px; }
+.achv__count { margin: 0; font-family: var(--display); font-size: 24px; font-weight: 800; line-height: 1.1; }
+.achv__shelf { display: flex; gap: 4px; }
+.achv__shelf span { flex: 1; height: 14px; border-radius: 3px; background: var(--line); }
+.achv__shelf span:first-child { border-radius: 999px 3px 3px 999px; }
+.achv__shelf span:last-child { border-radius: 3px 999px 999px 3px; }
+.achv__shelf span.is-earned { background: var(--accent); }
+
 .achv__section { display: flex; flex-direction: column; gap: 12px; }
 .achv__heading { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 800; }
 
-.achv__stats {
-  margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;
-}
-.achv__stats > div {
-  background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px;
-}
-.achv__stats dt { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
-.achv__stats dd { margin: 2px 0 0; font-family: var(--display); font-size: 28px; font-weight: 800; }
-
-.achv__grid {
+.achv__list {
   list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px;
+  background: var(--card); border: 1px solid var(--edge); border-radius: var(--radius);
 }
-.achv-card {
-  display: flex; gap: 12px; padding: 14px; align-items: flex-start;
-  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
-}
-.achv-card.is-earned { border-color: var(--accent); box-shadow: var(--shadow); }
-.achv-card__icon {
-  flex: none; display: grid; place-items: center; width: 40px; height: 40px;
+.achv-row { display: flex; align-items: center; gap: 14px; padding: 14px 18px; }
+.achv-row + .achv-row { border-top: 1px solid var(--line); }
+.achv-row__icon {
+  flex: none; display: grid; place-items: center; width: 36px; height: 36px;
   border-radius: 999px; background: var(--paper); color: var(--ink-soft);
 }
-.achv-card.is-earned .achv-card__icon { background: var(--accent-soft); color: var(--accent); }
-.achv-card__icon svg { width: 20px; height: 20px; }
-.achv-card__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.achv-card__title { margin: 0; font-weight: 700; }
-.achv-card:not(.is-earned) .achv-card__title { color: var(--ink-soft); }
-.achv-card__desc { margin: 0; font-size: 13px; color: var(--ink-soft); }
-.achv-card__meta { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: var(--accent); }
-.achv-card__bar {
-  position: relative; margin-top: 4px; height: 16px; border-radius: 999px;
-  background: var(--paper); overflow: hidden;
+.achv-row.is-earned .achv-row__icon { background: var(--accent-soft); color: var(--accent); }
+.achv-row__icon svg { width: 18px; height: 18px; }
+.achv-row__body { flex: 1; min-width: 0; }
+.achv-row__title { margin: 0; font-weight: 700; }
+.achv-row__desc { margin: 2px 0 0; font-size: 13.5px; color: var(--ink-soft); }
+.achv-row__side {
+  flex: none; width: 110px; margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+  font-size: 13px; color: var(--ink-soft);
 }
-.achv-card__bar span { position: absolute; inset: 0 auto 0 0; background: var(--accent-soft); }
-.achv-card__bar em {
-  position: relative; display: block; text-align: center; font-style: normal;
-  font-size: 11px; font-weight: 600; line-height: 16px; color: var(--ink-soft);
+.achv-row.is-earned .achv-row__side { color: var(--accent); font-weight: 600; }
+.achv-row__bar { position: relative; width: 100%; height: 6px; border-radius: 999px; background: var(--paper); overflow: hidden; }
+/* Quieter than the shelf above, which is the page's one strong colour. */
+.achv-row__bar span { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: color-mix(in srgb, var(--accent) 45%, var(--card)); }
+/* Narrow screens give the description the width and put progress under it. */
+@media (max-width: 520px) {
+  .achv-row { flex-wrap: wrap; align-items: flex-start; }
+  .achv-row__body { flex-basis: calc(100% - 50px); }
+  .achv-row__side { width: auto; flex: 1; margin-left: 50px; align-items: stretch; flex-direction: row-reverse; justify-content: flex-end; align-items: center; gap: 10px; }
+  .achv-row__bar { flex: 1; }
 }
 
 .achv__games { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
