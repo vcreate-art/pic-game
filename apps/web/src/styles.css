@@ -2834,7 +2834,7 @@ button, input { font: inherit; color: inherit; }
    in the game's own colour. */
 .achv-game .achv-row__icon,
 .achv-games__untried .achv-row__icon { background: color-mix(in srgb, var(--game) 14%, var(--card)); color: var(--game); }
-.achv-game .achv-row__side { width: 64px; }
+.achv-game > .achv-row__bar { flex: none; width: 56px; }
 .achv-game .achv-row__bar span { background: color-mix(in srgb, var(--game) 45%, var(--card)); }
 .achv-games__untried { flex-direction: column; align-items: stretch; gap: 10px; }
 .achv-games__untried .achv-row__desc { margin: 0; }

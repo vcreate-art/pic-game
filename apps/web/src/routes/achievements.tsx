@@ -110,15 +110,12 @@ function Achievements() {
                   <span className="achv-row__icon" aria-hidden="true"><Icon /></span>
                   <div className="achv-row__body">
                     <p className="achv-row__title">{GAME_LABELS[g.kind].name}</p>
-                    <p className="achv-row__desc">{g.played} played</p>
+                    <p className="achv-row__desc">{g.played} played, {g.won} won</p>
                   </div>
-                  <div className="achv-row__side">
-                    <span>{g.won} won</span>
-                    {/* How much of what you played there, you won. */}
-                    <span className="achv-row__bar" aria-hidden="true">
-                      <span style={{ width: `${(g.won / g.played) * 100}%` }} />
-                    </span>
-                  </div>
+                  {/* How much of what you played there, you won. */}
+                  <span className="achv-row__bar" aria-hidden="true">
+                    <span style={{ width: `${(g.won / g.played) * 100}%` }} />
+                  </span>
                 </li>
               );
             })}
