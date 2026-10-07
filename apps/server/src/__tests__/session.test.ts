@@ -203,6 +203,19 @@ describe('coming back to a room', () => {
     expect(room.meta().winsByGame).toEqual({ [again.id]: { flip7: 1 } });
   });
 
+  it("tells everyone else a rejoining player's record straight away", () => {
+    const { io, sent } = fakeIO();
+    const room = new TestRoom('ABCDEF', io);
+    const a = room.addPlayer('Ana', { color: 0, face: 0 }, 's1', ME);
+    room.addPlayer('Ben', { color: 1, face: 1 }, 's2');
+    room.win([a.id]);
+    room.removePlayer(a.id);
+
+    const again = room.addPlayer('Ana', { color: 0, face: 0 }, 's3', ME);
+    const meta = sent.filter((m) => m.event === 'room:meta');
+    expect(meta.at(-1)?.args[0]).toMatchObject({ wins: { [again.id]: 1 } });
+  });
+
   it('lets a newer tab of the same browser take the seat over', () => {
     const { io } = fakeIO();
     const room = new TestRoom('ABCDEF', io);

@@ -144,6 +144,8 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     this.order.push(player.id);
     if (!this.hostId) this.hostId = player.id;
     this.cancelEmptyCollection();
+    // Someone back after leaving brings their record with them.
+    this.sendMetaIfChanged();
     return player;
   }
 
@@ -229,6 +231,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     }
 
     this.onPlayerRemoved(playerId);
+    this.sendMetaIfChanged();
     if (this.players.size < this.minPlayers && !this.isLobby()) this.onTooFewPlayers();
     if (this.activeCount() === 0) this.scheduleEmptyCollection();
   }
@@ -490,6 +493,12 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     this.io.to(this.code).emit('state:sync', state);
   }
 
+  /** Sends the meta if it differs from what clients last had, for changes
+   *  that aren't a game's own, like who is seated. */
+  private sendMetaIfChanged(): void {
+    if (JSON.stringify(this.meta()) !== this.sentMeta) this.emitMeta();
+  }
+
   /** Sends the meta if it differs from what clients last had: a game starting
    *  or ending changes what the host can do. Each game calls this whenever it
    *  broadcasts its own state. */
@@ -503,7 +512,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     }
     this.noteStage(stage);
     this.lastStage = stage;
-    if (JSON.stringify(this.meta()) !== this.sentMeta) this.emitMeta();
+    this.sendMetaIfChanged();
   }
 
   /** Every game reports its result here, from wherever it ends. Ties give each
