@@ -378,6 +378,11 @@ button, input { font: inherit; color: inherit; }
   align-content: start;
 }
 .lobby__invite { grid-area: invite; text-align: center; }
+/* Stays put when pressed and as its label changes. */
+.invite__copy:active:not(:disabled) { transform: none; }
+.invite__labels { display: inline-grid; }
+.invite__labels > span { grid-area: 1 / 1; visibility: hidden; }
+.invite__labels > .is-on { visibility: visible; }
 .lobby__players { grid-area: players; }
 .lobby__settings { grid-area: settings; display: flex; flex-direction: column; gap: 16px; }
 /* The card stretches to the column height, so an auto margin drops the action to
