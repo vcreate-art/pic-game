@@ -1,5 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
 import type { ClientToServerEvents, ServerToClientEvents } from '@pic-game/shared';
+import { uid } from '../lib/uid.js';
 
 export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -16,41 +17,39 @@ function personKey(): string {
   // For trying a game with several players from one browser: each tab opened
   // with ?newplayer is someone else.
   if (new URLSearchParams(location.search).has('newplayer')) return tabPerson();
+  return browserKey();
+}
+
+/** This browser's lasting id, whatever the tab. Also names this device's
+ *  share of the achievement stats. */
+export function browserKey(): string {
   try {
     let key = localStorage.getItem(PERSON_KEY);
     if (!key) {
-      key = uuid();
+      key = uid();
       localStorage.setItem(PERSON_KEY, key);
     }
     return key;
   } catch {
-    return uuid();
+    return (memoryKey ??= uid());
   }
 }
+
+/** Without storage, one id for as long as the page lasts. */
+let memoryKey: string | null = null;
 
 /** A person for this tab alone, kept across its refreshes. */
 function tabPerson(): string {
   try {
     let key = sessionStorage.getItem(PERSON_KEY);
     if (!key) {
-      key = uuid();
+      key = uid();
       sessionStorage.setItem(PERSON_KEY, key);
     }
     return key;
   } catch {
-    return uuid();
+    return uid();
   }
-}
-
-/** crypto.randomUUID is only there on https and localhost; a game over home
- *  Wi-Fi by plain http still needs one. */
-function uuid(): string {
-  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  const b = crypto.getRandomValues(new Uint8Array(16));
-  b[6] = (b[6]! & 0x0f) | 0x40;
-  b[8] = (b[8]! & 0x3f) | 0x80;
-  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
 /** One connection per tab, created lazily. Socket.IO handles reconnect and

@@ -64,6 +64,10 @@ function cleanAvatar(raw: unknown): Avatar {
 
 /** The browser's lasting id, from the handshake. A random UUID the client
  *  made; anything else is ignored, and that browser just isn't known again. */
+/** The most achievement data a handoff carries: far beyond what a player's
+ *  stats come to, a few kilobytes even after years of play. */
+const MAX_HANDOFF_STATS = 64 * 1024;
+
 function cleanPerson(raw: unknown): string | null {
   return typeof raw === 'string' && /^[0-9a-f-]{36}$/i.test(raw) ? raw : null;
 }
@@ -842,15 +846,17 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       }
       stepBack(room, moved);
       bind(room, moved.seat.id);
-      cb({ ok: true, playerId: moved.seat.id, token: moved.seat.token, state: room.publicState() });
+      cb({ ok: true, playerId: moved.seat.id, token: moved.seat.token, state: room.publicState(), stats: moved.stats });
       io.to(room.code).emit('player:updated', room.publicPlayers().find((x) => x.id === moved.seat.id)!);
       if (room.kind === 'skribbl') room.resendSecretIfDrawer(moved.seat.id);
     });
 
-    socket.on('seat:handoff', (cb) => {
+    socket.on('seat:handoff', (p, cb) => {
       if (typeof cb !== 'function') return;
       const room = s.room;
-      const h = room && s.playerId ? room.issueHandoff(s.playerId) : null;
+      // Only carried, never read; capped so a code can't hold the server's memory.
+      const stats = typeof p?.stats === 'string' && p.stats.length <= MAX_HANDOFF_STATS ? p.stats : null;
+      const h = room && s.playerId ? room.issueHandoff(s.playerId, stats) : null;
       cb(h ? { ok: true, ...h } : { ok: false });
     });
 

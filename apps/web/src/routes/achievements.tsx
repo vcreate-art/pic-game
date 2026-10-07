@@ -167,7 +167,7 @@ function Achievements() {
         </section>
       </div>
 
-      <p className="achv__note">Your progress is saved in this browser only and isn't shared with anyone.</p>
+      <p className="achv__note">Your progress is saved on this device. Moving to your phone by QR code brings it along.</p>
     </div>
   );
 }

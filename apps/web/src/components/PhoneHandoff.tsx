@@ -3,12 +3,14 @@ import { ArrowLeft } from 'lucide-react';
 import { encode } from 'uqr';
 import type { GameKind } from '@pic-game/shared';
 import { getSocket } from '../net/socket.js';
+import { exportStats } from '../lib/achievements.js';
 import { GAME_ICONS } from './gameIcons.js';
 import { useGame } from '../store/game.js';
 
 /**
  * A QR code that moves this seat to a phone. Scanning it opens /handoff/<code>
- * there; the seat, tonight's wins and its cards go with it, and this tab shows
+ * there; the seat, tonight's wins, its cards and the player's achievements go
+ * with it, and this tab shows
  * where it went. Each code works once, for a few minutes, and is renewed here
  * when it runs out.
  */
@@ -23,7 +25,8 @@ export function PhoneHandoff({ onBack }: { onBack: () => void }) {
 
   const ask = useCallback(() => {
     setFailed(false);
-    getSocket().emit('seat:handoff', (r) => {
+    // Achievements go too, read fresh each time a code is made.
+    getSocket().emit('seat:handoff', { stats: exportStats() }, (r) => {
       if (!r.ok) return setFailed(true);
       const at = Date.now();
       setToken(r.token);

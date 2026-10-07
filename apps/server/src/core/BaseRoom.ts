@@ -200,19 +200,20 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
 
   /** Lets this seat be picked up on another device: a code for its QR link,
    *  good once, for a few minutes. */
-  issueHandoff(playerId: string): { token: string; ms: number } | null {
+  issueHandoff(playerId: string, stats: string | null = null): { token: string; ms: number } | null {
     if (!this.players.has(playerId)) return null;
-    return this.session.issueHandoff(playerId);
+    return this.session.issueHandoff(playerId, stats);
   }
 
   /** Moves a seat to the device that scanned its code, and remembers that
-   *  device's browser so it can take the seat back again later. */
-  useHandoff(token: string, person: string | null, socketId: string): Moved<P> | null {
-    const playerId = this.session.useHandoff(token);
-    const p = playerId ? this.players.get(playerId) : undefined;
-    if (!p) return null;
+   *  device's browser so it can take the seat back again later. Hands back
+   *  the stats the other device sent with the code. */
+  useHandoff(token: string, person: string | null, socketId: string): (Moved<P> & { stats: string | null }) | null {
+    const h = this.session.useHandoff(token);
+    const p = h ? this.players.get(h.playerId) : undefined;
+    if (!h || !p) return null;
     if (person && !p.persons.includes(person)) p.persons.push(person);
-    return this.moveSeat(p, person, socketId);
+    return { ...this.moveSeat(p, person, socketId), stats: h.stats };
   }
 
   private moveSeat(p: P, person: string | null, socketId: string): Moved<P> {

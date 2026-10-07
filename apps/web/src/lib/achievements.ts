@@ -1,62 +1,71 @@
 import { useEffect, useState } from 'react';
 import { PLAYABLE_KINDS, type GameKind } from '@pic-game/shared';
 import { useGame } from '../store/game.js';
+import { browserKey } from '../net/socket.js';
+import {
+  countGame, emptyDevice, emptyStored, mergeStored, readStored, totals, type Stats, type Stored,
+} from './stats.js';
 
 /**
- * What this browser has played and won, and the achievements that adds up
- * to. Kept in localStorage only: there are no accounts, and nothing here is
- * sent anywhere, so clearing site data or switching device starts afresh.
+ * What this player has played and won, and the achievements that adds up to.
+ * Kept in localStorage, as each device's share (see stats.ts): there are no
+ * accounts. Moving to a phone by QR code carries every share across; nothing
+ * else sends them anywhere.
  */
-export interface Stats {
-  played: Partial<Record<GameKind, number>>;
-  won: Partial<Record<GameKind, number>>;
-  /** Games finished while we were the host. */
-  hosted: number;
-  /** Most players in a game we finished. */
-  biggestRoom: number;
-  /** Wins in a row, and the best run so far. */
-  streak: number;
-  bestStreak: number;
-  /** Achievement id → when it was first earned (epoch ms). */
-  unlocked: Record<string, number>;
-  /** Each game's last few nights it was played, oldest first. */
-  nights: Partial<Record<GameKind, Night[]>>;
-}
-
-/** One local day's games of one kind. */
-export interface Night {
-  /** YYYY-MM-DD, in the player's own time zone. */
-  day: string;
-  played: number;
-  won: number;
-}
-
-/** How many nights each game keeps. */
-export const NIGHTS = 7;
+export { NIGHTS, type Night, type Stats } from './stats.js';
 
 const STATS_KEY = 'pic-game:stats';
 
 /** Fired on every save, so an open achievements page keeps up. */
 export const STATS_EVENT = 'pic-game:stats';
 
-const empty = (): Stats => ({ played: {}, won: {}, hosted: 0, biggestRoom: 0, streak: 0, bestStreak: 0, unlocked: {}, nights: {} });
-
-export function loadStats(): Stats {
+function loadStored(): Stored {
   try {
     const raw = localStorage.getItem(STATS_KEY);
-    return raw ? { ...empty(), ...(JSON.parse(raw) as Partial<Stats>) } : empty();
+    return raw ? readStored(JSON.parse(raw), browserKey()) : emptyStored();
   } catch {
-    return empty();
+    return emptyStored();
   }
 }
 
-function saveStats(s: Stats): void {
+function saveStored(s: Stored): void {
   try {
     localStorage.setItem(STATS_KEY, JSON.stringify(s));
   } catch {
     /* private mode — this visit's progress just isn't kept */
   }
-  window.dispatchEvent(new CustomEvent<Stats>(STATS_EVENT, { detail: s }));
+  window.dispatchEvent(new CustomEvent<Stats>(STATS_EVENT, { detail: totals(s, browserKey()) }));
+}
+
+export function loadStats(): Stats {
+  return totals(loadStored(), browserKey());
+}
+
+/** Every device's share, to send along with a seat moving to another device. */
+export function exportStats(): string {
+  return JSON.stringify(loadStored());
+}
+
+/**
+ * Takes in the shares that came with a seat from another device. Returns
+ * whether that brought anything new, for saying so.
+ */
+export function importStats(json: string): boolean {
+  let incoming: Stored;
+  try {
+    incoming = readStored(JSON.parse(json), browserKey());
+  } catch {
+    return false;
+  }
+  const before = loadStored();
+  const merged = mergeStored(before, incoming);
+  if (JSON.stringify(merged) === JSON.stringify(before)) return false;
+  // Together they may have reached a badge neither had on its own.
+  const now = totals(merged, browserKey());
+  unlockNew(now);
+  merged.unlocked = now.unlocked;
+  saveStored(merged);
+  return true;
 }
 
 /** The saved stats, kept current as games finish. */
@@ -126,19 +135,6 @@ export function byRelevance(s: Stats): Achievement[] {
 
 const today = () => new Date().toLocaleDateString('en-CA');
 
-function addNight(s: Stats, kind: GameKind, won: boolean) {
-  const nights = s.nights[kind] ?? [];
-  const day = today();
-  let last = nights[nights.length - 1];
-  if (last?.day !== day) {
-    last = { day, played: 0, won: 0 };
-    nights.push(last);
-  }
-  last.played += 1;
-  if (won) last.won += 1;
-  s.nights[kind] = nights.slice(-NIGHTS);
-}
-
 /** Marks anything newly earned and returns those, oldest-defined first. */
 function unlockNew(s: Stats): Achievement[] {
   const fresh = ACHIEVEMENTS.filter((a) => !s.unlocked[a.id] && a.progress(s) >= a.goal);
@@ -149,15 +145,18 @@ function unlockNew(s: Stats): Achievement[] {
 
 const NOTICE_MS = 4000;
 
-function announce(earned: Achievement[]) {
-  if (!earned.length) return;
-  const [first] = earned;
-  const text = earned.length === 1 && first ? `🏆 Achievement: ${first.title}` : `🏆 ${earned.length} new achievements`;
-  const g = useGame.getState();
-  g.setNotice(text);
+/** Shows a notice for a few seconds, unless another replaces it first. */
+export function flash(text: string): void {
+  useGame.getState().setNotice(text);
   setTimeout(() => {
     if (useGame.getState().notice === text) useGame.getState().setNotice(null);
   }, NOTICE_MS);
+}
+
+function announce(earned: Achievement[]) {
+  if (!earned.length) return;
+  const [first] = earned;
+  flash(earned.length === 1 && first ? `🏆 Achievement: ${first.title}` : `🏆 ${earned.length} new achievements`);
 }
 
 /**
@@ -182,15 +181,12 @@ useGame.subscribe((st, prev) => {
   startedIn = null;
 
   const won = (room.meta.wins[me] ?? 0) > (before.meta.wins[me] ?? 0);
-  const s = loadStats();
-  s.played[room.kind] = (s.played[room.kind] ?? 0) + 1;
-  if (won) s.won[room.kind] = (s.won[room.kind] ?? 0) + 1;
-  if (room.hostId === me) s.hosted += 1;
-  s.biggestRoom = Math.max(s.biggestRoom, room.players.length);
-  addNight(s, room.kind, won);
-  s.streak = won ? s.streak + 1 : 0;
-  s.bestStreak = Math.max(s.bestStreak, s.streak);
-  const earned = unlockNew(s);
-  saveStats(s);
+  const stored = loadStored();
+  const device = (stored.devices[browserKey()] ??= emptyDevice());
+  countGame(device, { kind: room.kind, won, hosted: room.hostId === me, players: room.players.length, day: today() });
+  const now = totals(stored, browserKey());
+  const earned = unlockNew(now);
+  stored.unlocked = now.unlocked;
+  saveStored(stored);
   announce(earned);
 });

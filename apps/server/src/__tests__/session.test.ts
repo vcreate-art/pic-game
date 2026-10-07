@@ -254,6 +254,14 @@ describe('handing a seat to another device', () => {
     expect(room.meta().wins).toEqual({ [a.id]: 1 });
   });
 
+  it('carries the stats sent with the code, untouched', () => {
+    const { io } = fakeIO();
+    const room = new TestRoom('ABCDEF', io);
+    const a = room.addPlayer('Ana', { color: 0, face: 0 }, 'desk', DESK);
+    const { token } = room.issueHandoff(a.id, '{"v":2}')!;
+    expect(room.useHandoff(token, PHONE, 'phone')?.stats).toBe('{"v":2}');
+  });
+
   it('works once', () => {
     const { io } = fakeIO();
     const room = new TestRoom('ABCDEF', io);

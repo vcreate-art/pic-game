@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoute, useNavigate, useParams } from '@tanstack/react-router';
 import { getSocket, loadProfile, saveProfile, saveSeat } from '../net/socket.js';
+import { flash, importStats } from '../lib/achievements.js';
 import { useGame } from '../store/game.js';
 import { Route as rootRoute } from './__root.js';
 
 /**
  * Where a seat's QR code lands on the other device. Takes the seat, with its
- * name and avatar if this device has no profile yet, then goes to the room,
- * so the room's own address is what stays in history.
+ * name and avatar if this device has no profile yet, and the achievements
+ * the other device sent, then goes to the room, so the room's own address is
+ * what stays in history.
  */
 function HandoffPage() {
   const { token } = useParams({ from: '/handoff/$token' });
@@ -28,10 +30,13 @@ function HandoffPage() {
       const seat = res.state.players.find((p) => p.id === res.playerId);
       if (!loadProfile() && seat) saveProfile({ name: seat.name, avatar: seat.avatar });
       if (useGame.getState().replaced === code) useGame.getState().setReplaced(null);
+      // The achievements came along: join them with whatever this device has.
+      const brought = res.stats ? importStats(res.stats) : false;
       useGame.getState().setMe(res.playerId);
       useGame.getState().sync(res.state);
       saveSeat({ code, playerId: res.playerId, token: res.token });
       void navigate({ to: '/room/$code', params: { code }, replace: true });
+      if (brought) flash('🏆 Your achievements came along');
     });
   }, [token, navigate]);
 

@@ -33,6 +33,8 @@ export interface JoinErr {
   message: string;
 }
 export type JoinAck = JoinOk | JoinErr;
+/** A seat picked up by QR code, with the achievements the other device sent. */
+export type PickupAck = (JoinOk & { stats: string | null }) | JoinErr;
 
 export type SuggestAck =
   | { ok: true; text: string }
@@ -58,10 +60,14 @@ export interface ClientToServerEvents {
   'room:leave': () => void;
   /** A one-time code to move this seat to another device, for its QR link. */
   /** `ms` is how long it works for: a duration, since the two clocks may differ. */
-  'seat:handoff': (cb: (r: { ok: true; token: string; ms: number } | { ok: false }) => void) => void;
+  'seat:handoff': (
+    /** The player's achievements, carried to the other device with the seat. */
+    p: { stats?: string },
+    cb: (r: { ok: true; token: string; ms: number } | { ok: false }) => void,
+  ) => void;
   /** On the other device: takes the seat a code was made for, in whichever
    *  room it is. The seat brings its name and avatar. */
-  'seat:pickup': (p: { token: string }, cb: (r: JoinAck) => void) => void;
+  'seat:pickup': (p: { token: string }, cb: (r: PickupAck) => void) => void;
   /** Host only, outside the lobby: the same game again from the start. A
    *  game in progress is abandoned with no result. */
   'game:restart': () => void;

@@ -46,7 +46,7 @@ export class RoomSession {
   readonly banned = new Set<string>();
   /** Codes for moving a seat to another device, each good once until it
    *  runs out: code → seat. */
-  private readonly handoffs = new Map<string, { playerId: string; until: number }>();
+  private readonly handoffs = new Map<string, { playerId: string; until: number; stats: string | null }>();
   /** Games finished, including ones nobody won. */
   games = 0;
   history: GameResult[] = [];
@@ -94,14 +94,16 @@ export class RoomSession {
     this.history = this.history.slice(0, -1);
   }
 
-  issueHandoff(playerId: string): { token: string; ms: number } {
+  /** `stats` are the player's achievements, carried to the other device
+   *  with the seat. Only passed along, never read here. */
+  issueHandoff(playerId: string, stats: string | null = null): { token: string; ms: number } {
     const now = Date.now();
     for (const [k, h] of this.handoffs) if (h.until <= now || h.playerId === playerId) this.handoffs.delete(k);
     // Short, so the QR code stays easy to scan; 72 random bits, used once
     // within minutes, is plenty.
     const token = randomBytes(9).toString('base64url');
     const until = now + HANDOFF_MS;
-    this.handoffs.set(token, { playerId, until });
+    this.handoffs.set(token, { playerId, until, stats });
     return { token, ms: HANDOFF_MS };
   }
 
@@ -111,12 +113,14 @@ export class RoomSession {
     return !!h && h.until > Date.now();
   }
 
-  /** The seat a code moves, using the code up. Null once used or run out. */
-  useHandoff(token: string): string | null {
+  /** The seat a code moves and the stats sent with it, using the code up.
+   *  Null once used or run out. */
+  useHandoff(token: string): { playerId: string; stats: string | null } | null {
     const h = this.handoffs.get(token);
     this.handoffs.delete(token);
-    return h && h.until > Date.now() ? h.playerId : null;
+    return h && h.until > Date.now() ? { playerId: h.playerId, stats: h.stats } : null;
   }
+
 
   /** Wins for the given players, leaving out anyone with none. */
   winsOf(ids: Iterable<string>): Record<string, number> {
