@@ -456,6 +456,12 @@ button, input { font: inherit; color: inherit; }
 .settings__row input[type='range'] { width: 100%; accent-color: var(--accent); }
 .settings__value { font-family: var(--display); font-weight: 700; min-width: 30px; text-align: right; }
 .settings__note { margin: 0; font-size: 13px; color: var(--ink-soft); text-align: center; }
+/* In the start button's place for everyone but the host: the same box, so
+   the settings card has the same shape whoever is looking. */
+.settings__note--start {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 52px; padding: 13px 22px; border: 1px solid transparent; box-sizing: border-box;
+}
 
 /* ---------------------------------------------------------------- game */
 

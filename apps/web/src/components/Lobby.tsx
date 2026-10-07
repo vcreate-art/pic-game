@@ -58,7 +58,7 @@ export function Lobby() {
             {!enough ? 'Need 2+ players' : short ? 'Add more of your words' : 'Start game'}
           </button>
         ) : (
-          <p className="settings__note">Waiting for the host to start<Dots /></p>
+          <p className="settings__note settings__note--start">Waiting for the host to start<Dots /></p>
         )}
       </div>
     </div>
