@@ -247,39 +247,7 @@ button, input { font: inherit; color: inherit; }
 .cat__ear--left { transform-box: fill-box; transform-origin: 70% 100%; }
 .cat__breath:hover .cat__ear--left { animation: cat-twitch .5s ease-in-out; }
 
-/* Typing a code wakes it: eyes open, head up, no more z's. */
-.cat__iris { fill: #e8c547; }
-.cat__pupil { fill: var(--ink); }
-.cat__open { opacity: 0; }
-.cat__head { transition: transform .3s ease; }
-.cat__open, .cat__shut, .cat__z { transition: opacity .2s ease; }
-.cat.is-awake .cat__open { opacity: 1; }
-.cat.is-awake .cat__shut { opacity: 0; }
-.cat.is-awake .cat__z { animation: none; opacity: 0; }
-.cat.is-awake .cat__head { transform: translateY(-4px); }
-/* Once it's up, the walker below takes over and this one is gone. */
-.cat.is-gone { visibility: hidden; }
-
-/* The cat on its feet, hopping down and walking off the left edge. Placed
-   by SleepingCat.tsx in window coordinates. */
-.walker { position: fixed; left: 0; top: 0; z-index: 80; width: 100px; height: 70px; pointer-events: none; }
-.walker__cat { display: block; width: 100px; height: 70px; overflow: visible; }
-.walker__leg { stroke: var(--ink); stroke-width: 5; stroke-linecap: round; transform-box: fill-box; transform-origin: 50% 0; }
-.walker__tail {
-  fill: none; stroke: var(--ink); stroke-width: 5; stroke-linecap: round;
-  transform-origin: 77px 38px; animation: cat-sway 1.6s ease-in-out infinite;
-}
-/* Mid-hop the legs reach: front ones forward, back ones behind. */
-.walker__cat.is-hopping .walker__leg:nth-of-type(-n+2) { transform: rotate(28deg); }
-.walker__cat.is-hopping .walker__leg:nth-of-type(n+3) { transform: rotate(-28deg); }
-.walker__cat.is-walking { animation: walker-bob .25s ease-in-out infinite alternate; }
-.walker__cat.is-walking .walker__leg--a { animation: walker-step .5s ease-in-out infinite alternate; }
-.walker__cat.is-walking .walker__leg--b { animation: walker-step .5s ease-in-out infinite alternate-reverse; }
-@keyframes walker-step { from { transform: rotate(20deg); } to { transform: rotate(-20deg); } }
-@keyframes walker-bob { to { transform: translateY(-1.5px); } }
-
 @keyframes cat-breathe { 50% { transform: scale(1.02, 1.05); } }
-
 @keyframes cat-sway { 50% { transform: rotate(7deg); } }
 @keyframes cat-z {
   0% { opacity: 0; transform: translate(0, 0); }
@@ -292,9 +260,7 @@ button, input { font: inherit; color: inherit; }
   75% { transform: rotate(-6deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cat__tail, .cat__breath, .cat__z, .cat__breath:hover .cat__ear--left,
-  .walker__tail, .walker__cat.is-walking, .walker__leg { animation: none !important; }
-  .cat__head, .cat__open, .cat__shut { transition: none; }
+  .cat__tail, .cat__breath, .cat__z, .cat__breath:hover .cat__ear--left { animation: none; }
   .cat__z:first-of-type { opacity: .7; }
 }
 .landing--home .landing__section { margin-top: 0; }

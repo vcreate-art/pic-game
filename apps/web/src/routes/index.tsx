@@ -132,7 +132,7 @@ function Landing() {
 
         <section className="landing__section landing__join" aria-label="Join a room">
           <div className="card landing__card">
-            <SleepingCat stirred={`${code}|${draft.name}`} />
+            <SleepingCat />
             <JoinPanel
               submitLabel="Join room"
               busy={busy && !game}
