@@ -217,85 +217,39 @@ button, input { font: inherit; color: inherit; }
 /* Room above the join card for the cat asleep on it, taken back with a
    negative margin so the card still lines up with the covers. Sticky, the
    room keeps the cat from being cut off at the top of the window. */
-.landing--home .landing__join { padding-top: 44px; margin-top: -44px; }
+.landing--home .landing__join { padding-top: 70px; margin-top: -70px; }
 .landing__join .landing__card { position: relative; }
 
 /* ---------------------------------------------------------------- cat */
 
-/* y = 56 of its 120×80 grid is the card's top edge (see SleepingCat.tsx). */
-.cat {
-  position: absolute; top: -56px; right: 26px; width: 120px; height: 80px;
-  overflow: visible; pointer-events: none;
-}
-.cat__fur { fill: var(--ink); }
-.cat__inner { fill: #f2b8c6; }
-.cat__eye { fill: none; stroke: #9a9eb0; stroke-width: 1.4; stroke-linecap: round; }
-.cat__tail {
-  fill: none; stroke: var(--ink); stroke-width: 5.5; stroke-linecap: round;
-  transform-origin: 103px 52px; animation: cat-sway 6s ease-in-out infinite;
-}
-/* Slow breaths that lift the back more than the head. */
-.cat__breath { transform-origin: 70px 56px; animation: cat-breathe 4s ease-in-out infinite; }
+/* A sprite cat asleep on the join card's top edge, its feet on the edge
+   (see SleepingCat.tsx and catPacks.ts for the frames). */
+.cat { position: absolute; bottom: calc(100% - 1px); right: 30px; pointer-events: none; }
+.cat.is-gone { visibility: hidden; }
+/* Pixel art stays crisp when scaled up. */
+.cat__sprite { display: block; width: 100%; height: 100%; image-rendering: pixelated; user-select: none; }
+.cat__zs { position: absolute; }
 .cat__z {
-  fill: var(--ink-soft); font-family: var(--display); font-weight: 800; font-size: 14px;
+  position: absolute; left: 0; bottom: 0;
+  color: var(--ink-soft); font-family: var(--display); font-weight: 800; font-size: 14px; line-height: 1;
   opacity: 0; animation: cat-z 4.5s ease-out infinite;
 }
-.cat__z:nth-of-type(2) { font-size: 17px; animation-delay: 1.5s; }
-.cat__z:nth-of-type(3) { font-size: 12px; animation-delay: 3s; }
-/* Only the cat itself answers the pointer; an ear flicks, then settles. */
-.cat__breath { pointer-events: auto; }
-.cat__ear--left { transform-box: fill-box; transform-origin: 70% 100%; }
-.cat__breath:hover .cat__ear--left { animation: cat-twitch .5s ease-in-out; }
+.cat__z:nth-child(2) { font-size: 17px; animation-delay: 1.5s; }
+.cat__z:nth-child(3) { font-size: 12px; animation-delay: 3s; }
 
-/* Typing a code wakes it: eyes open, head up, no more z's. */
-.cat__iris { fill: #e8c547; }
-.cat__pupil { fill: var(--ink); }
-.cat__open { opacity: 0; }
-.cat__head { transition: transform .3s ease; }
-.cat__open, .cat__shut, .cat__z { transition: opacity .2s ease; }
-.cat.is-awake .cat__open { opacity: 1; }
-.cat.is-awake .cat__shut { opacity: 0; }
-.cat.is-awake .cat__z { animation: none; opacity: 0; }
-.cat.is-awake .cat__head { transform: translateY(-4px); }
-/* Once it's up, the walker below takes over and this one is gone. */
-.cat.is-gone { visibility: hidden; }
-
-/* The cat on its feet, hopping down and walking off the left edge. Placed
+/* The cat on its feet, jumping down and walking off the left edge. Placed
    by SleepingCat.tsx in window coordinates. */
-.walker { position: fixed; left: 0; top: 0; z-index: 80; width: 100px; height: 70px; pointer-events: none; }
-.walker__cat { display: block; width: 100px; height: 70px; overflow: visible; }
-.walker__leg { stroke: var(--ink); stroke-width: 5; stroke-linecap: round; transform-box: fill-box; transform-origin: 50% 0; }
-.walker__tail {
-  fill: none; stroke: var(--ink); stroke-width: 5; stroke-linecap: round;
-  transform-origin: 77px 38px; animation: cat-sway 1.6s ease-in-out infinite;
-}
-/* Mid-hop the legs reach: front ones forward, back ones behind. */
-.walker__cat.is-hopping .walker__leg:nth-of-type(-n+2) { transform: rotate(28deg); }
-.walker__cat.is-hopping .walker__leg:nth-of-type(n+3) { transform: rotate(-28deg); }
-.walker__cat.is-walking { animation: walker-bob .25s ease-in-out infinite alternate; }
-.walker__cat.is-walking .walker__leg--a { animation: walker-step .5s ease-in-out infinite alternate; }
-.walker__cat.is-walking .walker__leg--b { animation: walker-step .5s ease-in-out infinite alternate-reverse; }
-@keyframes walker-step { from { transform: rotate(20deg); } to { transform: rotate(-20deg); } }
-@keyframes walker-bob { to { transform: translateY(-1.5px); } }
+.walker { position: fixed; left: 0; top: 0; z-index: 80; pointer-events: none; }
+.walker > div { width: 100%; height: 100%; }
 
-@keyframes cat-breathe { 50% { transform: scale(1.02, 1.05); } }
-
-@keyframes cat-sway { 50% { transform: rotate(7deg); } }
 @keyframes cat-z {
   0% { opacity: 0; transform: translate(0, 0); }
   20% { opacity: .9; }
   100% { opacity: 0; transform: translate(-10px, -26px); }
 }
-@keyframes cat-twitch {
-  25% { transform: rotate(-14deg); }
-  50% { transform: rotate(6deg); }
-  75% { transform: rotate(-6deg); }
-}
 @media (prefers-reduced-motion: reduce) {
-  .cat__tail, .cat__breath, .cat__z, .cat__breath:hover .cat__ear--left,
-  .walker__tail, .walker__cat.is-walking, .walker__leg { animation: none !important; }
-  .cat__head, .cat__open, .cat__shut { transition: none; }
-  .cat__z:first-of-type { opacity: .7; }
+  .cat__z { animation: none; }
+  .cat__z:first-child { opacity: .7; }
 }
 .landing--home .landing__section { margin-top: 0; }
 .landing__intro .landing__title { margin: 0; font-size: 40px; line-height: 1.05; }
