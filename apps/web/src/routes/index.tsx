@@ -6,6 +6,7 @@ import { CategoryLabel } from '../components/CategoryLabel.js';
 import { GameCovers } from '../components/GameCovers.js';
 import { GAME_ICONS } from '../components/gameIcons.js';
 import { JoinPanel, initialIdentity, type Identity } from '../components/JoinPanel.js';
+import { SleepingCat } from '../components/SleepingCat.js';
 import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { logGameEntry } from '../lib/posthogLogs.js';
 import { peekRoom } from '../api/client.js';
@@ -13,6 +14,15 @@ import { getSocket, saveSeat } from '../net/socket.js';
 import { useGame } from '../store/game.js';
 import { Route as rootRoute } from './__root.js';
 import vcreateLogo from '../assets/vcreate-logo.svg';
+
+/** The cat on the join card is a rare find: one page load in fifty. */
+const CAT_CHANCE = 0.02;
+
+/** Whether this page load gets the cat. `?cat` in the address always does,
+ *  for seeing and testing it. */
+function catShows(): boolean {
+  return new URLSearchParams(window.location.search).has('cat') || Math.random() < CAT_CHANCE;
+}
 
 /** While a phone's on-screen keyboard is up, `top` and `bottom` that fit a
  *  fixed overlay into the space above it. Mobile browsers don't shrink the
@@ -51,6 +61,7 @@ function Landing() {
   // One name and avatar for both cards, so a name typed to join carries over
   // when the player picks a game instead.
   const [draft, setDraft] = useState(initialIdentity);
+  const [cat] = useState(catShows);
 
   const open = (k: GameKind) => {
     setError(null);
@@ -129,8 +140,9 @@ function Landing() {
           <p className="landing__sub">Start a room, then send friends the code.</p>
         </div>
 
-        <section className="landing__section landing__join" aria-label="Join a room">
+        <section className={`landing__section landing__join ${cat ? 'has-cat' : ''}`} aria-label="Join a room">
           <div className="card landing__card">
+            {cat && <SleepingCat />}
             <JoinPanel
               submitLabel="Join room"
               busy={busy && !game}
