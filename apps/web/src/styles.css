@@ -215,9 +215,10 @@ button, input { font: inherit; color: inherit; }
 .landing__credit img { display: block; height: 28px; width: auto; }
 .landing--home .landing__join { position: sticky; top: 20px; }
 /* Room above the join card for the cat asleep on it, taken back with a
-   negative margin so the card still lines up with the covers. Sticky, the
-   room keeps the cat from being cut off at the top of the window. */
-.landing--home .landing__join { padding-top: 44px; margin-top: -44px; }
+   negative margin so the card's top lines up with the covers' (their grid
+   starts .25em down). Sticky, the room keeps the cat from being cut off at
+   the top of the window. */
+.landing--home .landing__section.landing__join { padding-top: calc(44px + .25em); margin-top: -44px; }
 .landing__join .landing__card { position: relative; }
 
 /* ---------------------------------------------------------------- cat */
@@ -1022,7 +1023,9 @@ button, input { font: inherit; color: inherit; }
     grid-template-columns: minmax(0, 1fr); grid-template-areas: 'join' 'intro' 'start'; gap: 24px;
   }
   .landing__join { width: 100%; max-width: 460px; margin: 0 auto; }
-  .landing--home .landing__join { position: static; margin-top: 0; }
+  /* Stacked, the card has no covers beside it to line up with: just room
+     for the cat and its z's under the header. */
+  .landing--home .landing__section.landing__join { position: static; margin-top: 0; padding-top: 36px; }
   .landing__intro .landing__title { font-size: 24px; }
 }
 @media (max-width: 560px) {
