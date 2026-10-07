@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import { loadProfile, PROFILE_EVENT, type Profile } from '../net/socket.js';
 
 const posthogKey = import.meta.env.VITE_POSTHOG_KEY;
 const posthogHost = import.meta.env.VITE_POSTHOG_HOST;
@@ -13,6 +14,10 @@ if (isPostHogEnabled) {
   posthog.init(posthogKey, {
     api_host: posthogHost,
     defaults: '2026-05-30',
+    // Nobody signs in, so 'identified_only' (the default) would leave every
+    // player personless. This keeps them anonymous but gives each browser a
+    // person, so one player's sessions, replays and games line up across visits.
+    person_profiles: 'always',
     capture_exceptions: {
       capture_unhandled_errors: true,
       capture_unhandled_rejections: true,
@@ -39,6 +44,14 @@ if (isPostHogEnabled) {
     device_pixel_ratio: window.devicePixelRatio,
     primary_input: window.matchMedia('(hover: hover)').matches ? 'mouse' : 'touch',
   });
+  // The player's chosen name, as a note on their person. Not 'name': PostHog
+  // labels people by that, and names change on a whim, so the anonymous id
+  // stays the label and this just follows whatever they last went by.
+  const notePlayerName = (p: Profile | null) => {
+    if (p?.name) posthog.setPersonProperties({ player_name: p.name });
+  };
+  notePlayerName(loadProfile());
+  window.addEventListener(PROFILE_EVENT, (e) => notePlayerName((e as CustomEvent<Profile>).detail));
 }
 
 export default posthog;
