@@ -20,7 +20,9 @@ export function SkribblGame() {
   const phase = room.phase;
 
   return (
-    <div className="game game--skribbl">
+    // Guessers and the drawer get different phone layouts: a guesser's is the
+    // canvas full screen with the chat over it, like a live stream.
+    <div className={`game game--skribbl ${isDrawer ? 'game--drawing' : 'game--guessing'}`}>
       {/* Three tracks, with the word in the middle one, so it centres against
           the header itself rather than against whatever space is left over. */}
       <div className="game__head">

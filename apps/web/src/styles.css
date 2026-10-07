@@ -810,6 +810,58 @@ button, input { font: inherit; color: inherit; }
   .game--skribbl .board__wrap > .overlay { position: fixed; z-index: 80; border-radius: 0; }
 }
 
+/* ---------------------------------- draw & guess on a phone: guessing */
+
+/* Like a live stream: the canvas takes the screen under the top bar, the
+   chat rises over its lower part and fades as it climbs, and the guess box
+   is pinned to the bottom of the screen, above the keyboard when it's open.
+   No word, hints or timer for now. */
+@media (max-width: 640px) {
+  .app:has(.game--guessing) { height: 100dvh; overflow: hidden; }
+  .app:has(.game--guessing) .main { padding: 0; min-height: 0; }
+  .game--skribbl.game--guessing { flex: 1; min-height: 0; gap: 0; }
+  .game--guessing .game__head, .game--guessing .scores { display: none; }
+  .game--guessing .game__body { display: block; position: relative; flex: 1; min-height: 0; height: 100%; }
+  .game--guessing .game__stage, .game--guessing .board__wrap { height: 100%; }
+  /* The board fills the screen in the canvas's own white. The drawing keeps
+     its 4:3 shape, a band across the top, so the chat rises through the
+     white below it and never covers it. */
+  .game--guessing .board {
+    aspect-ratio: auto !important; height: 100%;
+    display: flex; align-items: flex-start; border: 0; border-radius: 0;
+  }
+  .game--guessing .board__canvas { height: auto; aspect-ratio: 4 / 3; }
+
+  .game--guessing .chat {
+    position: absolute; left: 0; right: 0; bottom: 0; top: 75vw;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 0 12px calc(var(--keyboard, 0px) + 72px + env(safe-area-inset-bottom));
+    background: none; border: 0; border-radius: 0; pointer-events: none;
+  }
+  /* Newest at the bottom; older lines climb, fade, and go. */
+  .game--guessing .chat__list {
+    flex: 0 1 auto; max-height: none; min-height: 0; overflow: hidden;
+    justify-content: flex-end; gap: 4px; padding: 0;
+    -webkit-mask-image: linear-gradient(to top, #000 30%, transparent);
+    mask-image: linear-gradient(to top, #000 30%, transparent);
+  }
+  .game--guessing .msg {
+    align-self: flex-start; max-width: 85%;
+    background: rgba(255, 255, 255, .82); box-shadow: 0 1px 3px rgba(31, 34, 51, .12);
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  }
+  .game--guessing .msg--correct { background: rgba(220, 252, 231, .92); }
+  .game--guessing .msg--close { background: rgba(254, 243, 199, .92); }
+  .game--guessing .msg--divider { align-self: stretch; background: none; box-shadow: none; }
+  .game--guessing .chat__empty { display: none; }
+
+  .game--guessing .chat__form {
+    position: fixed; left: 12px; right: 12px; z-index: 20; margin: 0; pointer-events: auto;
+    bottom: calc(var(--keyboard, 0px) + 12px + env(safe-area-inset-bottom));
+  }
+  .game--guessing .chat__input { background: var(--card); box-shadow: 0 4px 16px rgba(31, 34, 51, .14); }
+}
+
 /* Cards stay put at the top; the Leave button sits in the middle of whatever
    height is left below them. The min-height keeps a gap from the cards on short
    viewports, where there is no leftover space to centre within. */

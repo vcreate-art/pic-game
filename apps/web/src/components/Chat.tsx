@@ -26,6 +26,23 @@ export function Chat() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
+  // How much of the screen the on-screen keyboard covers, for a guess box
+  // pinned to the bottom of the screen to sit above it.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const place = () => root.style.setProperty('--keyboard', `${Math.max(0, window.innerHeight - vv.height - vv.offsetTop)}px`);
+    place();
+    vv.addEventListener('resize', place);
+    vv.addEventListener('scroll', place);
+    return () => {
+      vv.removeEventListener('resize', place);
+      vv.removeEventListener('scroll', place);
+      root.style.removeProperty('--keyboard');
+    };
+  }, []);
+
   const drawing = phase === 'drawing';
   const locked = drawing && isDrawer;
   // Only the drawing game has guesses; elsewhere this is ordinary chat.
