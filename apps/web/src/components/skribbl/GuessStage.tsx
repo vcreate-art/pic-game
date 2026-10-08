@@ -407,13 +407,10 @@ export function GuessStage() {
         )}
       </div>
 
-      <form
-        className="gstage__form"
-        onSubmit={(e) => {
-          fold();
-          box.send(e);
-        }}
-      >
+      {/* Not a form: Chrome on Android puts its autofill bar (passwords,
+          cards, addresses) over the keyboard for boxes in a form, whatever
+          autocomplete says. Enter, the keyboard's Send, sends instead. */}
+      <div className="gstage__form">
         <div className="chat__field">
           <input
             ref={input}
@@ -427,6 +424,12 @@ export function GuessStage() {
               fold();
               if (sheet) setSheet(null);
             }}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+              e.preventDefault();
+              fold();
+              box.send();
+            }}
             aria-label="Your guess"
             enterKeyHint="send"
             {...noAutofill}
@@ -437,10 +440,7 @@ export function GuessStage() {
             </span>
           )}
         </div>
-        <button type="submit" className="visually-hidden" tabIndex={-1}>
-          Send
-        </button>
-      </form>
+      </div>
 
       {/* The tabs. Each swaps the keyboard for its sheet; tapped again, or
           Guess, brings the keyboard back. preventDefault on pointerdown keeps a

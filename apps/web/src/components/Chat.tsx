@@ -40,8 +40,9 @@ export function useGuessBox() {
   const showCount = isSkribbl && drawing && !locked && !haveGuessed && target > 0 && typed > 0;
   const matches = typed === target;
 
-  const send = (e: React.FormEvent) => {
-    e.preventDefault();
+  /** From a form's submit, or straight from the Enter key where there's no form. */
+  const send = (e?: { preventDefault(): void }) => {
+    e?.preventDefault();
     const t = text.trim();
     if (!t || locked) return;
     getSocket().emit('chat:guess', { text: t });
