@@ -893,6 +893,10 @@ button, input { font: inherit; color: inherit; }
 .gstage {
   position: fixed; left: 0; right: 0; z-index: 30; overflow: hidden;
   display: flex; flex-direction: column; background: var(--card);
+  /* A tap or a held finger on a button shouldn't select text or flash the
+     browser's tap highlight; typing places keep their selection. */
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
   /* The stage owns every gesture: a drag here pans nothing and scrolls
      nothing, so Chrome's address bar has no reason to move. Taps still work. */
   touch-action: none;
@@ -1073,6 +1077,9 @@ button, input { font: inherit; color: inherit; }
 .gstage__form .chat__input { font-size: 16px; background: var(--card); }
 /* The guess box is an editable div here (see GuessField): one line that
    scrolls sideways, an input's placeholder, and its disabled look. */
+.gstage .chat__input--editable, .gstage input, .gstage textarea {
+  -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
+}
 .chat__input--editable {
   white-space: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
   position: relative; line-height: 1.25; cursor: text; user-select: text; -webkit-user-select: text;
@@ -1179,6 +1186,11 @@ button, input { font: inherit; color: inherit; }
 }
 .dtools__sizes .dtools__btn.is-active { background: var(--accent-soft); color: inherit; }
 
+/* A sheet opens under the bottom row, in the stage's flow: the guesses
+   give it their room, and the row stays above it as its header. Both sit
+   over the scrim. */
+.dstage .dstage__sheet { position: relative; left: auto; right: auto; bottom: auto; flex: 0 1 auto; min-height: 0; }
+.dstage.has-sheet .dstage__foot { position: relative; z-index: 31; padding-bottom: 8px; }
 /* Above an open sheet, over the canvas: a tap here closes it, never draws. */
 .dstage__scrim { position: fixed; inset: 0; z-index: 30; background: rgba(31, 34, 51, .12); }
 

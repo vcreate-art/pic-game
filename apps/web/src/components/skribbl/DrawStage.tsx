@@ -50,7 +50,7 @@ export function DrawStage() {
   const toggle = (kind: Exclude<Sheet, null>) => setSheet((s) => (s === kind ? null : kind));
 
   return (
-    <div className="gstage dstage" style={{ top: vv.offsetTop, height: vv.height }}>
+    <div className={`gstage dstage ${sheet ? 'has-sheet' : ''}`} style={{ top: vv.offsetTop, height: vv.height }}>
       <StageHead headRef={headRef} />
 
       <div className="gstage__board board__wrap">
@@ -102,6 +102,8 @@ export function DrawStage() {
             aria-label="Your guess"
             data-empty=""
             data-placeholder={box.placeholder}
+            // As tapping the guess box does when guessing: back to the chat.
+            onClick={() => setSheet(null)}
           />
         </div>
         <button
@@ -119,10 +121,13 @@ export function DrawStage() {
 
       {sheet && (
         <>
-          {/* Above the sheet: a tap here closes it, and never draws. */}
+          {/* Above the bottom row and its sheet: a tap here closes the sheet,
+              and never draws. */}
           <div className="dstage__scrim" onClick={() => setSheet(null)} aria-hidden="true" />
+          {/* Under the bottom row, which stays as the sheet's header, as it
+              does over the keyboard's place when guessing. */}
           <div
-            className={`gsheet ${sheet === 'me' ? 'gsheet--me' : ''}`}
+            className={`gsheet dstage__sheet ${sheet === 'me' ? 'gsheet--me' : ''}`}
             style={{ height: Math.min(SHEET_PX, Math.round(vv.height * SHEET_RATIO)) }}
           >
             {sheet === 'players' ? (
