@@ -30,7 +30,7 @@ export function useGuessBox() {
   const placeholder = !isSkribbl
     ? 'Say something…'
     : locked
-      ? "You're drawing — no chatting!"
+      ? "You're drawing — no chat"
       : haveGuessed && drawing
         ? 'Chat with others who guessed it'
         : 'Type your guess...';

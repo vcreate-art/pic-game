@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Eraser, PaintBucket, Pencil, Redo2, Trash2, Undo2, Users } from 'lucide-react';
 import { BRUSH_SIZES } from '@pic-game/shared';
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
+import { useGuessBox } from '../Chat.js';
 import { useDismiss } from '../../lib/useDismiss.js';
 import { useVisualViewport } from '../../lib/useVisualViewport.js';
 import { getSocket } from '../../net/socket.js';
@@ -19,8 +20,8 @@ import { MeButton, SenderAvatar, SheetMe, StageHead, useStageChrome } from './st
  * drawing in place of the blanks), the canvas as wide as the screen with a
  * colour bar down its right edge, the tools right under it (the brush, pen,
  * fill and eraser, undo and redo, and clear, grouped by spacing), and the
- * guesses filling the rest, down to the bottom, with your avatar and the
- * players button in their corner. There's no keyboard to make room for; the sheets rise
+ * guesses filling the rest, and at the bottom the guessing stage's row:
+ * your avatar, the guess box (shut while you draw), and the players button. There's no keyboard to make room for; the sheets rise
  * over the tools, and a tap above one closes it.
  * Nothing scrolls, so a stroke never moves the page.
  */
@@ -42,6 +43,7 @@ export function DrawStage() {
   const [sheet, setSheet] = useState<Sheet>(null);
   const meRef = useRef<HTMLButtonElement>(null);
   const headRef = useRef<HTMLElement>(null);
+  const box = useGuessBox();
 
   if (!room) return null;
   const phase = room.phase;
@@ -67,7 +69,7 @@ export function DrawStage() {
       )}
 
       {/* The guesses, newest at the bottom, under the drawing, never on it;
-          you and the players in the corner, clear of the tools. */}
+          then the same bottom row as when guessing. */}
       <div className="dstage__middle">
       <div className="gstage__chat dstage__feed" aria-live="polite">
         {messages.slice(-30).map((m) =>
@@ -85,8 +87,23 @@ export function DrawStage() {
           ),
         )}
       </div>
-      <div className="dstage__corner">
+      </div>
+
+      {/* The guessing stage's bottom row, the same here: you, the guess box
+          (shut while you draw, and saying so, as the desktop's does), and
+          the players. */}
+      <div className="gstage__form dstage__foot">
         <MeButton btnRef={meRef} on={sheet === 'me'} onToggle={() => toggle('me')} />
+        <div className="chat__field">
+          <div
+            className="chat__input chat__input--editable"
+            role="textbox"
+            aria-disabled="true"
+            aria-label="Your guess"
+            data-empty=""
+            data-placeholder={box.placeholder}
+          />
+        </div>
         <button
           type="button"
           className={`gstage__roombtn ${sheet === 'players' ? 'is-on' : ''}`}
@@ -97,7 +114,6 @@ export function DrawStage() {
           <Users aria-hidden="true" />
           <span className="gstage__roomcount">{room.players.length}</span>
         </button>
-      </div>
       </div>
 
 
