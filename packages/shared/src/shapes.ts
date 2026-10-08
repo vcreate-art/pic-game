@@ -234,6 +234,9 @@ function asEllipse(ps: readonly P[]): SnapShape | null {
 const CORNER_TURN = 0.52;
 /** Each of a rectangle's corners within this of a right angle (about 15°). */
 const RIGHT_ANGLE_SLACK = 0.26;
+/** Where a loop closes is looked for in the last part of the stroke, after
+ *  this share of it: the start's own neighbours are near it too. */
+const CLOSE_AFTER = 0.6;
 /** A shape with corners is traced within this share of its longer side,
  *  as well as CORNER_FIT of its shorter. */
 const LONG_SIDE_FIT = 0.035;
@@ -256,7 +259,8 @@ function turn(a: P, b: P, c: P): number {
  * Begun at the corner nearest where the stroke began, and run the way it
  * was drawn.
  */
-function asPolygon(ps: readonly P[]): SnapShape | null {
+function asPolygon(drawn: readonly P[]): SnapShape | null {
+  const ps = closedPart(drawn);
   const xs = ps.map((p) => p[0]);
   const ys = ps.map((p) => p[1]);
   const w = Math.max(...xs) - Math.min(...xs);
@@ -332,6 +336,16 @@ function asPolygon(ps: readonly P[]): SnapShape | null {
     Math.min(LOGICAL_H, Math.max(0, u * s2 + v * c)),
   ] as P);
   return { kind: square ? 'square' : 'rectangle', pts: toWire([...back, back[0]!]) };
+}
+
+/** Of a loop drawn on past where it closed (back to the start, then a little
+ *  further, or a hook off it), just the closed part: up to where, late in
+ *  the stroke, it came nearest its start. An open stroke is left whole. */
+function closedPart(ps: readonly P[]): readonly P[] {
+  const from = Math.floor(ps.length * CLOSE_AFTER);
+  let near = ps.length - 1;
+  for (let i = from; i < ps.length; i++) if (dist(ps[i]!, ps[0]!) < dist(ps[near]!, ps[0]!)) near = i;
+  return near < ps.length - 1 ? ps.slice(0, near + 1) : ps;
 }
 
 /** Distance from p to the segment a–b. */

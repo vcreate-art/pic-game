@@ -157,6 +157,17 @@ describe('snapping to shapes with corners', () => {
     expect(recognizeShape(wire(polygon([[300, 200], [500, 200], [580, 400], [220, 400]], 2)))?.kind).toBe('quadrilateral');
   });
 
+  it('reads a closed shape drawn on past its start, ignoring the overshoot', () => {
+    // Back to the first corner, then on along the first side a little...
+    const square = polygon([[200, 200], [400, 200], [400, 400], [200, 400]], 2);
+    expect(recognizeShape(wire([...square, ...line([200, 200], [250, 200], 1, 6).slice(1)]))?.kind).toBe('square');
+    // ...or off at an angle, a small hook past the close.
+    const tri = polygon([[400, 150], [550, 400], [250, 400]], 2);
+    expect(recognizeShape(wire([...tri, ...line([400, 150], [430, 120], 1, 5).slice(1)]))?.kind).toBe('triangle');
+    const rect = polygon([[200, 200], [500, 200], [500, 320], [200, 320]], 2);
+    expect(recognizeShape(wire([...rect, ...line([200, 200], [215, 175], 1, 4).slice(1)]))?.kind).toBe('rectangle');
+  });
+
   it('leaves five or more corners, and an open zigzag, alone', () => {
     const pentagon = Array.from({ length: 5 }, (_, i) => [400 + 150 * Math.cos((i * 2 * Math.PI) / 5), 300 + 150 * Math.sin((i * 2 * Math.PI) / 5)] as [number, number]);
     expect(recognizeShape(wire(polygon(pentagon, 1)))).toBeNull();
