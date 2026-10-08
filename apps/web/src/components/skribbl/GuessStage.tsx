@@ -865,8 +865,8 @@ function SheetMe() {
 /** How long sent stand-ins wait, landed, for the real line from the server. */
 const LANDING_WAIT_MS = 1500;
 
-/** Your avatar beside the guess box: the box's height. */
-const ME_AVATAR_PX = 42;
+/** Your avatar beside the guess box. */
+const ME_AVATAR_PX = 34;
 
 /** How big a sender's avatar is in the chat's gutter. */
 const SENDER_AVATAR_PX = 18;

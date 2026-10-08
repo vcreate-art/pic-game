@@ -1015,17 +1015,10 @@ button, input { font: inherit; color: inherit; }
   background: var(--paper); border-top: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 14px;
 }
-/* The room's controls in the sheet: 4:3 tiles no wider than 80px, centred,
-   in a tray of their own across the bottom, apart from the players and
-   always in reach while the list scrolls behind it. Last, after the host
-   note, whatever order the room menu gives them in. */
-.gsheet .room__controls {
-  order: 2; grid-auto-columns: minmax(0, 80px); justify-content: center;
-  position: sticky; bottom: calc(-14px - env(safe-area-inset-bottom));
-  margin: auto -16px calc(-14px - env(safe-area-inset-bottom));
-  padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
-  background: var(--card); border-top: 1px solid var(--line);
-}
+/* The room's controls in the sheet: 4:3 tiles no wider than 80px, centred
+   at the bottom. Last, after the host note, whatever order the room menu
+   gives them in. */
+.gsheet .room__controls { order: 2; grid-auto-columns: minmax(0, 80px); justify-content: center; margin-top: auto; }
 .gsheet .room__note { order: 1; margin: 0; }
 .gsheet .room__ctl { aspect-ratio: 4 / 3; justify-content: center; padding: 4px; }
 /* You, atop the "you" sheet, and the name and look editor in its place. */
