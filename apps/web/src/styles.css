@@ -3074,3 +3074,18 @@ button, input { font: inherit; color: inherit; }
 .achv-games__untried { flex-direction: column; align-items: stretch; gap: 10px; }
 .achv-games__untried .achv-row__desc { margin: 0; }
 .achv-games__untried ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------------------------------------------------------------- dev preview */
+
+/* The switches on /dev/draw-guess: small, out of the way, never in production. */
+.devpanel {
+  position: fixed; right: 8px; top: 72px; z-index: 95; display: flex; flex-direction: column; gap: 4px;
+  padding: 6px; border-radius: 10px; background: rgba(28, 29, 38, .85); font-size: 11px;
+}
+.devpanel.is-closed { padding: 0; background: none; }
+.devpanel__row { display: flex; gap: 4px; }
+.devpanel button {
+  border: 0; border-radius: 6px; padding: 4px 7px; background: rgba(255, 255, 255, .14); color: #fff; cursor: pointer;
+}
+.devpanel button.is-on { background: #fff; color: #1c1d26; }
+.devpanel.is-closed .devpanel__toggle { background: rgba(28, 29, 38, .85); }

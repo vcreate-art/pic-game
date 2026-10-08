@@ -6,6 +6,7 @@ import { Route as rootRoute } from './routes/__root.js';
 import { Route as achievementsRoute } from './routes/achievements.js';
 import { Route as backstageRoute } from './routes/backstage.js';
 import { Route as handoffRoute } from './routes/handoff.$token.js';
+import { Route as devDrawGuessRoute } from './routes/dev.drawGuess.js';
 import { Route as indexRoute } from './routes/index.js';
 import { Route as roomRoute } from './routes/room.$code.js';
 import './lib/posthog.js';
@@ -15,7 +16,9 @@ import './lib/posthogCat.js';
 import './lib/buttonInk.js';
 import './styles.css';
 
-const routeTree = rootRoute.addChildren([indexRoute, roomRoute, backstageRoute, achievementsRoute, handoffRoute]);
+// Pages for working on screens without playing; never in a production build.
+const devRoutes = import.meta.env.DEV ? [devDrawGuessRoute] : [];
+const routeTree = rootRoute.addChildren([indexRoute, roomRoute, backstageRoute, achievementsRoute, handoffRoute, ...devRoutes]);
 const router = createRouter({ routeTree });
 
 declare module '@tanstack/react-router' {
