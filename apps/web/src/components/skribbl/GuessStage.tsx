@@ -605,8 +605,8 @@ function StageHead({ headRef }: { headRef: React.RefObject<HTMLElement> }) {
   return (
     <header ref={headRef} className="gstage__head">
       <span className="gstage__round" aria-label={`Round ${room.round} of ${room.settings.rounds}`}>
-        <small>Round</small>
-        {room.round}/{room.settings.rounds}
+        {room.round}
+        <small>/{room.settings.rounds}</small>
       </span>
       <div className="gstage__word">
         {phase === 'drawing' && turn?.mask ? (
@@ -615,7 +615,9 @@ function StageHead({ headRef }: { headRef: React.RefObject<HTMLElement> }) {
           <span className="gstage__status">{status}</span>
         )}
       </div>
-      {phase === 'drawing' && turn && <Timer endsAt={turn.endsAt} total={room.settings.drawTime} />}
+      <div className="gstage__clock">
+        {phase === 'drawing' && turn && <Timer endsAt={turn.endsAt} total={room.settings.drawTime} />}
+      </div>
     </header>
   );
 }
