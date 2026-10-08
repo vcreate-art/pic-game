@@ -33,6 +33,9 @@ type Sheet = 'players' | 'me' | null;
 const SHEET_PX = 320;
 const SHEET_RATIO = 0.55;
 
+/** How long the note on a tap of the shut guess box stays. */
+const NO_CHAT_MS = 2200;
+
 /** How long Clear waits for its second tap. */
 const CLEAR_CONFIRM_MS = 3000;
 
@@ -45,6 +48,13 @@ export function DrawStage() {
   const meRef = useRef<HTMLButtonElement>(null);
   const headRef = useRef<HTMLElement>(null);
   const box = useGuessBox();
+  // When the shut box was last tapped: its note shows for a moment after.
+  const [noChat, setNoChat] = useState(0);
+  useEffect(() => {
+    if (!noChat) return;
+    const t = setTimeout(() => setNoChat(0), NO_CHAT_MS);
+    return () => clearTimeout(t);
+  }, [noChat]);
 
   if (!room) return null;
   const phase = room.phase;
@@ -125,9 +135,15 @@ export function DrawStage() {
             aria-label="Your guess"
             data-empty=""
             data-placeholder={box.placeholder}
-            // As tapping the guess box does when guessing: back to the chat.
-            onClick={() => setSheet(null)}
+            // As tapping the guess box does when guessing: back to the chat;
+            // with no sheet to close, a word on why it won't type.
+            onClick={() => (sheet ? setSheet(null) : setNoChat(Date.now()))}
           />
+          {noChat > 0 && (
+            <span key={noChat} className="dstage__nochat" role="status">
+              You can’t chat while you’re drawing
+            </span>
+          )}
         </div>
         <button
           type="button"

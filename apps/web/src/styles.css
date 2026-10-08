@@ -1165,6 +1165,26 @@ button, input { font: inherit; color: inherit; }
 .dstage__middle { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* The bottom row, as on the guessing stage, on the stage's white. */
 .dstage__foot { flex: none; background: var(--card); border-top: 1px solid var(--line); }
+/* The note on a tap of the shut guess box: a dark bubble just above it,
+   in for a moment and out. */
+.dstage__foot .chat__field { position: relative; }
+.dstage__nochat {
+  position: absolute; left: 50%; bottom: calc(100% + 10px); z-index: 5; transform: translateX(-50%);
+  padding: 7px 12px; border-radius: 10px; background: #1c1d26; color: #fff;
+  font-size: 13px; font-weight: 600; white-space: nowrap; pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .2);
+  animation: nochat 2.2s ease both;
+}
+.dstage__nochat::after {
+  content: ''; position: absolute; left: 50%; top: 100%; margin-left: -5px;
+  border: 5px solid transparent; border-top-color: #1c1d26;
+}
+@keyframes nochat {
+  0% { opacity: 0; transform: translate(-50%, 4px); }
+  10%, 80% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .dstage__nochat { animation: none; } }
 /* No letters-typed count while drawing, so no room kept for one. */
 .dstage__foot .chat__input { padding-right: 12px; }
 .dstage__foot .chat__input--editable[data-empty]::before { right: 12px; }
