@@ -2,7 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <!-- interactive-widget=resizes-visual: the keyboard shrinks only the visual
+         viewport on both iOS and Android, so the game can measure the space it
+         leaves (useVisualViewport) the same way on both. viewport-fit=cover turns
+         on env(safe-area-inset-*) for notches and gesture bars. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual"
+    />
     <title>Game Night</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

@@ -2,6 +2,7 @@ import { getSocket } from '../net/socket.js';
 import { selectIsHost, useGame } from '../store/game.js';
 import { Avatar } from './Avatar.js';
 import { GalleryButton } from './Gallery.js';
+import { Dots } from './Dots.js';
 
 export function Podium() {
   const final = useGame((s) => s.final);
@@ -48,7 +49,7 @@ export function Podium() {
             Play again
           </button>
         ) : (
-          <p className="overlay__hint">Waiting for the host to start another game…</p>
+          <p className="overlay__hint">Waiting for the host to start another game<Dots /></p>
         )}
       </div>
     </div>

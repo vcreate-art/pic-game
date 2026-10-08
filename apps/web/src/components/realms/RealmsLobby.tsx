@@ -6,6 +6,7 @@ import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { SettingsTitle } from '../SettingsTitle.js';
 import { WinsByGame } from '../WinsByGame.js';
+import { Dots } from '../Dots.js';
 
 const SEAT_LABEL: Record<RealmsSide, string> = { a: 'First player', b: 'Second player' };
 
@@ -103,7 +104,7 @@ export function RealmsLobby() {
             </button>
           ) : (
             <p className="settings__note">
-              {open > 0 ? 'Take a seat to play.' : 'Waiting for the host to start…'}
+              {open > 0 ? 'Take a seat to play.' : <>Waiting for the host to start<Dots /></>}
             </p>
           )}
         </div>

@@ -14,6 +14,7 @@ import { getSocket, saveSeat } from '../net/socket.js';
 import { useGame } from '../store/game.js';
 import { Route as rootRoute } from './__root.js';
 import vcreateLogo from '../assets/vcreate-logo.svg';
+import { noAutofill } from '../lib/noAutofill.js';
 
 /** The cat on the join card is a rare find: one page load in fifty. */
 const CAT_CHANCE = 0.02;
@@ -160,9 +161,8 @@ function Landing() {
                   value={code}
                   maxLength={6}
                   placeholder="ABC123"
-                  autoComplete="off"
                   autoCapitalize="characters"
-                  spellCheck={false}
+                  {...noAutofill}
                   onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
                 />
               </label>

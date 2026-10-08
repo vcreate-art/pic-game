@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { maskOf } from '@pic-game/shared';
 import { useGame, selectIsDrawer, selectSkribbl } from '../store/game.js';
 
@@ -21,19 +21,28 @@ function EyeIcon({ off }: { off: boolean }) {
   );
 }
 
-/** The blanks, with any revealed hint letters filled in. */
-function Slots({ mask, revealed }: { mask: string; revealed: Record<number, string> }) {
+/** The blanks, with any revealed hint letters filled in. Each word's blanks
+ *  are kept together, so a long answer wraps between words, never inside one. */
+export function Slots({ mask, revealed }: { mask: string; revealed: Record<number, string> }) {
+  const words: { i: number; c: string }[][] = [[]];
+  [...mask].forEach((c, i) => (c === ' ' ? words.push([]) : words.at(-1)!.push({ i, c })));
   return (
     <span className="wordmask__slots">
-      {[...mask].map((c, i) => {
-        if (c === ' ') return <span key={i} className="wordmask__gap" />;
-        const shown = revealed[i];
-        return (
-          <span key={i} className={`wordmask__slot ${shown ? 'is-revealed' : ''}`}>
-            {shown ?? (c === '-' ? '-' : '')}
+      {words.map((word, w) => (
+        <Fragment key={w}>
+          {w > 0 && <span className="wordmask__gap" />}
+          <span className="wordmask__group">
+            {word.map(({ i, c }) => {
+              const shown = revealed[i];
+              return (
+                <span key={i} className={`wordmask__slot ${shown ? 'is-revealed' : ''} ${c === '-' ? 'is-hyphen' : ''}`}>
+                  {shown ?? (c === '-' ? '-' : '')}
+                </span>
+              );
+            })}
           </span>
-        );
-      })}
+        </Fragment>
+      ))}
     </span>
   );
 }

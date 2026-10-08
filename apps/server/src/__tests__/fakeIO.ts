@@ -15,7 +15,13 @@ export function fakeIO(): { io: IO; sent: Sent[] } {
       sent.push({ to, event, args });
       return true;
     };
-    return { emit, volatile: { emit } };
+    // except() narrows who hears it; here everything is kept regardless.
+    const self: { emit: typeof emit; volatile: { emit: typeof emit }; except: () => typeof self } = {
+      emit,
+      volatile: { emit },
+      except: () => self,
+    };
+    return self;
   };
   return { io: { to: target } as unknown as IO, sent };
 }

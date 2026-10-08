@@ -11,6 +11,7 @@ import { FighterCard } from './FighterCard.js';
 import { Controls, MoveList } from './MoveList.js';
 import { SettingsTitle } from '../SettingsTitle.js';
 import { WinsByGame } from '../WinsByGame.js';
+import { Dots } from '../Dots.js';
 
 export const SIDE_LABEL: Record<FightSide, string> = { a: 'Player 1', b: 'Player 2' };
 
@@ -57,7 +58,7 @@ export function FightLobby() {
                       <>
                         {nameOf(holder)}
                         <span className="seat__pick" style={{ color: pick ? FIGHTERS[pick].color : undefined }}>
-                          {pick ? FIGHTERS[pick].name : 'choosing…'}
+                          {pick ? FIGHTERS[pick].name : <>choosing<Dots /></>}
                         </span>
                       </>
                     ) : (
@@ -143,7 +144,7 @@ export function FightLobby() {
             </button>
           ) : (
             <p className="settings__note">
-              {!mySide ? 'Take a side to fight, or stay and watch.' : missing > 0 ? 'Waiting for both picks…' : 'Waiting for the host to start…'}
+              {!mySide ? 'Take a side to fight, or stay and watch.' : missing > 0 ? <>Waiting for both picks<Dots /></> : <>Waiting for the host to start<Dots /></>}
             </p>
           )}
         </div>

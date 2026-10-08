@@ -3,6 +3,7 @@ import { MAX_CHAT_LEN } from '../constants.js';
 import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { getSocket } from '../net/socket.js';
 import { selectHaveGuessed, selectIsDrawer, selectSkribbl, useGame } from '../store/game.js';
+import { noAutofill } from '../lib/noAutofill.js';
 
 /** Counts what the word mask counts: letters and digits, not spaces or hyphens,
  *  so "yo-yo" reads as 4 against 4 rather than 5. */
@@ -10,21 +11,18 @@ function letterCount(s: string): number {
   return (s.match(/[\p{L}\p{N}]/gu) ?? []).length;
 }
 
-export function Chat() {
-  const messages = useGame((s) => s.messages);
+/**
+ * The guess box's state and rules, shared by the chat card and the phone's
+ * guessing stage: what it says, whether it's locked to the drawer, the
+ * letters-typed count, and sending.
+ */
+export function useGuessBox() {
   const isDrawer = useGame(selectIsDrawer);
   const haveGuessed = useGame(selectHaveGuessed);
   const phase = useGame((s) => selectSkribbl(s)?.phase);
   const mask = useGame((s) => selectSkribbl(s)?.turn?.mask ?? '');
   const isSkribbl = useGame((s) => s.room?.kind === 'skribbl');
   const [text, setText] = useState('');
-  const listRef = useRef<HTMLDivElement>(null);
-  const socket = getSocket();
-
-  useEffect(() => {
-    const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
 
   const drawing = phase === 'drawing';
   const locked = drawing && isDrawer;
@@ -32,7 +30,7 @@ export function Chat() {
   const placeholder = !isSkribbl
     ? 'Say something…'
     : locked
-      ? "You're drawing — no chatting!"
+      ? "You're drawing — no chat"
       : haveGuessed && drawing
         ? 'Chat with others who guessed it'
         : 'Type your guess...';
@@ -42,17 +40,31 @@ export function Chat() {
   const showCount = isSkribbl && drawing && !locked && !haveGuessed && target > 0 && typed > 0;
   const matches = typed === target;
 
-  const send = (e: React.FormEvent) => {
-    e.preventDefault();
+  /** From a form's submit, or straight from the Enter key where there's no form. */
+  const send = (e?: { preventDefault(): void }) => {
+    e?.preventDefault();
     const t = text.trim();
     if (!t || locked) return;
-    socket.emit('chat:guess', { text: t });
+    getSocket().emit('chat:guess', { text: t });
     if (isPostHogEnabled) posthog.capture('chat_message_sent', { message_type: isSkribbl && drawing ? 'guess' : 'chat' });
     setText('');
   };
 
+  return { text, setText, send, placeholder, locked, isSkribbl, showCount, typed, target, matches };
+}
+
+export function Chat() {
+  const messages = useGame((s) => s.messages);
+  const { text, setText, send, placeholder, locked, isSkribbl, showCount, typed, target, matches } = useGuessBox();
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
   return (
-    <section className="chat card">
+    <section className={`chat card ${locked ? 'is-locked' : ''}`}>
       <h2 className="card__title">Chat</h2>
       <div className="chat__list" ref={listRef}>
         {messages.map((m) => m.kind === 'divider' ? (
@@ -82,7 +94,8 @@ export function Chat() {
             placeholder={placeholder}
             onChange={(e) => setText(e.target.value)}
             aria-label={isSkribbl ? 'Your guess' : 'Your message'}
-            autoComplete="off"
+            enterKeyHint="send"
+            {...noAutofill}
           />
           {showCount && (
             <span

@@ -8,6 +8,7 @@ import { selectFlip7, selectIsHost, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { Chat } from '../Chat.js';
 import { Flip7Lobby } from './Flip7Lobby.js';
+import { Dots } from '../Dots.js';
 
 const ODDS_KEY = 'flip7:odds';
 
@@ -105,7 +106,7 @@ export function Flip7Game() {
     if (game.phase === 'roundEnd') return `Round ${game.round} is over`;
     if (game.pending) {
       const what = ACTION_NAME[game.pending.card.face.kind as keyof typeof ACTION_NAME];
-      return choosing ? `You drew ${what}: who gets it?` : `${name(game.pending.by)} is choosing who gets ${what}…`;
+      return choosing ? `You drew ${what}: who gets it?` : <>{name(game.pending.by)} is choosing who gets {what}<Dots /></>;
     }
     if (myTurn) return 'Your turn: hit or stay';
     return `${name(game.turn)}'s turn`;

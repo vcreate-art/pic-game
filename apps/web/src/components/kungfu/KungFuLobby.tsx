@@ -9,6 +9,7 @@ import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { SettingsTitle } from '../SettingsTitle.js';
 import { WinsByGame } from '../WinsByGame.js';
+import { Dots } from '../Dots.js';
 
 /** Every piece, shortest rest first, so the slider means something concrete. */
 const PIECE_ROWS: Array<[PieceType, string]> = [
@@ -140,7 +141,7 @@ export function KungFuLobby() {
             </button>
           ) : (
             <p className="settings__note">
-              {open > 0 ? 'Take a side to play.' : 'Waiting for the host to start…'}
+              {open > 0 ? 'Take a side to play.' : <>Waiting for the host to start<Dots /></>}
             </p>
           )}
         </div>

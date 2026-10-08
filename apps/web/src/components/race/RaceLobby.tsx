@@ -6,6 +6,7 @@ import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { SettingsTitle } from '../SettingsTitle.js';
 import { WinsByGame } from '../WinsByGame.js';
+import { Dots } from '../Dots.js';
 
 const PACE: Record<ChaserPace, { name: string; blurb: string }> = {
   off: { name: 'Off', blurb: 'No wall. Take your time.' },
@@ -107,7 +108,7 @@ export function RaceLobby() {
               Start the cup
             </button>
           ) : (
-            <p className="settings__note">Waiting for the host to start…</p>
+            <p className="settings__note">Waiting for the host to start<Dots /></p>
           )}
         </div>
       </div>

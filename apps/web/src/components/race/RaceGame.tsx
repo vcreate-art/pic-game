@@ -9,6 +9,7 @@ import { Avatar } from '../Avatar.js';
 import { Chat } from '../Chat.js';
 import { FullscreenButton } from '../FullscreenButton.js';
 import { RaceControls, RaceLobby } from './RaceLobby.js';
+import { Dots } from '../Dots.js';
 
 const colorOf = (p: Player) => AVATAR_COLORS[p.avatar.color] ?? '#ef4444';
 
@@ -146,7 +147,7 @@ export function RaceGame() {
                       </button>
                     </div>
                   ) : (
-                    <p className="overlay__hint">Waiting for the host…</p>
+                    <p className="overlay__hint">Waiting for the host<Dots /></p>
                   )}
                 </div>
               </div>

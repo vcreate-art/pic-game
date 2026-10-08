@@ -1,6 +1,6 @@
 import type { Server, Socket } from 'socket.io';
 import {
-  AVATAR_COLORS, AVATAR_FACES, GAME_KINDS, sanitizePoints, PALETTE, BRUSH_SIZES,
+  AVATAR_COLORS, AVATAR_FACES, GAME_KINDS, sanitizePoints, BRUSH_SIZES,
   MANUAL_BONUSES, HEXES, type GameKind, type ManualBonus, type Side,
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
@@ -74,8 +74,10 @@ function cleanPerson(raw: unknown): string | null {
 
 /** Colors and brush sizes are validated against the palette rather than accepted
  *  as free strings, which keeps arbitrary CSS out of every other player's canvas. */
-function cleanColor(raw: unknown): string {
-  return typeof raw === 'string' && (PALETTE as readonly string[]).includes(raw) ? raw : '#000000';
+/** Any solid colour as #rrggbb: the desktop's palette, or anywhere along a
+ *  phone's colour bar. Anything else draws black. */
+export function cleanColor(raw: unknown): string {
+  return typeof raw === 'string' && /^#[0-9a-f]{6}$/i.test(raw) ? raw.toLowerCase() : '#000000';
 }
 function cleanSize(raw: unknown): number {
   const n = Number(raw);
@@ -329,6 +331,12 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       const room = skribbl();
       if (!room || !s.playerId || !s.draw.tryTake(4)) return;
       room.undo(s.playerId);
+    });
+
+    socket.on('canvas:redo', () => {
+      const room = skribbl();
+      if (!room || !s.playerId || !s.draw.tryTake(4)) return;
+      room.redo(s.playerId);
     });
 
     socket.on('canvas:clear', () => {

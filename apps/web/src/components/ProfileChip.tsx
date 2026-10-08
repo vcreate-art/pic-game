@@ -9,6 +9,7 @@ import { useDismiss } from '../lib/useDismiss.js';
 import { ACHIEVEMENTS, byRelevance, totalPlayed, totalWon, useStats } from '../lib/achievements.js';
 import { Avatar } from './Avatar.js';
 import { PhoneHandoff } from './PhoneHandoff.js';
+import { noAutofill } from '../lib/noAutofill.js';
 
 /** How many badges the menu shows before handing over to the full page. */
 const PEEK = 3;
@@ -25,9 +26,6 @@ export function ProfileChip() {
   const [editing, setEditing] = useState(false);
   const [phone, setPhone] = useState(false);
   const stats = useStats();
-  const [name, setName] = useState('');
-  const [color, setColor] = useState(0);
-  const [face, setFace] = useState(0);
   const inRoom = useGame((s) => !!s.room && !!s.me);
   const box = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
@@ -57,26 +55,10 @@ export function ProfileChip() {
     setOpen((o) => !o);
   };
 
-  const edit = () => {
-    setName(profile.name);
-    setColor(profile.avatar.color);
-    setFace(profile.avatar.face);
-    setEditing(true);
-  };
+  const edit = () => setEditing(true);
 
   const played = totalPlayed(stats);
   const won = totalWon(stats);
-  const earned = ACHIEVEMENTS.filter((a) => stats.unlocked[a.id]).length;
-
-  const save = (e: React.FormEvent) => {
-    e.preventDefault();
-    const n = name.replace(/\s+/g, ' ').trim().slice(0, MAX_NAME_LEN);
-    if (!n) return;
-    const next: Profile = { name: n, avatar: { color, face } };
-    saveProfile(next);
-    if (inRoom) getSocket().emit('player:rename', next);
-    setEditing(false);
-  };
 
   return (
     <div className="profile" ref={box}>
@@ -102,28 +84,7 @@ export function ProfileChip() {
             </button>
           </div>
 
-          <div className="profile__badges">
-            <p className="profile__count">{earned} of {ACHIEVEMENTS.length} achievements</p>
-            {/* One segment per achievement, so the bar is the whole shelf. */}
-            <div className="profile__shelf" aria-hidden="true">
-              {ACHIEVEMENTS.map((a, i) => (
-                <span key={a.id} className={i < earned ? 'is-earned' : ''} />
-              ))}
-            </div>
-            <ul>
-              {byRelevance(stats).slice(0, PEEK).map((a) => {
-                const at = stats.unlocked[a.id];
-                const n = Math.min(a.progress(stats), a.goal);
-                return (
-                  <li key={a.id} className={at ? 'is-earned' : ''}>
-                    <span className="profile__badge" aria-hidden="true">{at ? <Trophy /> : <Lock />}</span>
-                    <span className="profile__badgename">{a.title}</span>
-                    {!at && a.goal > 1 && <span className="profile__badgeat">{n} of {a.goal}</span>}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+          <ProfileBadges peek={PEEK} />
 
           {/* Following a link out of a room would leave it, so not from there. */}
           {inRoom ? (
@@ -143,32 +104,104 @@ export function ProfileChip() {
 
       {open && phone && <PhoneHandoff onBack={() => setPhone(false)} />}
 
-      {open && editing && (
-        <form className="profile__pop card" onSubmit={save}>
-          <div className="profile__avatar">
-            <Avatar data={{ color, face }} size={56} />
-            <div className="join__cycle">
-              <button type="button" onClick={() => setColor((c) => (c + 1) % AVATAR_COLORS.length)}>Colour</button>
-              <button type="button" onClick={() => setFace((f) => (f + 1) % AVATAR_FACES.length)}>Face</button>
-            </div>
-          </div>
-          <label className="field">
-            <span className="field__label">Nickname</span>
-            <input
-              className="field__input"
-              value={name}
-              maxLength={MAX_NAME_LEN}
-              autoFocus
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
-          <div className="profile__actions">
-            <button type="button" className="btn btn--ghost" onClick={() => setEditing(false)}>Cancel</button>
-            <button type="submit" className="btn btn--primary" disabled={!name.trim()}>Save</button>
-          </div>
-          {inRoom && <p className="profile__note">Everyone in the room sees the change.</p>}
-        </form>
+      {open && editing && <ProfileEditor className="profile__pop card" onDone={() => setEditing(false)} />}
+    </div>
+  );
+}
+
+/**
+ * Changing your name and look: in the header's profile menu, and in the
+ * phone's "you" sheet. Outside a room an edit just updates what the join
+ * form will use next; inside one, the rename goes to the server and everyone
+ * sees the new name at once.
+ */
+export function ProfileEditor({ className, onDone }: { className?: string; onDone: () => void }) {
+  const [start] = useState(() => loadProfile());
+  const [name, setName] = useState(start?.name ?? '');
+  const [color, setColor] = useState(start?.avatar.color ?? 0);
+  const [face, setFace] = useState(start?.avatar.face ?? 0);
+  const inRoom = useGame((s) => !!s.room && !!s.me);
+
+  const save = (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = name.replace(/\s+/g, ' ').trim().slice(0, MAX_NAME_LEN);
+    if (!n) return;
+    const next: Profile = { name: n, avatar: { color, face } };
+    saveProfile(next);
+    if (inRoom) getSocket().emit('player:rename', next);
+    onDone();
+  };
+
+  return (
+    <form className={className} onSubmit={save}>
+      <div className="profile__avatar">
+        <Avatar data={{ color, face }} size={56} />
+        <div className="join__cycle">
+          <button type="button" onClick={() => setColor((c) => (c + 1) % AVATAR_COLORS.length)}>Colour</button>
+          <button type="button" onClick={() => setFace((f) => (f + 1) % AVATAR_FACES.length)}>Face</button>
+        </div>
+      </div>
+      <label className="field">
+        <span className="field__label">Nickname</span>
+        <input
+          className="field__input"
+          value={name}
+          maxLength={MAX_NAME_LEN}
+          autoFocus
+          onChange={(e) => setName(e.target.value)}
+          {...noAutofill}
+        />
+      </label>
+      <div className="profile__actions">
+        <button type="button" className="btn btn--ghost" onClick={onDone}>Cancel</button>
+        <button type="submit" className="btn btn--primary" disabled={!name.trim()}>Save</button>
+      </div>
+      {inRoom && <p className="profile__note">Everyone in the room sees the change.</p>}
+    </form>
+  );
+}
+
+/**
+ * Your achievements: how many of them, as a count and a shelf with one
+ * segment each, and the badges, most relevant first, or the first few.
+ */
+export function ProfileBadges({
+  peek,
+  shelf = true,
+  count = true,
+}: {
+  peek?: number;
+  shelf?: boolean;
+  /** The "N of M achievements" line; off where it's shown elsewhere. */
+  count?: boolean;
+}) {
+  const stats = useStats();
+  const earned = ACHIEVEMENTS.filter((a) => stats.unlocked[a.id]).length;
+  const badges = byRelevance(stats);
+  return (
+    <div className="profile__badges">
+      {count && <p className="profile__count">{earned} of {ACHIEVEMENTS.length} achievements</p>}
+      {/* One segment per achievement, so the bar is the whole shelf. */}
+      {shelf && (
+        <div className="profile__shelf" aria-hidden="true">
+          {ACHIEVEMENTS.map((a, i) => (
+            <span key={a.id} className={i < earned ? 'is-earned' : ''} />
+          ))}
+        </div>
       )}
+      <ul>
+        {(peek ? badges.slice(0, peek) : badges).map((a) => {
+          const at = stats.unlocked[a.id];
+          const n = Math.min(a.progress(stats), a.goal);
+          return (
+            <li key={a.id} className={at ? 'is-earned' : ''}>
+              <span className="profile__badge" aria-hidden="true">{at ? <Trophy /> : <Lock />}</span>
+              <span className="profile__badgename">{a.title}</span>
+              {!at && a.goal > 1 && <span className="profile__badgeat">{n} of {a.goal}</span>}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

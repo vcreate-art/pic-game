@@ -428,12 +428,40 @@ button, input { font: inherit; color: inherit; }
   font-weight: 600; font-size: 13px; text-align: center; word-break: break-word;
 }
 
-.settings { display: flex; flex-direction: column; gap: 12px; }
+.settings { position: relative; display: flex; flex-direction: column; gap: 12px; }
+.settings__shield {
+  position: absolute; inset: -8px; z-index: 1; border-radius: 12px; cursor: not-allowed;
+  transition: background .2s ease, backdrop-filter .2s ease, -webkit-backdrop-filter .2s ease;
+}
+/* While the message shows, the settings blur behind it, word list and all. */
+.settings__shield.is-on {
+  z-index: 3; background: rgba(255, 255, 255, .4);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+}
+.settings .wordbox__box { position: relative; z-index: 2; }
+/* Floats in the middle of the settings for a moment, so saying it moves
+   nothing around. */
+.settings__told {
+  position: absolute; left: 50%; top: 50%; z-index: 4; margin: 0;
+  padding: 9px 16px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+  background: var(--ink); color: #fff; font-size: 13px; font-weight: 600;
+  opacity: 0; transform: translate(-50%, calc(-50% + 6px)); transition: opacity .2s ease, transform .2s ease;
+}
+.settings__told.is-on { opacity: 1; transform: translate(-50%, -50%); }
+@media (prefers-reduced-motion: reduce) {
+  .settings__told, .settings__shield { transition: none; }
+}
 .settings__row { display: grid; grid-template-columns: 1fr 1.4fr auto; align-items: center; gap: 12px; }
 .settings__label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .settings__row input[type='range'] { width: 100%; accent-color: var(--accent); }
 .settings__value { font-family: var(--display); font-weight: 700; min-width: 30px; text-align: right; }
 .settings__note { margin: 0; font-size: 13px; color: var(--ink-soft); text-align: center; }
+/* In the start button's place for everyone but the host: the same box, so
+   the settings card has the same shape whoever is looking. */
+.settings__note--start {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 52px; padding: 13px 22px; border: 1px solid transparent; box-sizing: border-box;
+}
 
 /* ---------------------------------------------------------------- game */
 
@@ -484,6 +512,10 @@ button, input { font: inherit; color: inherit; }
   letter-spacing: .02em; line-height: 1.15;
 }
 .wordmask__slots { display: flex; gap: 5px; flex-wrap: wrap; align-items: flex-end; justify-content: center; }
+/* One word's blanks, kept together: a long answer wraps between words. */
+.wordmask__group { display: flex; gap: inherit; align-items: flex-end; }
+/* A hyphen is given, not guessed: shown, with no blank under it. */
+.wordmask__slot.is-hyphen { width: 10px; border-bottom-color: transparent; }
 .wordmask__eye {
   display: grid; place-items: center; width: 30px; height: 30px; flex: none;
   border: 1px solid var(--line); border-radius: 9px;
@@ -531,9 +563,11 @@ button, input { font: inherit; color: inherit; }
    fine on one line but flung Undo/Clear to the far right of a second row the
    moment the bar wrapped. Sized to fit one row at the usual stage width. */
 .toolbar {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  /* The groups spread across, the palette against the left edge and clear
+     against the right, with the same padding all round. */
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 10px 12px;
-  padding: 12px 14px; background: var(--card);
+  padding: 14px; background: var(--card);
   border: 1px solid var(--edge); border-radius: var(--radius);
 }
 .toolbar__palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
@@ -546,13 +580,33 @@ button, input { font: inherit; color: inherit; }
 .toolbar__group { display: flex; align-items: center; gap: 6px; }
 
 .brush {
-  width: 30px; height: 30px; display: grid; place-items: center;
+  /* No padding: the browser's 6px a side left the biggest dot (22.5px) too
+     little room, and it overflowed off centre. */
+  width: 30px; height: 30px; padding: 0; display: grid; place-items: center;
   border: 1px solid var(--line); border-radius: 9px; background: var(--card); cursor: pointer;
 }
 .brush.is-active { border-color: var(--accent); background: var(--accent-soft); }
 .brush span { display: block; border-radius: 50%; }
 
+/* The brush sizes behind one button: a click opens them in a row above it. */
+.brushpick { position: relative; }
+/* As tall as the tool buttons beside it, so the row is one height. */
+.brushpick__now { width: 36px; height: 36px; border-radius: 10px; }
+.brushpick__menu {
+  position: absolute; left: 50%; bottom: 100%; z-index: 60; transform: translateX(-50%);
+  display: flex; gap: 6px; padding: 6px 6px; margin-bottom: 8px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(31, 34, 51, .16);
+  opacity: 0; visibility: hidden; transition: opacity .12s ease, visibility 0s .12s;
+}
+.brushpick.is-open .brushpick__menu {
+  opacity: 1; visibility: visible; transition: opacity .12s ease, visibility 0s;
+}
+/* Open, the button's tooltip would sit on the sizes. */
+.brushpick.is-open .brushpick__now::after, .brushpick.is-open .brushpick__now::before { display: none; }
+
 .tool {
+  display: inline-flex; align-items: center; gap: 6px;
   border: 1px solid var(--line); background: var(--card); border-radius: 10px;
   padding: 7px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
   white-space: nowrap;
@@ -560,6 +614,53 @@ button, input { font: inherit; color: inherit; }
 .tool:hover { border-color: var(--accent); }
 .tool.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .tool--danger:hover { border-color: var(--warn); color: var(--warn); }
+/* A tooltip: a dark bubble with a small arrow above anything with a
+   data-tip, where there's a pointer to hover with. Quicker than the
+   browser's own, which waits about a second. */
+@media (hover: hover) {
+  [data-tip] { position: relative; }
+  [data-tip]::after, [data-tip]::before {
+    position: absolute; left: 50%; z-index: 70; pointer-events: none;
+    opacity: 0; transition: opacity .12s ease; transition-delay: 0s;
+  }
+  [data-tip]::after {
+    content: attr(data-tip); bottom: calc(100% + 9px); transform: translateX(-50%);
+    padding: 6px 11px; border-radius: 9px; background: #1c1d26; color: #fff;
+    font-size: 12.5px; font-weight: 500; line-height: 1.2; white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+  }
+  [data-tip]::before {
+    content: ''; bottom: calc(100% + 4px); width: 10px; height: 10px; margin-left: -5px;
+    background: #1c1d26; border-radius: 2px; transform: rotate(45deg);
+  }
+  [data-tip]:hover::after, [data-tip]:hover::before,
+  [data-tip]:focus-visible::after, [data-tip]:focus-visible::before { opacity: 1; transition-delay: .15s; }
+}
+
+/* The drawing tools: icon and word, roomy, each one's key in its tooltip.
+   Where the toolbar can't fit them all on one line like that, the words
+   go (kept for screen readers) and the icons stand alone, so it stays one
+   line rather than wrapping. */
+.toolbar { container-type: inline-size; }
+.toolbar .tool { height: 36px; padding: 0 12px 0 10px; gap: 6px; }
+.tool__icon { flex: none; width: 16px; height: 16px; }
+/* Actions (undo, redo, clear) are icons alone; their words are for screen
+   readers, their names and keys in their tooltips. */
+.toolbar .tool--icon { width: 36px; padding: 0; justify-content: center; }
+.toolbar .tool--icon .tool__label {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+/* Pen, fill and eraser, and undo and redo: separate buttons, each set
+   grouped by sitting closer together than the groups do. */
+.toolbar__seg { gap: 4px; }
+@container (max-width: 627px) {
+  .toolbar .tool { width: 30px; height: 30px; padding: 0; justify-content: center; }
+  .toolbar .brushpick__now { width: 30px; height: 30px; }
+  .toolbar .toolbar__palette { gap: 2px; }
+  .toolbar .tool__label {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+}
 .tool--leave { border-color: var(--warn-edge); background: var(--warn-wash); color: var(--warn); }
 .tool--leave:hover { background: var(--warn); border-color: var(--warn); color: #fff; }
 
@@ -619,7 +720,9 @@ button, input { font: inherit; color: inherit; }
   border-radius: 10px; padding: 10px 62px 10px 12px; outline: none;
 }
 .chat__input:focus { border-color: var(--accent); background: var(--card); }
-.chat__input:disabled { opacity: .6; }
+/* Shut, there's no letters-typed count, so no room kept for one: the
+   placeholder gets the whole box. */
+.chat__input:disabled { opacity: .6; padding-right: 12px; }
 .chat__count {
   position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
   font-size: 11px; font-weight: 700; color: var(--ink-soft);
@@ -702,6 +805,484 @@ button, input { font: inherit; color: inherit; }
   .toolbar { gap: 8px 10px; }
 }
 
+/* ------------------------------------------------ draw & guess on a phone */
+
+/* Canvas first, and everything a turn needs within one screen: a slim
+   header, the board, then the guesses and guess box (or the drawer's tools)
+   right under it, and the players as a strip at the end. */
+@media (max-width: 640px) {
+  .game--skribbl { gap: 10px; }
+  .game--skribbl .game__head { padding: 8px 12px; gap: 4px 8px; }
+  .game--skribbl .game__round { font-size: 14px; }
+  .game--skribbl .wordmask { min-height: 0; }
+  .game--skribbl .wordmask__label { display: none; }
+  .game--skribbl .wordmask__word { font-size: 22px; }
+  .game--skribbl .timer { width: 38px; height: 38px; }
+  .game--skribbl .timer__num { font-size: 14px; }
+  .game--skribbl .reactions { margin-left: 0; gap: 4px; }
+
+  .game--skribbl .game__body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'stage' 'chat' 'scores';
+    gap: 10px;
+  }
+  .game--skribbl .game__stage { grid-area: stage; gap: 10px; }
+  .game--skribbl .chat { grid-area: chat; }
+  .game--skribbl .scores { grid-area: scores; }
+
+  /* The guesses: a few lines, newest at the bottom, the box right under. */
+  .game--skribbl .chat { height: auto; padding: 10px 12px; }
+  .game--skribbl .chat .card__title { display: none; }
+  .game--skribbl .chat__list { max-height: 92px; min-height: 46px; }
+  .game--skribbl .chat__form { margin-top: 8px; }
+  /* The drawer can't guess, so the box goes; the guesses stay to watch. */
+  .game--skribbl .chat.is-locked .chat__form { display: none; }
+  .game--skribbl .chat__input { font-size: 16px; }
+
+  /* The drawer's tools: colours swipe sideways in one row, and the nine
+     buttons under them (sizes, tools, undo, clear) are icons on one row. */
+  .game--skribbl .toolbar {
+    display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); justify-items: center;
+    gap: 8px 4px; padding: 10px 12px;
+  }
+  .game--skribbl .toolbar__group { display: contents; }
+  .game--skribbl .toolbar__palette {
+    grid-column: 1 / -1; justify-self: stretch;
+    display: flex; gap: 6px; overflow-x: auto; padding: 3px 2px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .game--skribbl .toolbar__palette::-webkit-scrollbar { display: none; }
+  .game--skribbl .swatch { flex: none; width: 30px; height: 30px; border-radius: 8px; }
+  .game--skribbl .brush, .game--skribbl .tool { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; }
+  .game--skribbl .tool__icon { display: block; width: 18px; height: 18px; }
+  .game--skribbl .tool__label {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+
+  /* Players as a strip: avatar, name and points, green once guessed. Removing
+     someone is done from the room panel here. */
+  .game--skribbl .scores { padding: 10px 12px; }
+  .game--skribbl .scores .card__title { display: none; }
+  .game--skribbl .scores__list {
+    flex-direction: row; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  }
+  .game--skribbl .scores__list::-webkit-scrollbar { display: none; }
+  .game--skribbl .scores__row,
+  .game--skribbl .scores__list.is-host .scores__row {
+    flex: none; width: 72px; grid-template-columns: 1fr; justify-items: center; gap: 2px; padding: 6px 4px;
+  }
+  .game--skribbl .scores__rank, .game--skribbl .scores__tags, .game--skribbl .scores .kick,
+  .game--skribbl .scores .kick-slot { display: none; }
+  .game--skribbl .scores__meta { align-items: center; width: 100%; }
+  .game--skribbl .scores__name { max-width: 100%; font-size: 12px; text-align: center; }
+  .game--skribbl .scores__name em { display: none; }
+  .game--skribbl .scores__pts { font-size: 14px; }
+  .game--skribbl .scores__row.is-drawing { background: #fef3c7; }
+
+  /* Picking a word and the round's results cover the screen, not just the
+     board, so they never spill out of it. Under the 3-2-1 and the pause
+     screen, which have to show over everything in the game. */
+  .game--skribbl .board__wrap > .overlay { position: fixed; z-index: 50; border-radius: 0; }
+}
+
+/* ---------------------------------- draw & guess on a phone: guessing */
+
+/* GuessStage: fixed to the part of the screen the top bar and the keyboard
+   (or the sheet in its place) leave, so the browser never scrolls anything
+   under the keys. */
+.gstage {
+  position: fixed; left: 0; right: 0; z-index: 30; overflow: hidden;
+  display: flex; flex-direction: column; background: var(--card);
+  /* A tap or a held finger on a button shouldn't select text or flash the
+     browser's tap highlight; typing places keep their selection. */
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  /* The stage owns every gesture: a drag here pans nothing and scrolls
+     nothing, so Chrome's address bar has no reason to move. Taps still work. */
+  touch-action: none;
+}
+.gstage__board { position: relative; flex: none; }
+.gstage__board .board { border: 0; border-radius: 0; }
+.gstage__foot { position: relative; margin-top: auto; flex: none; }
+/* Over the drawing, under the open chat: the drawing stays in sight, faint,
+   and the lines read against the veil. Fades with the lines. Taps go
+   through to the drawing, which folds the chat. */
+.gstage__veil {
+  position: absolute; inset: 0; pointer-events: none;
+  background: color-mix(in srgb, color-mix(in srgb, var(--ink) 14%, var(--card)) 72%, transparent);
+  opacity: 0; transition: opacity .45s ease;
+}
+.gstage__veil.is-on { opacity: 1; }
+
+/* The chat hangs over everything above the guess box: newest at the bottom,
+   older lines fading as they climb, and a drag scrolls back through them. A
+   tap on it acts as one on the drawing. */
+.gstage__chat {
+  position: absolute; left: 0; right: 0; bottom: 100%;
+  display: flex; flex-direction: column; gap: 4px;
+  /* The left gutter holds each line's sender, and the turn marker's tab. */
+  padding: 0 12px 8px 32px; overflow-x: hidden; overflow-y: auto;
+  /* The stage allows no gestures; the chat takes back the vertical drag, and
+     its scroll ends here rather than passing to the page. */
+  touch-action: pan-y; overscroll-behavior: contain; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to top, #000 45%, rgba(0, 0, 0, var(--fade-to)));
+  mask-image: linear-gradient(to top, #000 45%, rgba(0, 0, 0, var(--fade-to)));
+  --fade-to: 0; transition: --fade-to .45s ease;
+}
+/* While someone reads back through the chat, no fade: the top end goes
+   solid too. Registered so it eases; a browser without @property snaps. */
+@property --fade-to { syntax: '<number>'; inherits: false; initial-value: 0; }
+.gstage__chat.is-reading { --fade-to: 1; }
+.gstage__chat::-webkit-scrollbar { display: none; }
+/* Down to the bottom when there's room to spare. Not justify-content:
+   flex-end, which leaves what overflows the top out of reach of the scroll. */
+.gstage__chat > :first-child { margin-top: auto; }
+.gstage__chat .msg { position: relative; }
+/* The sender, small, centred in the gutter beside their line. */
+.msg__avatar { position: absolute; left: -25px; top: 50%; transform: translateY(-50%); display: flex; }
+.gstage__chat .msg {
+  flex: none; align-self: flex-start; max-width: 85%;
+  background: rgba(255, 255, 255, .86); box-shadow: 0 1px 3px rgba(31, 34, 51, .12);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+}
+.gstage__chat .msg--correct { background: rgba(220, 252, 231, .94); }
+.gstage__chat .msg--close { background: rgba(254, 243, 199, .94); }
+/* With the whole screen, solid down the gap under the drawing and fading
+   only over it. */
+.gstage__chat.is-roomy {
+  -webkit-mask-image: linear-gradient(to top, #000 var(--solid), rgba(0, 0, 0, var(--fade-to)) calc(var(--solid) + var(--fade)));
+  mask-image: linear-gradient(to top, #000 var(--solid), rgba(0, 0, 0, var(--fade-to)) calc(var(--solid) + var(--fade)));
+}
+/* The turn marker, quieter here than in the side chat: a small pill on the
+   left like the messages, no rules across the drawing, no capitals. */
+.gstage__chat .msg--divider {
+  position: relative;
+  /* Square on the left, where the marker joins it: one tab off the edge. */
+  flex: none; align-self: flex-start; margin: 4px 0 0; padding: 2px 8px; border-radius: 0 999px 999px 0;
+  background: rgba(255, 255, 255, .7); box-shadow: none;
+  font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none;
+}
+.gstage__chat .msg--divider::after { content: none; }
+/* A marker hanging off its left edge, out to the screen's edge, so a new
+   turn stands out in the run of messages without crossing the drawing. */
+.gstage__chat .msg--divider::before {
+  content: ''; flex: none; position: absolute; right: 100%; top: 0; bottom: 0; width: 32px;
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.gstage__chat .msg--divider span { max-width: none; }
+
+/* You, before the guess box and as tall as it: opens the "you" sheet. */
+.gstage__mebtn {
+  flex: none; display: flex; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer;
+  /* Closer to the box than the row's 8px gap: 6px. */
+  margin-right: -2px;
+}
+.gstage__mebtn.is-on { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gstage__mebtn { position: relative; }
+/* Your place in the game, on your avatar's upper corner, as the players
+   button wears its count. */
+.gstage__merank {
+  position: absolute; right: -6px; top: -6px; display: grid; place-items: center;
+  min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; border: 2px solid var(--card);
+  background: var(--ink); color: var(--card); font-size: 10px; font-weight: 800; line-height: 1;
+}
+.gstage__mebtn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* A sent line and your avatar on their way from the guess box to the chat
+   (flySent), and each line fading in as it lands, so the two cross. */
+.gstage__flying, .gstage__flying-face { position: fixed; z-index: 40; pointer-events: none; margin: 0; }
+.gstage__flying-face { transform-origin: 0 0; }
+.gstage__flying {
+  max-width: 85vw; background: rgba(255, 255, 255, .86); box-shadow: 0 1px 3px rgba(31, 34, 51, .12);
+}
+.gstage__chat .msg { animation: msg-in .25s ease; }
+/* Yours, back from the server while its stand-in is still flying: unseen
+   until it lands, then shown in the same frame the stand-in goes, exactly
+   in its place. Its fade-in runs out unseen meanwhile, so it doesn't fade. */
+.gstage__chat .msg.is-landing { opacity: 0; }
+@keyframes msg-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .gstage__chat .msg { animation: none; } }
+
+/* The guess box and the room button beside it, last above the keyboard. */
+.gstage__form {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom)) 6px;
+}
+.gstage__form .chat__field { flex: 1; min-width: 0; }
+.gstage__roombtn {
+  position: relative; flex: none; display: grid; place-items: center; width: 44px; height: 44px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink-soft); cursor: pointer;
+}
+.gstage__roombtn svg { width: 20px; height: 20px; }
+.gstage__roombtn.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.gstage__roombtn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.gstage__roomcount {
+  position: absolute; top: -6px; right: -6px; min-width: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--ink); color: var(--card); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+}
+
+/* The stage's own header: round and timer, the blanks, the reactions. The
+   app's header steps aside while the stage is up (hidden, not removed: its
+   bug button is what the bug-report survey listens to). */
+.has-gstage .topbar { visibility: hidden; }
+/* Paused, the pause screen covers the stage, its header and its room
+   button; the app's header comes back over it so the host can resume. */
+.has-gstage:has(.paused) .topbar { visibility: visible; }
+.gstage__head {
+  position: relative; z-index: 1; flex: none; display: flex; align-items: center; gap: 8px;
+  min-height: 52px; padding: 6px 7px 6px 12px; background: var(--card); border-bottom: 1px solid var(--line);
+}
+/* The round and the clock take the same width, so the word between them is
+   centred on the screen; the clock's place is kept while there's no clock. */
+.gstage__round, .gstage__clock { flex: none; width: 44px; }
+/* The clock sits closer to the edge (the header's right padding is 7px, the
+   left 12px): its space is wider by the difference, so the word stays centred. */
+.gstage__clock { width: 49px; }
+/* The round you're on, big; out of how many, small and muted. */
+.gstage__round { font-family: var(--display); font-weight: 800; font-size: 27px; line-height: 1; white-space: nowrap; }
+.gstage__round small { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+.gstage__clock { display: flex; justify-content: flex-end; }
+.gstage__head .timer { width: 36px; height: 36px; }
+.gstage__head .timer__num { font-size: 13px; }
+/* The blanks take what's left and shrink before anything wraps. */
+.gstage__word { flex: 1; min-width: 0; display: flex; justify-content: center; overflow: hidden; }
+/* Words wrap onto a second line when the answer won't fit on one (the
+   header grows for those); a single long word shrinks to fit instead, down
+   to 8px blanks, which holds the 20-letter longest a host can add. */
+.gstage__head .wordmask__slots { flex-wrap: wrap; column-gap: 12px; row-gap: 4px; min-width: 0; }
+.gstage__head .wordmask__gap { display: none; }
+.gstage__head .wordmask__group { flex: 0 1 auto; min-width: 0; gap: 3px; }
+.gstage__head .wordmask__slot.is-hyphen { flex-basis: 8px; width: 8px; min-width: 6px; }
+/* Each dash a little wider than the letter it holds, with the letter centred
+   over it. */
+.gstage__head .wordmask__slot {
+  /* A real width, not just a flex basis: Chrome on Android sizes the row
+     from its contents, and an empty slot has none. Still shrinks for long
+     words, down to min-width. */
+  flex: 0 1 22px; min-width: 8px; width: 22px; height: 26px; border-bottom-width: 3px;
+  font-size: 19px; line-height: 1; text-align: center; justify-items: center;
+}
+.gstage__status { font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Thumbs up or down, as one faint button in the drawing's top corner; open,
+   the two thumbs and their counts slide out to its left. */
+.gstage__react {
+  position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; align-items: center; gap: 6px;
+}
+.gstage__reactbtn, .gstage__reactopt {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 38px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--card); color: var(--ink-soft); font-size: 17px; cursor: pointer;
+  box-shadow: 0 1px 3px rgba(31, 34, 51, .12);
+}
+.gstage__reactbtn { width: 38px; opacity: .5; transition: opacity .2s ease; }
+.gstage__reactbtn svg { width: 19px; height: 19px; }
+.gstage__react.is-open .gstage__reactbtn { opacity: 1; }
+.gstage__reactopt { padding: 0 12px; animation: react-in .18s ease both; }
+.gstage__reactopt b { font-size: 13px; color: var(--ink); }
+.gstage__reactopt.is-on { background: var(--accent-soft); border-color: var(--accent); }
+@keyframes react-in { from { opacity: 0; transform: translateX(8px); } }
+.gstage__form .chat__input { font-size: 16px; background: var(--card); }
+/* The guess box is an editable div here (see GuessField): one line that
+   scrolls sideways, an input's placeholder, and its disabled look. */
+.gstage .chat__input--editable, .gstage input, .gstage textarea {
+  -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
+}
+.chat__input--editable {
+  white-space: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  position: relative; line-height: 1.25; cursor: text; user-select: text; -webkit-user-select: text;
+  /* An input's height even when empty: a line, the padding, the border. */
+  min-height: calc(1.25em + 22px);
+}
+.chat__input--editable::-webkit-scrollbar { display: none; }
+.chat__input--editable[data-empty]::before {
+  /* Out of the text's flow, so the caret sits at the start, not after it. */
+  position: absolute; left: 12px; right: 62px; top: 50%; transform: translateY(-50%);
+  overflow: hidden; text-overflow: ellipsis;
+  content: attr(data-placeholder); color: var(--ink-soft); pointer-events: none;
+}
+.chat__input--editable[aria-disabled] { opacity: .6; cursor: default; }
+
+/* ------------------------------------ draw & guess on a phone: drawing */
+
+/* The drawer's word in the stage's header, and the eye that hides it. */
+.gstage__drawword { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.gstage__secret {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--display); font-size: 22px; font-weight: 800;
+}
+.gstage__eye {
+  flex: none; display: grid; place-items: center; width: 30px; height: 30px; padding: 0;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--card); color: var(--ink-soft); cursor: pointer;
+}
+.gstage__eye svg { width: 16px; height: 16px; }
+
+/* DrawStage: the canvas, the guesses under it, the tools along the bottom.
+   The stage is grey and the canvas white, so it's plain where a stroke
+   counts and where it doesn't. */
+.dstage { background: var(--paper); }
+.dstage .gstage__board { flex: none; }
+.dstage .gstage__board .board { border-bottom: 1px solid var(--line); }
+/* The guesses take whatever height is left, newest at the bottom, older ones
+   fading as they climb; under the drawing, so they never cover it. */
+.dstage__feed {
+  position: static; flex: 1; min-height: 0; max-height: none; overflow: hidden;
+  justify-content: flex-end; padding-top: 6px; pointer-events: none;
+}
+.dstage__feed > :first-child { margin-top: auto; }
+/* The likes and dislikes, faint in the drawing's top-left corner; strokes
+   pass through. */
+.dstage__tally {
+  position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; gap: 10px;
+  padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+  background: rgba(255, 255, 255, .86); font-size: 13px; font-weight: 700;
+  opacity: .85; pointer-events: none;
+}
+/* The colour bar down the drawing's right edge (ColorBar): a thin line,
+   with a white rim and a shadow so it reads on any drawing, inside a wide
+   invisible catch area, 40px across, for a thumb. */
+.colorbar {
+  position: absolute; top: 16px; bottom: 16px; right: 17px; z-index: 3; width: 6px;
+  border-radius: 999px; cursor: pointer; touch-action: none;
+  box-shadow: 0 0 0 2px #fff, 0 1px 6px rgba(31, 34, 51, .3);
+}
+.colorbar::before { content: ''; position: absolute; inset: -10px -17px; }
+.colorbar:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+/* Where the colour is on the bar. */
+.colorbar__thumb {
+  position: absolute; left: 50%; width: 22px; height: 22px; border-radius: 50%; pointer-events: none;
+  transform: translate(-50%, -50%); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(31, 34, 51, .4);
+  transition: width .12s ease, height .12s ease;
+}
+.colorbar.is-dragging .colorbar__thumb { width: 26px; height: 26px; }
+/* While dragging, a big drop of the colour to the left of the finger. */
+.colorbar__drop {
+  position: absolute; right: calc(100% + 22px); width: 46px; height: 46px; border-radius: 50%; pointer-events: none;
+  transform: translateY(-50%); border: 3px solid #fff; box-shadow: 0 2px 10px rgba(31, 34, 51, .35);
+}
+
+/* The middle: the guesses, and you and the players in the corner. */
+.dstage__middle { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* The bottom row, as on the guessing stage, on the stage's white. */
+.dstage__foot { flex: none; background: var(--card); border-top: 1px solid var(--line); }
+/* No letters-typed count while drawing, so no room kept for one. */
+.dstage__foot .chat__input { padding-right: 12px; }
+.dstage__foot .chat__input--editable[data-empty]::before { right: 12px; }
+
+/* The tools, right under the drawing: the groups spread across. */
+.dtools {
+  flex: none; display: flex; flex-direction: column; padding: 10px 12px;
+  border-bottom: 1px solid var(--line); background: var(--card);
+}
+.dtools__row { display: flex; align-items: center; justify-content: space-between; }
+.dtools__group { display: flex; gap: 4px; }
+.dtools__btn {
+  position: relative; flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); cursor: pointer;
+}
+.dtools__btn svg { width: 20px; height: 20px; }
+.dtools__btn.is-active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.dtools__btn.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.dtools__btn--danger { color: var(--warn); }
+.dtools__btn--danger.is-asking { border-color: var(--warn); background: var(--warn-wash); }
+/* Clear's second-tap prompt, over the button. */
+.dtools__ask {
+  position: absolute; bottom: calc(100% + 6px); right: 0;
+  padding: 3px 8px; border-radius: 6px; background: var(--warn); color: #fff;
+  font-size: 12px; font-weight: 700; white-space: nowrap; pointer-events: none;
+}
+.dtools__dot { display: block; border-radius: 50%; }
+/* The brush sizes, a column rising from the brush button: the smallest
+   nearest it, growing as they go up. */
+.dtools .brushpick { position: relative; }
+.dtools__sizes {
+  position: absolute; left: -6px; bottom: calc(100% + 8px); z-index: 5;
+  display: flex; flex-direction: column-reverse; gap: 6px; padding: 6px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 24px rgba(31, 34, 51, .16);
+}
+.dtools__sizes .dtools__btn.is-active { background: var(--accent-soft); color: inherit; }
+
+/* A sheet opens just above the chat bar, in the stage's flow, taking the
+   guesses' room; the chat bar stays put at the bottom. Both sit over the
+   scrim. */
+.dstage .dstage__sheet {
+  position: relative; left: auto; right: auto; bottom: auto; flex: 0 1 auto; min-height: 0;
+  padding-bottom: 14px; border-bottom: 1px solid var(--line);
+}
+.dstage.has-sheet .dstage__foot { position: relative; z-index: 31; }
+/* Above an open sheet, over the canvas: a tap here closes it, never draws. */
+.dstage__scrim { position: fixed; inset: 0; z-index: 30; background: rgba(31, 34, 51, .12); }
+
+/* The room sheet, in the keyboard's place and at its height. */
+.gsheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; overflow-y: auto;
+  /* Scrolls itself, and only itself: pan-y has to be on the sheet, since the
+     stage around it allows none, and contain keeps the end of its scroll
+     from passing on to the page. */
+  touch-action: pan-y; overscroll-behavior: contain;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  background: var(--paper); border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 14px;
+}
+/* The room's controls in the sheet: equal tiles filling the bottom row
+   (the host's Pause, Restart, Lobby and Leave; for anyone else, Leave
+   alone, across). Last, after the host note, whatever order the room menu
+   gives them in. */
+.gsheet .room__controls { order: 2; grid-auto-columns: minmax(0, 1fr); margin-top: auto; }
+.gsheet .room__note { order: 1; margin: 0; }
+.gsheet .room__ctl { justify-content: center; min-height: 54px; padding: 5px 4px; }
+/* You, atop the "you" sheet, and the name and look editor in its place. */
+.gsheet__me { display: flex; align-items: center; gap: 10px; }
+.gsheet__mename { flex: 1; min-width: 0; display: flex; flex-direction: column; font-weight: 700; }
+/* Your name with small edit (and bug report) buttons right beside it. */
+.gsheet__nameline { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.gsheet__name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 4px; }
+/* How many achievements, where the edit button was: the count big, the word small. */
+.gsheet__count { flex: none; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.gsheet__count b { font-family: var(--display); font-size: 18px; font-weight: 800; }
+.gsheet__count small { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+.gsheet__mename small { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+.gsheet__edit-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  color: var(--ink-soft); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.gsheet__edit-btn svg { width: 14px; height: 14px; }
+.gsheet__icon-btn {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: 8px; background: none; color: var(--ink-soft); cursor: pointer;
+}
+.gsheet__icon-btn svg { width: 15px; height: 15px; }
+.gsheet__icon-btn:hover { background: var(--paper); color: var(--ink); }
+/* The "you" sheet fits the keyboard's height without scrolling: tighter,
+   with you and your achievements together on a plain white card. */
+.gsheet--me { gap: 10px; }
+.gsheet__card {
+  display: flex; flex-direction: column; gap: 10px; padding: 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+}
+.gsheet--me .profile__badges { padding-top: 0; }
+.gsheet--me .profile__badges ul { margin-top: 8px; gap: 4px; }
+.gsheet__edit { display: flex; flex-direction: column; gap: 12px; }
+/* The QR card and the room menu, laid in the sheet rather than popping up. */
+.gsheet .profile__pop { position: static; width: auto; box-shadow: none; }
+/* The players as a list here, not the strip the drawer's phone layout uses. */
+.game--skribbl .gsheet .scores { padding: 0; background: none; border: 0; }
+.game--skribbl .gsheet .scores .card__title { display: none; }
+.game--skribbl .gsheet .scores__list { flex-direction: column; overflow: visible; }
+/* Full rows, as in the desktop's sidebar: the avatar at its size, the tags
+   under the name. The host's rows have a fifth column, for the remove
+   button. */
+.game--skribbl .gsheet .scores__row {
+  width: auto; grid-template-columns: 16px auto minmax(0, 1fr) auto; justify-items: stretch; gap: 9px; padding: 6px 8px;
+}
+.game--skribbl .gsheet .scores__list.is-host .scores__row {
+  width: auto; grid-template-columns: 16px auto minmax(0, 1fr) auto auto; justify-items: stretch; gap: 9px; padding: 6px 8px;
+}
+.game--skribbl .gsheet .scores__rank, .game--skribbl .gsheet .scores__tags { display: revert; }
+.game--skribbl .gsheet .scores__meta { align-items: flex-start; }
+.game--skribbl .gsheet .scores__name { text-align: left; font-size: 14px; }
+
 /* Cards stay put at the top; the Leave button sits in the middle of whatever
    height is left below them. The min-height keeps a gap from the cards on short
    viewports, where there is no leftover space to centre within. */
@@ -712,6 +1293,21 @@ button, input { font: inherit; color: inherit; }
 .leavebar {
   flex: 1; min-height: 72px;
   display: flex; align-items: center; justify-content: center;
+}
+
+/* "Waiting for the host…": the dots light up one after another, so the wait
+   reads as someone doing something. Each keeps its width, so nothing beside
+   them moves. */
+.dots { display: inline-flex; }
+.dots > span { animation: dots-wait 1.4s ease-in-out infinite; opacity: .25; }
+.dots > span:nth-child(2) { animation-delay: .2s; }
+.dots > span:nth-child(3) { animation-delay: .4s; }
+@keyframes dots-wait {
+  0%, 60%, 100% { opacity: .25; }
+  30% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dots > span { animation: none; opacity: 1; }
 }
 
 .visually-hidden {
@@ -2671,6 +3267,10 @@ button, input { font: inherit; color: inherit; }
 .room__ctl.is-on:hover { color: #fff; }
 .room__ctl.is-on { background: var(--game); border-color: var(--game); color: #fff; }
 .room__ctl:focus-visible { outline: 2px solid var(--game); outline-offset: 2px; }
+/* Leaving, as a tile among the controls (the phone's room sheet): red. */
+.room__ctl--leave { --btn-ink: var(--warn-wash); color: var(--warn); border-color: var(--warn-edge); }
+.room__ctl--leave:hover { border-color: var(--warn); color: var(--warn); }
+.room__ctl--leave:focus-visible { outline-color: var(--warn); }
 .room__confirm { display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; }
 .room__confirm p { margin: 0; }
 .room__confirmrow { display: flex; gap: 8px; }
@@ -2793,13 +3393,24 @@ button, input { font: inherit; color: inherit; }
 .paused__wins { font-size: 12.5px; font-weight: 700; color: var(--game); font-variant-numeric: tabular-nums; }
 .paused__more { margin: 4px 0 0; font-size: 12px; color: var(--ink-soft); }
 /* The 3-2-1: the same tinted screen, one huge number, each landing afresh. */
-.countdown__label { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink-soft); }
+/* Nearly opaque, so whatever is under it (on a phone, the word picker's dark
+   scrim) can't muddy it: the number and its label keep their contrast in
+   every game's colour. */
+.paused.countdown {
+  background: color-mix(in srgb, color-mix(in srgb, var(--game) 8%, var(--card)) 96%, transparent);
+}
+.countdown__label { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink); }
 .countdown__n {
   margin: 0; font-family: var(--display); font-weight: 800; line-height: .85;
   font-size: clamp(140px, 30vw, 260px); color: var(--game); font-variant-numeric: tabular-nums;
   animation: countdown-land .45s cubic-bezier(.2, .9, .3, 1.3);
 }
-@keyframes countdown-land { from { transform: scale(1.35); opacity: 0; } }
+/* Each number still lands from large, but is solid almost at once: fading
+   over the whole landing left it pale for half of its second on screen. */
+@keyframes countdown-land {
+  from { transform: scale(1.35); opacity: 0; }
+  30% { opacity: 1; }
+}
 @media (prefers-reduced-motion: reduce) {
   .paused, .room__panel, .countdown__n { animation: none; }
 }
@@ -2887,3 +3498,19 @@ button, input { font: inherit; color: inherit; }
 .achv-games__untried { flex-direction: column; align-items: stretch; gap: 10px; }
 .achv-games__untried .achv-row__desc { margin: 0; }
 .achv-games__untried ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------------------------------------------------------------- dev preview */
+
+/* The switches on /dev/draw-guess: small, out of the way, never in production. */
+.devpanel {
+  /* Left: the drawing's top-right corner holds the react button. */
+  position: fixed; left: 8px; top: 72px; z-index: 95; display: flex; flex-direction: column; gap: 4px;
+  padding: 6px; border-radius: 10px; background: rgba(28, 29, 38, .85); font-size: 11px;
+}
+.devpanel.is-closed { padding: 0; background: none; }
+.devpanel__row { display: flex; gap: 4px; }
+.devpanel button {
+  border: 0; border-radius: 6px; padding: 4px 7px; background: rgba(255, 255, 255, .14); color: #fff; cursor: pointer;
+}
+.devpanel button.is-on { background: #fff; color: #1c1d26; }
+.devpanel.is-closed .devpanel__toggle { background: rgba(28, 29, 38, .85); }

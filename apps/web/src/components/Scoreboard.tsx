@@ -25,6 +25,7 @@ export function Scoreboard() {
               key={p.id}
               className={[
                 'scores__row',
+                isDrawer ? 'is-drawing' : '',
                 guessed ? 'is-guessed' : '',
                 p.connected ? '' : 'is-away',
               ].join(' ')}

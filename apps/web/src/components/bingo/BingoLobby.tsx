@@ -6,6 +6,7 @@ import { KickButton } from '../KickButton.js';
 import { InviteCard } from '../InviteCard.js';
 import { SettingsTitle } from '../SettingsTitle.js';
 import { WinsByGame } from '../WinsByGame.js';
+import { Dots } from '../Dots.js';
 
 const MODES: { value: BingoMode; name: string; blurb: string }[] = [
   { value: 'turns', name: '5×5, take turns', blurb: 'Write 1–25 on your grid. Call numbers in turn; five lines spells BINGO.' },
@@ -145,7 +146,7 @@ export function BingoLobby() {
               {enough ? (turns ? 'Hand out the grids' : 'Eyes down') : 'Needs two players'}
             </button>
           ) : (
-            <p className="settings__note">Waiting for the host to start…</p>
+            <p className="settings__note">Waiting for the host to start<Dots /></p>
           )}
         </div>
       </div>

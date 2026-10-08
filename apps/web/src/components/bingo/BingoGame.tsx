@@ -9,6 +9,7 @@ import { selectBingo, selectIsHost, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { Chat } from '../Chat.js';
 import { BingoLobby } from './BingoLobby.js';
+import { Dots } from '../Dots.js';
 
 function useTick(on: boolean): void {
   const [, set] = useState(0);
@@ -143,7 +144,7 @@ function Arrange({ game }: { game: BingoPublic }) {
           <>
             <p className="barrange__next">Grid sent.</p>
             <p className="settings__note settings__note--left">
-              {waiting ? `Waiting for ${waiting} more…` : 'Starting…'}
+              {waiting ? <>Waiting for {waiting} more<Dots /></> : 'Starting…'}
             </p>
             <button type="button" className="btn" onClick={() => socket.emit('bingo:ready', { card: null })}>
               Change it

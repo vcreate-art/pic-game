@@ -8,6 +8,7 @@ import { Who, pts, saveBackup } from './common.js';
 import { BONUS_SHORT, ReportSheet } from './ReportSheet.js';
 import { Results } from './Results.js';
 import { TourneyLobby } from './TourneyLobby.js';
+import { Dots } from '../Dots.js';
 
 /** What the last match did to each player's stack, for the leaderboard arrows. */
 function lastChange(t: TourneyState): Map<string, number> {
@@ -153,7 +154,7 @@ export function TourneyGame() {
                 )
               ) : (
                 <p className="tfight__wait">
-                  {t.phase === 'fighting' ? 'Best of 3, on the console. The host enters the result.' : 'Waiting for the host to start the match…'}
+                  {t.phase === 'fighting' ? 'Best of 3, on the console. The host enters the result.' : <>Waiting for the host to start the match<Dots /></>}
                 </p>
               )}
             </section>

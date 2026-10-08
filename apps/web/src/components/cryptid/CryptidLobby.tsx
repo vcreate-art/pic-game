@@ -6,6 +6,7 @@ import { InviteCard } from '../InviteCard.js';
 import { KickButton } from '../KickButton.js';
 import { SettingsTitle } from '../SettingsTitle.js';
 import { WinsByGame } from '../WinsByGame.js';
+import { Dots } from '../Dots.js';
 
 const MODES = [
   { advanced: false, name: 'Standard', blurb: 'Every clue says where the creature could be. Six structures in three colours.' },
@@ -109,7 +110,7 @@ export function CryptidLobby() {
               {enough ? 'Deal the clues' : `Needs ${CRYPTID_MIN_PLAYERS} players`}
             </button>
           ) : (
-            <p className="settings__note">Waiting for the host to start…</p>
+            <p className="settings__note">Waiting for the host to start<Dots /></p>
           )}
         </div>
       </div>

@@ -5,6 +5,7 @@ import { selectIsHost, selectTourney, useGame } from '../../store/game.js';
 import { InviteCard } from '../InviteCard.js';
 import { MainSelect, NumberField, forgetBackup, loadBackup, pts } from './common.js';
 import { SettingsTitle } from '../SettingsTitle.js';
+import { Dots } from '../Dots.js';
 
 const BONUS_LABELS: { key: keyof TourneyBonuses; name: string; note: string }[] = [
   { key: 'clean', name: 'Clean 2-0', note: 'automatic' },
@@ -214,7 +215,7 @@ export function TourneyLobby() {
               {t.entrants.length < TOURNEY_BOUNDS.entrants.min ? 'Needs two players' : `Start: ${t.entrants.length} players`}
             </button>
           ) : (
-            <p className="settings__note">Waiting for the host to start…</p>
+            <p className="settings__note">Waiting for the host to start<Dots /></p>
           )}
         </section>
       </div>
