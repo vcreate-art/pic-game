@@ -650,16 +650,12 @@ button, input { font: inherit; color: inherit; }
 .toolbar .tool--icon .tool__label {
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
 }
-/* Pen, fill and eraser (one choice of three), and undo and redo: each
-   one control, joined, with a line between, the chosen tool filled. */
-.toolbar__seg { gap: 0; }
-.toolbar__seg .tool { border-radius: 0; margin-left: -1px; }
-.toolbar__seg .tool:first-child { margin-left: 0; border-radius: 10px 0 0 10px; }
-.toolbar__seg .tool:last-child { border-radius: 0 10px 10px 0; }
-.toolbar__seg .tool:hover, .toolbar__seg .tool.is-active { position: relative; z-index: 1; }
-@container (max-width: 612px) {
-  .toolbar .tool { width: 32px; height: 32px; padding: 0; justify-content: center; }
-  .toolbar .brushpick__now { width: 32px; height: 32px; }
+/* Pen, fill and eraser, and undo and redo: separate buttons, each set
+   grouped by sitting closer together than the groups do. */
+.toolbar__seg { gap: 4px; }
+@container (max-width: 627px) {
+  .toolbar .tool { width: 30px; height: 30px; padding: 0; justify-content: center; }
+  .toolbar .brushpick__now { width: 30px; height: 30px; }
   .toolbar .toolbar__palette { gap: 2px; }
   .toolbar .tool__label {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
