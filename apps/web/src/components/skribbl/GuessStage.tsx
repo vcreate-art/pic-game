@@ -100,6 +100,26 @@ export function GuessStage() {
   const keyboardIsUp = () =>
     performance.now() - changedAt.current < KEYBOARD_GRACE_MS ? wanted.current : keyboardOpen;
 
+  // Nothing under the stage may scroll while it's up. With the keyboard open
+  // the visible window is smaller than the page, and a drag that pans it
+  // makes Chrome's address bar collapse and expand, which moves everything.
+  // As toys' storefront does for its stage; overscroll-behavior also keeps
+  // pull-to-refresh and the rubber band out of a game in progress. Put back
+  // as it was when the stage goes, so other pages scroll as normal.
+  useEffect(() => {
+    const els = [document.documentElement, document.body];
+    const before = els.map((el) => [el.style.overflow, el.style.overscrollBehavior] as const);
+    for (const el of els) {
+      el.style.overflow = 'hidden';
+      el.style.overscrollBehavior = 'none';
+    }
+    return () =>
+      els.forEach((el, i) => {
+        el.style.overflow = before[i]![0];
+        el.style.overscrollBehavior = before[i]![1];
+      });
+  }, []);
+
   // Best effort on arrival: a desktop browser focuses; a phone waits for the
   // first tap, since it won't raise the keyboard without one.
   useEffect(() => {

@@ -819,6 +819,9 @@ button, input { font: inherit; color: inherit; }
 .gstage {
   position: fixed; left: 0; right: 0; z-index: 30; overflow: hidden;
   display: flex; flex-direction: column; background: var(--card);
+  /* The stage owns every gesture: a drag here pans nothing and scrolls
+     nothing, so Chrome's address bar has no reason to move. Taps still work. */
+  touch-action: none;
 }
 .gstage__board { position: relative; flex: none; }
 .gstage__board .board { border: 0; border-radius: 0; }
@@ -859,6 +862,10 @@ button, input { font: inherit; color: inherit; }
 /* A tab's sheet, in the keyboard's place and at its height. */
 .gsheet {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; overflow-y: auto;
+  /* Scrolls itself, and only itself: pan-y has to be on the sheet, since the
+     stage around it allows none, and contain keeps the end of its scroll
+     from passing on to the page. */
+  touch-action: pan-y; overscroll-behavior: contain;
   padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
   background: var(--paper); border-top: 1px solid var(--line);
 }
