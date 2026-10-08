@@ -944,13 +944,16 @@ button, input { font: inherit; color: inherit; }
 .has-gstage:has(.paused) .topbar { visibility: visible; }
 .gstage__head {
   position: relative; z-index: 1; flex: none; display: flex; align-items: center; gap: 8px;
-  min-height: 52px; padding: 6px 12px; background: var(--card); border-bottom: 1px solid var(--line);
+  min-height: 52px; padding: 6px 7px 6px 12px; background: var(--card); border-bottom: 1px solid var(--line);
 }
 /* The round and the clock take the same width, so the word between them is
    centred on the screen; the clock's place is kept while there's no clock. */
-.gstage__round, .gstage__clock { flex: none; width: 40px; }
+.gstage__round, .gstage__clock { flex: none; width: 44px; }
+/* The clock sits closer to the edge (the header's right padding is 7px, the
+   left 12px): its space is wider by the difference, so the word stays centred. */
+.gstage__clock { width: 49px; }
 /* The round you're on, big; out of how many, small and muted. */
-.gstage__round { font-family: var(--display); font-weight: 800; font-size: 22px; line-height: 1; white-space: nowrap; }
+.gstage__round { font-family: var(--display); font-weight: 800; font-size: 27px; line-height: 1; white-space: nowrap; }
 .gstage__round small { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
 .gstage__clock { display: flex; justify-content: flex-end; }
 .gstage__head .timer { width: 36px; height: 36px; }
