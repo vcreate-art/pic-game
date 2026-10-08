@@ -30,9 +30,11 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   round = 0;
   turnIndex = 0;
   ops: CanvasOp[] = [];
-  /** The drawer's undone ops, latest last, for redo. Emptied by anything new
-   *  drawn, a fill, a clear, or a new turn, as in any editor. */
-  private undone: CanvasOp[] = [];
+  /** The drawer's undone steps, latest last, for redo: an op, or a clear.
+   *  Emptied by anything new drawn or filled, or a new turn, as in any editor. */
+  private undone: (CanvasOp | { kind: 'clear' })[] = [];
+  /** What each clear this turn set aside, latest last, for undo to bring back. */
+  private cleared: CanvasOp[][] = [];
 
   // ---- current turn (word is private to this object and the drawer's socket) ----
   private word: string | null = null;
@@ -260,6 +262,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.phase = 'choosing';
     this.ops = [];
     this.undone = [];
+    this.cleared = [];
 
     // Always stock a full list of built-ins. In players mode these are padding
     // that suggestions push out; in builtin mode they are the whole list.
@@ -566,6 +569,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.turnIndex = 0;
     this.ops = [];
     this.undone = [];
+    this.cleared = [];
     this.broadcastState();
   }
 
@@ -679,29 +683,46 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
   undo(playerId: string): void {
     if (!this.isDrawer(playerId)) return;
+    let took = false;
     for (let i = this.ops.length - 1; i >= 0; i--) {
       if (this.ops[i]!.by === playerId) {
         this.undone.push(...this.ops.splice(i, 1));
+        took = true;
         break;
       }
+    }
+    // Nothing of theirs drawn since the last clear: that clear is the latest
+    // step, and undoing it brings back what it set aside.
+    const before = took ? undefined : this.cleared.pop();
+    if (before) {
+      this.ops = [...before, ...this.ops];
+      this.undone.push({ kind: 'clear' });
     }
     // Undo ships the surviving history rather than a reverse-op: replaying a known
     // list is always correct, where incremental un-drawing drifts over time.
     this.io.to(this.code).emit('canvas:undone', { ops: this.ops });
   }
 
-  /** Puts back the last op undone, and ships the history as undo does. */
+  /** Puts back the last step undone (an op, or a clear, done again), and
+   *  ships the history as undo does. */
   redo(playerId: string): void {
     if (!this.isDrawer(playerId)) return;
     if (this.ops.length >= MAX_OPS_PER_TURN) return;
-    const op = this.undone.pop();
-    if (!op) return;
-    this.ops.push(op);
+    const step = this.undone.pop();
+    if (!step) return;
+    if (step.kind === 'clear') {
+      this.cleared.push(this.ops);
+      this.ops = [];
+    } else {
+      this.ops.push(step);
+    }
     this.io.to(this.code).emit('canvas:undone', { ops: this.ops });
   }
 
+  /** Clears the drawing, setting it aside so undo can bring it back. */
   clearCanvas(playerId: string): void {
     if (!this.isDrawer(playerId)) return;
+    if (this.ops.length) this.cleared.push(this.ops);
     this.ops = [];
     this.undone = [];
     this.openStrokes.clear();

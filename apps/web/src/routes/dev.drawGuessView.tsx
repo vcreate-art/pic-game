@@ -131,16 +131,19 @@ export default function DrawGuessPreview() {
   useEffect(() => {
     const socket = getSocket();
     const emit = socket.emit.bind(socket);
-    // The canvas, done here as the server would: clear, and undo and redo of
-    // your own strokes, with anything new drawn emptying what redo has.
+    // The canvas, done here as the server would: clear (set aside, so undo
+    // can bring it back), and undo and redo of your own steps, with anything
+    // new drawn emptying what redo has.
     const engine = getEngine();
-    let undone: CanvasOp[] = [];
+    let undone: (CanvasOp | 'clear')[] = [];
+    const cleared: CanvasOp[][] = [];
     (socket as unknown as { emit: (...a: unknown[]) => unknown }).emit = (ev: unknown, ...rest: unknown[]) => {
       if (ev === 'chat:guess') {
         useGame.getState().pushMessage(say('You', (rest[0] as { text: string }).text));
         return socket;
       }
       if (ev === 'canvas:clear') {
+        if (engine.snapshot().length) cleared.push([...engine.snapshot()]);
         engine.clear();
         undone = [];
         return socket;
@@ -151,12 +154,23 @@ export default function DrawGuessPreview() {
         if (i >= 0) {
           undone.push(...ops.splice(i, 1));
           engine.replay(ops);
+        } else {
+          const before = cleared.pop();
+          if (before) {
+            undone.push('clear');
+            engine.replay([...before, ...ops]);
+          }
         }
         return socket;
       }
       if (ev === 'canvas:redo') {
-        const op = undone.pop();
-        if (op) engine.replay([...engine.snapshot(), op]);
+        const step = undone.pop();
+        if (step === 'clear') {
+          cleared.push([...engine.snapshot()]);
+          engine.clear();
+        } else if (step) {
+          engine.replay([...engine.snapshot(), step]);
+        }
         return socket;
       }
       if (ev === 'draw:start' || ev === 'draw:fill') undone = [];

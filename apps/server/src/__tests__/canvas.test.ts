@@ -134,3 +134,61 @@ describe('snapping a stroke to a shape', () => {
     expect(op.kind === 'stroke' && op.pts).toEqual([10, 20, 30, 40]);
   });
 });
+
+describe('undoing a clear', () => {
+  it('brings back what the clear set aside, and redo clears it again', () => {
+    const { room, drawer } = drawing();
+    stroke(room, drawer, 'a');
+    stroke(room, drawer, 'b');
+    room.clearCanvas(drawer);
+    expect(ids(room)).toEqual([]);
+    room.undo(drawer);
+    expect(ids(room)).toEqual(['a', 'b']);
+    room.redo(drawer);
+    expect(ids(room)).toEqual([]);
+  });
+
+  it('steps back in order: what came after the clear first, then the clear', () => {
+    const { room, drawer } = drawing();
+    stroke(room, drawer, 'a');
+    room.clearCanvas(drawer);
+    stroke(room, drawer, 'b');
+    room.undo(drawer);
+    expect(ids(room)).toEqual([]);
+    room.undo(drawer);
+    expect(ids(room)).toEqual(['a']);
+    room.undo(drawer);
+    expect(ids(room)).toEqual([]);
+    // And forward again: a, the clear, then b.
+    room.redo(drawer);
+    expect(ids(room)).toEqual(['a']);
+    room.redo(drawer);
+    expect(ids(room)).toEqual([]);
+    room.redo(drawer);
+    expect(ids(room)).toEqual(['b']);
+  });
+
+  it('undoes clears one at a time, latest first', () => {
+    const { room, drawer } = drawing();
+    stroke(room, drawer, 'a');
+    room.clearCanvas(drawer);
+    stroke(room, drawer, 'b');
+    room.clearCanvas(drawer);
+    room.undo(drawer);
+    expect(ids(room)).toEqual(['b']);
+    room.undo(drawer);
+    expect(ids(room)).toEqual([]);
+    room.undo(drawer);
+    expect(ids(room)).toEqual(['a']);
+  });
+
+  it('tells everyone the brought-back drawing', () => {
+    const { room, sent, drawer } = drawing();
+    stroke(room, drawer, 'a');
+    room.clearCanvas(drawer);
+    sent.length = 0;
+    room.undo(drawer);
+    const told = sent.find((m) => m.event === 'canvas:undone');
+    expect((told?.args[0] as { ops: CanvasOp[] }).ops.map((o) => o.id)).toEqual(['a']);
+  });
+});
