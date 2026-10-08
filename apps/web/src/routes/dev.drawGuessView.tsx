@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
-  DEFAULT_SETTINGS, quantize, type CanvasOp, type ChatMessage, type Phase, type Player, type SkribblRoomState,
+  DEFAULT_SETTINGS, maskOf, quantize, type CanvasOp, type ChatMessage, type Phase, type Player, type SkribblRoomState,
 } from '@pic-game/shared';
 import { SkribblGame } from '../components/skribbl/SkribblGame.js';
 import { getEngine } from '../canvas/engineInstance.js';
@@ -13,7 +13,8 @@ import { useGame } from '../store/game.js';
  * playing a game: no server, no second player. Development only.
  *
  * ?as=guesser|drawer and ?phase=choosing|drawing|turnEnd set the scene,
- * ?players=N (up to 16) fills the room, and
+ * ?players=N (up to 16) fills the room, ?word= sets the word (spaces and
+ * hyphens show as in a real one, for trying long answers), and
  * the panel in the corner changes them, adds guesses, or keeps a stream of
  * them coming. Guesses you type show up locally, since nothing is listening.
  */
@@ -54,7 +55,7 @@ function people(count: number): Player[] {
   return [...PEOPLE, ...extra];
 }
 
-function room(phase: Phase, drawer: string, count: number): SkribblRoomState {
+function room(phase: Phase, drawer: string, count: number, word: string): SkribblRoomState {
   const now = Date.now();
   return {
     kind: 'skribbl',
@@ -71,7 +72,7 @@ function room(phase: Phase, drawer: string, count: number): SkribblRoomState {
     round: 1,
     turn: {
       drawerId: drawer, round: 1, turnIndex: 0,
-      mask: WORD.replace(/./g, '_'), revealed: { 2: 'n' },
+      mask: maskOf(word), revealed: /[^\s-]/.test(word[2] ?? ' ') ? { 2: word[2]! } : {},
       endsAt: now + 70_000, guessed: ['ben'], likes: [], dislikes: [],
     },
     ops: sampleOps(),
@@ -85,14 +86,15 @@ const say = (name: string, text: string, kind: ChatMessage['kind'] = 'chat'): Ch
 });
 
 export default function DrawGuessPreview() {
-  const search = useSearch({ strict: false }) as { as?: string; phase?: string; players?: string };
+  const search = useSearch({ strict: false }) as { as?: string; phase?: string; players?: string; word?: string };
   const navigate = useNavigate();
   const as = search.as === 'drawer' ? 'drawer' : 'guesser';
   const phase = (['choosing', 'drawing', 'turnEnd'].includes(search.phase ?? '') ? search.phase : 'drawing') as Phase;
   const [stream, setStream] = useState(false);
   const [open, setOpen] = useState(false);
   const count = Math.min(16, Math.max(PEOPLE.length, Number(search.players) || PEOPLE.length));
-  const state = useMemo(() => room(phase, as === 'drawer' ? ME : 'ana', count), [as, phase, count]);
+  const word = (search.word?.trim() || WORD).toLowerCase();
+  const state = useMemo(() => room(phase, as === 'drawer' ? ME : 'ana', count, word), [as, phase, count, word]);
 
   // The scene: the room, who we are, what's been said, and the word if ours.
   useEffect(() => {
@@ -101,7 +103,7 @@ export default function DrawGuessPreview() {
     g.setConnected(true);
     g.setMe(ME);
     g.sync(state);
-    if (as === 'drawer') g.setSecret(WORD);
+    if (as === 'drawer') g.setSecret(word);
     if (!g.messages.length) {
       for (const m of [say('', 'Ana is drawing', 'divider'), say('Ben', 'a bird'), say('Priya', 'is it a duck?'), say('Ben', 'Ben guessed the word!', 'correct')]) {
         g.pushMessage(m);
@@ -140,7 +142,16 @@ export default function DrawGuessPreview() {
   }, [stream]);
 
   const go = (patch: Record<string, string>) =>
-    void navigate({ to: '/dev/draw-guess', search: { as, phase, ...(count > PEOPLE.length ? { players: String(count) } : {}), ...patch } as never });
+    void navigate({
+      to: '/dev/draw-guess',
+      search: {
+        as,
+        phase,
+        ...(count > PEOPLE.length ? { players: String(count) } : {}),
+        ...(word !== WORD ? { word } : {}),
+        ...patch,
+      } as never,
+    });
 
   return (
     <>

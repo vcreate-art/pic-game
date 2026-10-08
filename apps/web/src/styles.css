@@ -512,6 +512,10 @@ button, input { font: inherit; color: inherit; }
   letter-spacing: .02em; line-height: 1.15;
 }
 .wordmask__slots { display: flex; gap: 5px; flex-wrap: wrap; align-items: flex-end; justify-content: center; }
+/* One word's blanks, kept together: a long answer wraps between words. */
+.wordmask__group { display: flex; gap: inherit; align-items: flex-end; }
+/* A hyphen is given, not guessed: shown, with no blank under it. */
+.wordmask__slot.is-hyphen { width: 10px; border-bottom-color: transparent; }
 .wordmask__eye {
   display: grid; place-items: center; width: 30px; height: 30px; flex: none;
   border: 1px solid var(--line); border-radius: 9px;
@@ -960,7 +964,13 @@ button, input { font: inherit; color: inherit; }
 .gstage__head .timer__num { font-size: 13px; }
 /* The blanks take what's left and shrink before anything wraps. */
 .gstage__word { flex: 1; min-width: 0; display: flex; justify-content: center; overflow: hidden; }
-.gstage__head .wordmask__slots { flex-wrap: nowrap; gap: 4px; min-width: 0; }
+/* Words wrap onto a second line when the answer won't fit on one (the
+   header grows for those); a single long word shrinks to fit instead, down
+   to 8px blanks, which holds the 20-letter longest a host can add. */
+.gstage__head .wordmask__slots { flex-wrap: wrap; column-gap: 12px; row-gap: 4px; min-width: 0; }
+.gstage__head .wordmask__gap { display: none; }
+.gstage__head .wordmask__group { flex: 0 1 auto; min-width: 0; gap: 3px; }
+.gstage__head .wordmask__slot.is-hyphen { flex-basis: 8px; width: 8px; min-width: 6px; }
 /* Each dash a little wider than the letter it holds, with the letter centred
    over it. */
 .gstage__head .wordmask__slot {
@@ -970,7 +980,6 @@ button, input { font: inherit; color: inherit; }
   flex: 0 1 22px; min-width: 8px; width: 22px; height: 26px; border-bottom-width: 3px;
   font-size: 19px; line-height: 1; text-align: center; justify-items: center;
 }
-.gstage__head .wordmask__gap { flex: 0 1 12px; width: 12px; }
 .gstage__status { font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Thumbs up or down, as one faint button in the drawing's top corner; open,
