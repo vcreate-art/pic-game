@@ -563,9 +563,11 @@ button, input { font: inherit; color: inherit; }
    fine on one line but flung Undo/Clear to the far right of a second row the
    moment the bar wrapped. Sized to fit one row at the usual stage width. */
 .toolbar {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
-  gap: 10px;
-  padding: 12px 14px; background: var(--card);
+  /* The groups spread across, the palette against the left edge and clear
+     against the right, with the same padding all round. */
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px 12px;
+  padding: 14px; background: var(--card);
   border: 1px solid var(--edge); border-radius: var(--radius);
 }
 .toolbar__palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
@@ -578,16 +580,18 @@ button, input { font: inherit; color: inherit; }
 .toolbar__group { display: flex; align-items: center; gap: 6px; }
 
 .brush {
-  width: 30px; height: 30px; display: grid; place-items: center;
+  /* No padding: the browser's 6px a side left the biggest dot (22.5px) too
+     little room, and it overflowed off centre. */
+  width: 30px; height: 30px; padding: 0; display: grid; place-items: center;
   border: 1px solid var(--line); border-radius: 9px; background: var(--card); cursor: pointer;
 }
 .brush.is-active { border-color: var(--accent); background: var(--accent-soft); }
 .brush span { display: block; border-radius: 50%; }
 
-/* The brush sizes behind one button: hovering it, or tabbing into it,
-   opens them in a row above it. The menu's bottom padding bridges the gap,
-   so the pointer can cross to it without it closing. */
+/* The brush sizes behind one button: a click opens them in a row above it. */
 .brushpick { position: relative; }
+/* As tall as the tool buttons beside it, so the row is one height. */
+.brushpick__now { width: 36px; height: 36px; border-radius: 10px; }
 .brushpick__menu {
   position: absolute; left: 50%; bottom: 100%; z-index: 60; transform: translateX(-50%);
   display: flex; gap: 6px; padding: 6px 6px; margin-bottom: 8px;
@@ -595,10 +599,11 @@ button, input { font: inherit; color: inherit; }
   box-shadow: 0 8px 24px rgba(31, 34, 51, .16);
   opacity: 0; visibility: hidden; transition: opacity .12s ease, visibility 0s .12s;
 }
-.brushpick__menu::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 10px; }
-.brushpick:hover .brushpick__menu, .brushpick:focus-within .brushpick__menu {
+.brushpick.is-open .brushpick__menu {
   opacity: 1; visibility: visible; transition: opacity .12s ease, visibility 0s;
 }
+/* Open, the button's tooltip would sit on the sizes. */
+.brushpick.is-open .brushpick__now::after, .brushpick.is-open .brushpick__now::before { display: none; }
 
 .tool {
   display: inline-flex; align-items: center; gap: 6px;
@@ -632,11 +637,34 @@ button, input { font: inherit; color: inherit; }
   [data-tip]:focus-visible::after, [data-tip]:focus-visible::before { opacity: 1; transition-delay: .15s; }
 }
 
-/* The drawing tools: icon and word, as tall as the brush button, snug
-   enough that the whole toolbar fits one line; each one's key is in its
-   tooltip. */
-.toolbar .tool { height: 30px; padding: 0 10px 0 8px; gap: 5px; border-radius: 9px; }
+/* The drawing tools: icon and word, roomy, each one's key in its tooltip.
+   Where the toolbar can't fit them all on one line like that, the words
+   go (kept for screen readers) and the icons stand alone, so it stays one
+   line rather than wrapping. */
+.toolbar { container-type: inline-size; }
+.toolbar .tool { height: 36px; padding: 0 12px 0 10px; gap: 6px; }
 .tool__icon { flex: none; width: 16px; height: 16px; }
+/* Actions (undo, redo, clear) are icons alone; their words are for screen
+   readers, their names and keys in their tooltips. */
+.toolbar .tool--icon { width: 36px; padding: 0; justify-content: center; }
+.toolbar .tool--icon .tool__label {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+/* Pen, fill and eraser (one choice of three), and undo and redo: each
+   one control, joined, with a line between, the chosen tool filled. */
+.toolbar__seg { gap: 0; }
+.toolbar__seg .tool { border-radius: 0; margin-left: -1px; }
+.toolbar__seg .tool:first-child { margin-left: 0; border-radius: 10px 0 0 10px; }
+.toolbar__seg .tool:last-child { border-radius: 0 10px 10px 0; }
+.toolbar__seg .tool:hover, .toolbar__seg .tool.is-active { position: relative; z-index: 1; }
+@container (max-width: 612px) {
+  .toolbar .tool { width: 32px; height: 32px; padding: 0; justify-content: center; }
+  .toolbar .brushpick__now { width: 32px; height: 32px; }
+  .toolbar .toolbar__palette { gap: 2px; }
+  .toolbar .tool__label {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+}
 .tool--leave { border-color: var(--warn-edge); background: var(--warn-wash); color: var(--warn); }
 .tool--leave:hover { background: var(--warn); border-color: var(--warn); color: #fff; }
 
