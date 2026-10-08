@@ -17,9 +17,12 @@ to a shape, it snaps to a clean one, the way Apple Notes does it:
 - **Rectangle**, squared up at the angle you drew it, or a **square** if
   its sides are nearly equal. Other four-sided shapes get straight sides.
 
-Anything else stays as drawn, and lifting without holding never snaps. The
-stroke eases into the shape on every player's screen. Undo takes a snapped
-shape back like any stroke, and **undo now goes back past a clear** too.
+Anything else stays as drawn, and lifting without holding never snaps. A
+closed shape still snaps if you carry on a little past where you started.
+Keep drawing after a snap and the stroke goes back to exactly what you
+drew, and carries on. The stroke eases into the shape on every player's
+screen. Undo takes a snapped shape back like any stroke, and **undo now
+goes back past a clear** too.
 
 ### Draw & Guess on a phone
 
@@ -38,7 +41,8 @@ the space the keyboard leaves, with nothing that scrolls under your finger.
   when you send. React to the drawing from a button in its corner.
 - **Drawing**: a colour bar down the edge of the drawing, as in WhatsApp
   and Instagram, for any colour; the tools under it, with redo next to
-  undo; your likes in the corner once there are any.
+  undo; your likes in the corner once there are any. Tapping the chat box
+  says you can't chat while you're drawing.
 - The keyboard stays out of the way of the countdown, the word choice and
   the turn's result.
 
@@ -46,6 +50,14 @@ On a desktop, the drawing toolbar gets **icons**, a **brush size picker**,
 **redo**, and **keyboard shortcuts** (P pen, F fill, E eraser, [ and ]
 brush size, 1–8 and Shift+1–8 colours, Z undo, Shift+Z redo), each shown in
 its tooltip.
+
+### Player-suggested words removed
+
+Draw & Guess no longer has the option for the other players to suggest the
+words the drawer picks from. It was causing bugs, such as the first drawer
+getting the suggestion card instead of their word choice. Every turn now
+starts with the drawer picking from their words. The host can still add
+their own words.
 
 ## 2026-10-08
 
