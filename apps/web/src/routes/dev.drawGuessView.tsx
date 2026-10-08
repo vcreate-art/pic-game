@@ -12,7 +12,8 @@ import { useGame } from '../store/game.js';
  * Draw & Guess with a made-up room, for working on its screens without
  * playing a game: no server, no second player. Development only.
  *
- * ?as=guesser|drawer and ?phase=choosing|drawing|turnEnd set the scene, and
+ * ?as=guesser|drawer and ?phase=choosing|drawing|turnEnd set the scene,
+ * ?players=N (up to 16) fills the room, and
  * the panel in the corner changes them, adds guesses, or keeps a stream of
  * them coming. Guesses you type show up locally, since nothing is listening.
  */
@@ -45,12 +46,20 @@ function sampleOps(): CanvasOp[] {
   ];
 }
 
-function room(phase: Phase, drawer: string): SkribblRoomState {
+/** The four regulars, then made-up others up to `count`, for a crowded room. */
+function people(count: number): Player[] {
+  const extra = Array.from({ length: Math.max(0, count - PEOPLE.length) }, (_, i) => ({
+    id: `p${i}`, name: `Player ${i + PEOPLE.length + 1}`, avatar: { color: i % 12, face: i % 8 }, score: 5 * i, connected: true,
+  }));
+  return [...PEOPLE, ...extra];
+}
+
+function room(phase: Phase, drawer: string, count: number): SkribblRoomState {
   const now = Date.now();
   return {
     kind: 'skribbl',
     code: 'DEVDEV',
-    players: PEOPLE,
+    players: people(count),
     hostId: ME,
     serverTime: now,
     meta: {
@@ -76,13 +85,14 @@ const say = (name: string, text: string, kind: ChatMessage['kind'] = 'chat'): Ch
 });
 
 export default function DrawGuessPreview() {
-  const search = useSearch({ strict: false }) as { as?: string; phase?: string };
+  const search = useSearch({ strict: false }) as { as?: string; phase?: string; players?: string };
   const navigate = useNavigate();
   const as = search.as === 'drawer' ? 'drawer' : 'guesser';
   const phase = (['choosing', 'drawing', 'turnEnd'].includes(search.phase ?? '') ? search.phase : 'drawing') as Phase;
   const [stream, setStream] = useState(false);
   const [open, setOpen] = useState(false);
-  const state = useMemo(() => room(phase, as === 'drawer' ? ME : 'ana'), [as, phase]);
+  const count = Math.min(16, Math.max(PEOPLE.length, Number(search.players) || PEOPLE.length));
+  const state = useMemo(() => room(phase, as === 'drawer' ? ME : 'ana', count), [as, phase, count]);
 
   // The scene: the room, who we are, what's been said, and the word if ours.
   useEffect(() => {
@@ -129,7 +139,8 @@ export default function DrawGuessPreview() {
     return () => clearInterval(t);
   }, [stream]);
 
-  const go = (patch: Record<string, string>) => void navigate({ to: '/dev/draw-guess', search: { as, phase, ...patch } as never });
+  const go = (patch: Record<string, string>) =>
+    void navigate({ to: '/dev/draw-guess', search: { as, phase, ...(count > PEOPLE.length ? { players: String(count) } : {}), ...patch } as never });
 
   return (
     <>
