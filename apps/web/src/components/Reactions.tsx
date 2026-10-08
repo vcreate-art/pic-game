@@ -4,11 +4,11 @@ import { getSocket } from '../net/socket.js';
 import { selectSkribbl, useGame } from '../store/game.js';
 
 /**
- * Thumbs up or down on the drawing in front of everyone, while it is drawn
- * and while the word is shown after. The drawer sees the tally but cannot
- * vote on their own picture.
+ * Where the drawing's thumbs stand: whether there's a drawing to react to,
+ * your vote, the tally, and voting (the same vote again takes it back).
+ * Null when there's nothing to react to.
  */
-export function Reactions() {
+export function useReaction() {
   const room = useGame(selectSkribbl);
   const me = useGame((s) => s.me);
   const turn = room?.turn;
@@ -21,6 +21,18 @@ export function Reactions() {
     getSocket().emit('draw:react', { vote: reaction });
     if (isPostHogEnabled) posthog.capture('drawing_reaction_set', { reaction: reaction ?? 'cleared' });
   };
+  return { isDrawer, mine, likes: turn.likes.length, dislikes: turn.dislikes.length, vote };
+}
+
+/**
+ * Thumbs up or down on the drawing in front of everyone, while it is drawn
+ * and while the word is shown after. The drawer sees the tally but cannot
+ * vote on their own picture.
+ */
+export function Reactions() {
+  const r = useReaction();
+  if (!r) return null;
+  const { isDrawer, mine, vote } = r;
 
   return (
     <div className="reactions" title={isDrawer ? 'What everyone thinks of your drawing' : 'Like this drawing?'}>
@@ -35,7 +47,7 @@ export function Reactions() {
           onClick={() => vote(v)}
         >
           <span aria-hidden="true">{v === 'like' ? '👍' : '👎'}</span>
-          <b>{(v === 'like' ? turn.likes : turn.dislikes).length}</b>
+          <b>{v === 'like' ? r.likes : r.dislikes}</b>
         </button>
       ))}
     </div>

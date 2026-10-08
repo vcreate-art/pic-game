@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Bug, Smartphone, Users } from 'lucide-react';
+import { Bug, SmilePlus, Smartphone, Users } from 'lucide-react';
 import { MAX_CHAT_LEN } from '../../constants.js';
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
 import { totalPlayed, totalWon, useStats } from '../../lib/achievements.js';
 import { isPostHogEnabled } from '../../lib/posthog.js';
+import { useDismiss } from '../../lib/useDismiss.js';
 import { lastKeyboardHeight, useVisualViewport } from '../../lib/useVisualViewport.js';
 import { PROFILE_EVENT, loadProfile, type Profile } from '../../net/socket.js';
 import { selectSkribbl, useGame } from '../../store/game.js';
@@ -11,7 +12,7 @@ import { Avatar } from '../Avatar.js';
 import { useGuessBox } from '../Chat.js';
 import { PhoneHandoff } from '../PhoneHandoff.js';
 import { Podium } from '../Podium.js';
-import { Reactions } from '../Reactions.js';
+import { useReaction } from '../Reactions.js';
 import { RoomMenu } from '../RoomPanel.js';
 import { Scoreboard } from '../Scoreboard.js';
 import { Timer } from '../Timer.js';
@@ -359,6 +360,7 @@ export function GuessStage() {
       {/* A tap on the drawing asks for the keyboard, like tapping a text. */}
       <div ref={boardRef} className="gstage__board board__wrap" onClick={tapStage}>
         <CanvasBoard />
+        <ReactButton />
         {phase === 'choosing' && <WordChoice />}
         {phase === 'turnEnd' && <TurnResult />}
         {phase === 'gameEnd' && <Podium />}
@@ -588,9 +590,9 @@ function GuessField({
 }
 
 /**
- * The stage's header, in place of the app's: the round and the timer, the
- * blanks with any hint letters, and the reactions, all in sight while the
- * keyboard is up. Between turns it says what's happening instead.
+ * The stage's header, in place of the app's: the round and the timer, and
+ * the blanks with any hint letters and the letter count, all in sight while
+ * the keyboard is up. Between turns it says what's happening instead.
  */
 function StageHead({ headRef }: { headRef: React.RefObject<HTMLElement> }) {
   const room = useGame(selectSkribbl);
@@ -609,12 +611,16 @@ function StageHead({ headRef }: { headRef: React.RefObject<HTMLElement> }) {
       {phase === 'drawing' && turn && <Timer endsAt={turn.endsAt} total={room.settings.drawTime} />}
       <div className="gstage__word">
         {phase === 'drawing' && turn?.mask ? (
-          <Slots mask={turn.mask} revealed={turn.revealed} />
+          <>
+            <Slots mask={turn.mask} revealed={turn.revealed} />
+            <span className="wordmask__count" title="Letters in the word">
+              {(turn.mask.match(/_/g) ?? []).length}
+            </span>
+          </>
         ) : (
           <span className="gstage__status">{status}</span>
         )}
       </div>
-      <Reactions />
     </header>
   );
 }
@@ -647,5 +653,58 @@ function SheetProfile() {
         <Smartphone aria-hidden="true" /> Play on your phone
       </button>
     </section>
+  );
+}
+
+/**
+ * Thumbs up or down, as one button in the drawing's top corner: faint until
+ * it's wanted, then the two thumbs with their counts. Shows your vote once
+ * you've given one. Taps on it stay off the drawing, which would raise the
+ * keyboard.
+ */
+function ReactButton() {
+  const r = useReaction();
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(box, open, close);
+  if (!r || r.isDrawer) return null;
+  const { mine, likes, dislikes, vote } = r;
+
+  return (
+    <div
+      ref={box}
+      className={`gstage__react ${open ? 'is-open' : ''}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {open &&
+        (['like', 'dislike'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            className={`gstage__reactopt ${mine === v ? 'is-on' : ''}`}
+            aria-pressed={mine === v}
+            aria-label={v === 'like' ? 'Like' : 'Dislike'}
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => {
+              vote(v);
+              close();
+            }}
+          >
+            <span aria-hidden="true">{v === 'like' ? '👍' : '👎'}</span>
+            <b>{v === 'like' ? likes : dislikes}</b>
+          </button>
+        ))}
+      <button
+        type="button"
+        className="gstage__reactbtn"
+        aria-expanded={open}
+        aria-label={mine ? `You ${mine === 'like' ? 'liked' : 'disliked'} this drawing` : 'React to the drawing'}
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={() => setOpen(!open)}
+      >
+        {mine ? <span aria-hidden="true">{mine === 'like' ? '👍' : '👎'}</span> : <SmilePlus aria-hidden="true" />}
+      </button>
+    </div>
   );
 }

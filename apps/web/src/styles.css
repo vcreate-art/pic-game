@@ -931,8 +931,26 @@ button, input { font: inherit; color: inherit; }
 .gstage__head .wordmask__slot { flex: 0 1 14px; min-width: 7px; width: auto; height: 22px; border-bottom-width: 2px; font-size: 15px; }
 .gstage__head .wordmask__gap { flex: 0 1 8px; width: auto; }
 .gstage__status { font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gstage__head .reactions { margin-left: 0; gap: 4px; flex: none; }
-.gstage__head .reactions__btn { padding: 2px 8px; font-size: 13px; gap: 3px; }
+.gstage__word .wordmask__count { flex: none; margin-left: 8px; }
+
+/* Thumbs up or down, as one faint button in the drawing's top corner; open,
+   the two thumbs and their counts slide out to its left. */
+.gstage__react {
+  position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; align-items: center; gap: 6px;
+}
+.gstage__reactbtn, .gstage__reactopt {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 38px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--card); color: var(--ink-soft); font-size: 17px; cursor: pointer;
+  box-shadow: 0 1px 3px rgba(31, 34, 51, .12);
+}
+.gstage__reactbtn { width: 38px; opacity: .5; transition: opacity .2s ease; }
+.gstage__reactbtn svg { width: 19px; height: 19px; }
+.gstage__react.is-open .gstage__reactbtn { opacity: 1; }
+.gstage__reactopt { padding: 0 12px; animation: react-in .18s ease both; }
+.gstage__reactopt b { font-size: 13px; color: var(--ink); }
+.gstage__reactopt.is-on { background: var(--accent-soft); border-color: var(--accent); }
+@keyframes react-in { from { opacity: 0; transform: translateX(8px); } }
 .gstage__form .chat__input { font-size: 16px; background: var(--card); }
 /* The guess box is an editable div here (see GuessField): one line that
    scrolls sideways, an input's placeholder, and its disabled look. */
@@ -3203,7 +3221,8 @@ button, input { font: inherit; color: inherit; }
 
 /* The switches on /dev/draw-guess: small, out of the way, never in production. */
 .devpanel {
-  position: fixed; right: 8px; top: 72px; z-index: 95; display: flex; flex-direction: column; gap: 4px;
+  /* Left: the drawing's top-right corner holds the react button. */
+  position: fixed; left: 8px; top: 72px; z-index: 95; display: flex; flex-direction: column; gap: 4px;
   padding: 6px; border-radius: 10px; background: rgba(28, 29, 38, .85); font-size: 11px;
 }
 .devpanel.is-closed { padding: 0; background: none; }
