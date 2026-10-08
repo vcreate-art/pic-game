@@ -2,13 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Bug, SmilePlus, Smartphone, Users } from 'lucide-react';
 import { MAX_CHAT_LEN } from '../../constants.js';
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
-import { totalPlayed, totalWon, useStats } from '../../lib/achievements.js';
 import { isPostHogEnabled } from '../../lib/posthog.js';
 import { useDismiss } from '../../lib/useDismiss.js';
 import { lastKeyboardHeight, useVisualViewport } from '../../lib/useVisualViewport.js';
-import { PROFILE_EVENT, loadProfile, type Profile } from '../../net/socket.js';
 import { selectSkribbl, useGame } from '../../store/game.js';
-import { Avatar } from '../Avatar.js';
 import { useGuessBox } from '../Chat.js';
 import { PhoneHandoff } from '../PhoneHandoff.js';
 import { Podium } from '../Podium.js';
@@ -25,8 +22,8 @@ import { Slots } from '../WordMask.js';
  * the timer, the blanks and the reactions, always in sight), the canvas, the
  * chat rising over it and fading as it climbs, and the guess box with the
  * room button beside it; under them the keyboard, which is up by default, or
- * the room sheet that button swaps in for it: the players, you, and what the
- * app's header held (the room menu, playing on your phone, reporting a bug).
+ * the room sheet that button swaps in for it: the players, and what the
+ * app's header held (playing on your phone, reporting a bug, the room menu).
  *
  * The keyboard handling is the toys repo's mobile editor's: the stage is sized
  * to what the keyboard leaves, so the browser never scrolls anything under the
@@ -477,7 +474,7 @@ export function GuessStage() {
       {sheet && (
         <div className="gsheet" style={{ height: dock }}>
           <Scoreboard />
-          <SheetProfile />
+          <SheetPhone />
           {isPostHogEnabled && (
             <button
               type="button"
@@ -632,33 +629,17 @@ function StageHead({ headRef }: { headRef: React.RefObject<HTMLElement> }) {
 }
 
 /**
- * You, in the room sheet: what the app header's profile chip showed, and
- * moving your seat to another phone. Editing your name stays with the chip,
- * on screens with the app's header.
+ * Moving your seat to another phone, as a row in the room sheet; the QR code
+ * opens in its place. You're already in the players list above it.
  */
-function SheetProfile() {
-  const [profile, setProfile] = useState<Profile | null>(() => loadProfile());
+function SheetPhone() {
   const [phone, setPhone] = useState(false);
-  const stats = useStats();
-  useEffect(() => {
-    const on = (e: Event) => setProfile((e as CustomEvent<Profile>).detail);
-    window.addEventListener(PROFILE_EVENT, on);
-    return () => window.removeEventListener(PROFILE_EVENT, on);
-  }, []);
-  if (!profile) return null;
   if (phone) return <PhoneHandoff onBack={() => setPhone(false)} />;
-  const played = totalPlayed(stats);
   return (
-    <section className="gsheet__me">
-      <Avatar data={profile.avatar} size={36} />
-      <span className="gsheet__mename">
-        {profile.name}
-        <small>{played ? `${played} played, ${totalWon(stats)} won` : 'No games finished yet'}</small>
-      </span>
-      <button type="button" className="btn btn--outline gsheet__phone" onClick={() => setPhone(true)}>
-        <Smartphone aria-hidden="true" /> Play on your phone
-      </button>
-    </section>
+    <button type="button" className="gsheet__row" onClick={() => setPhone(true)}>
+      <Smartphone aria-hidden="true" />
+      Play on your phone
+    </button>
   );
 }
 
