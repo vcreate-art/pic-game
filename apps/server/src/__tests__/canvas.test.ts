@@ -86,3 +86,14 @@ describe('undo and redo', () => {
     expect(ids(room)).toEqual([]);
   });
 });
+
+describe('stroke colours', () => {
+  it('takes any #rrggbb colour, and draws anything else in black', async () => {
+    const { cleanColor } = await import('../socket/index.js');
+    expect(cleanColor('#ef4444')).toBe('#ef4444');
+    expect(cleanColor('#A1B2C3')).toBe('#a1b2c3');
+    for (const bad of ['red', '#fff', '#12345g', 'url(x)', '#1234567', 42, null]) {
+      expect(cleanColor(bad)).toBe('#000000');
+    }
+  });
+});
