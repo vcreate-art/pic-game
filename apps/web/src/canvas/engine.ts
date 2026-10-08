@@ -10,6 +10,34 @@ const FILL_TOLERANCE = 32;
 /** How far from an edge pixel to look for the line colour it is blended from.
  *  Two covers a soft edge two pixels wide, which heavy strokes can leave. */
 const LINE_REACH = 2;
+/** How long a snapped stroke takes to ease from as drawn into its clean
+ *  shape, and how many points both are resampled to for it. */
+const SNAP_MS = 200;
+const SNAP_POINTS = 64;
+
+/** A stroke's flat points, evenly spaced along it, `n` of them. */
+function resampleFlat(pts: readonly number[], n: number): number[] {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let i = 0; i + 1 < pts.length; i += 2) {
+    xs.push(pts[i]!);
+    ys.push(pts[i + 1]!);
+  }
+  if (xs.length < 2) return Array.from({ length: n * 2 }, (_, i) => (i % 2 ? ys[0] ?? 0 : xs[0] ?? 0));
+  const at = [0];
+  for (let i = 1; i < xs.length; i++) at.push(at[i - 1]! + Math.hypot(xs[i]! - xs[i - 1]!, ys[i]! - ys[i - 1]!));
+  const total = at[at.length - 1]! || 1;
+  const out: number[] = [];
+  let j = 1;
+  for (let k = 0; k < n; k++) {
+    const want = (k / (n - 1)) * total;
+    while (j < at.length - 1 && at[j]! < want) j++;
+    const span = at[j]! - at[j - 1]! || 1;
+    const t = Math.min(1, Math.max(0, (want - at[j - 1]!) / span));
+    out.push(xs[j - 1]! + (xs[j]! - xs[j - 1]!) * t, ys[j - 1]! + (ys[j]! - ys[j - 1]!) * t);
+  }
+  return out;
+}
 
 /**
  * All painting happens on a fixed 800x600 backing canvas, which is then blitted
@@ -28,6 +56,8 @@ export class CanvasEngine {
   /** Strokes still receiving points, with how many points are already painted. */
   private live = new Map<string, { op: StrokeOp; drawn: number }>();
   private raf = 0;
+  /** A snap easing in: its frame, and how to finish it at once. */
+  private morph: { raf: number; finish: () => void } | null = null;
 
   constructor() {
     this.off = document.createElement('canvas');
@@ -98,6 +128,7 @@ export class CanvasEngine {
 
   /** Full repaint from an op list — used on join, on undo, and on reconnect. */
   replay(ops: CanvasOp[]): void {
+    this.endMorph();
     this.ops = ops.map((o) => (o.kind === 'stroke' ? { ...o, pts: [...o.pts] } : { ...o }));
     this.live.clear();
     this.paintBackground();
@@ -109,6 +140,7 @@ export class CanvasEngine {
   }
 
   clear(): void {
+    this.endMorph();
     this.ops = [];
     this.live.clear();
     this.paintBackground();
@@ -127,6 +159,7 @@ export class CanvasEngine {
   // ---------------------------------------------------------------- strokes
 
   startStroke(op: StrokeOp): void {
+    this.endMorph();
     const copy: StrokeOp = { ...op, pts: [...op.pts] };
     this.ops.push(copy);
     this.live.set(copy.id, { op: copy, drawn: 0 });
@@ -148,6 +181,68 @@ export class CanvasEngine {
 
   endStroke(id: string): void {
     this.live.delete(id);
+  }
+
+  /**
+   * A stroke snapped to a clean shape: its points swapped for the shape's,
+   * the drawn line easing into it over SNAP_MS. The picture without it is
+   * kept for the frames to paint over; that needs it to be the latest op,
+   * which it nearly always is (it's being held). If not, it just changes.
+   */
+  replaceStroke(id: string, pts: number[]): void {
+    const i = this.ops.findIndex((o) => o.id === id);
+    const op = this.ops[i];
+    if (!op || op.kind !== 'stroke') return;
+    this.endMorph();
+    const from = op.pts;
+    op.pts = [...pts];
+    const live = this.live.get(id);
+    if (live) live.drawn = op.pts.length;
+
+    const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (still || i !== this.ops.length - 1) {
+      this.repaint();
+      return;
+    }
+    this.ops.pop();
+    this.repaint();
+    const under = this.octx.getImageData(0, 0, LOGICAL_W, LOGICAL_H);
+    this.ops.push(op);
+    const a = resampleFlat(from, SNAP_POINTS);
+    const b = resampleFlat(op.pts, SNAP_POINTS);
+    const start = performance.now();
+    const paint = (k: number) => {
+      this.octx.putImageData(under, 0, 0);
+      this.paintStroke(k >= 1 ? op : { ...op, pts: a.map((v, j) => Math.round(v + (b[j]! - v) * k)) }, 0);
+      this.blit();
+    };
+    const finish = () => {
+      cancelAnimationFrame(this.morph?.raf ?? 0);
+      this.morph = null;
+      paint(1);
+    };
+    const frame = () => {
+      const t = Math.min(1, (performance.now() - start) / SNAP_MS);
+      if (t >= 1) return finish();
+      paint(1 - (1 - t) ** 3);
+      this.morph!.raf = requestAnimationFrame(frame);
+    };
+    this.morph = { raf: requestAnimationFrame(frame), finish };
+  }
+
+  /** A snap still easing in finishes at once, before anything else changes. */
+  private endMorph(): void {
+    this.morph?.finish();
+  }
+
+  /** Every op painted afresh, without touching what's live. */
+  private repaint(): void {
+    this.paintBackground();
+    for (const op of this.ops) {
+      if (op.kind === 'stroke') this.paintStroke(op, 0);
+      else this.paintFill(op);
+    }
+    this.schedule();
   }
 
   /** Paints the stroke from the given flat-array index onward. */
@@ -191,6 +286,7 @@ export class CanvasEngine {
 
   applyFill(op: CanvasOp): void {
     if (op.kind !== 'fill') return;
+    this.endMorph();
     this.ops.push({ ...op });
     this.paintFill(op);
     this.schedule();

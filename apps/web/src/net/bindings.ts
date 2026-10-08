@@ -75,6 +75,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
   socket.on('draw:start', (op) => engine.startStroke({ kind: 'stroke', ...op }));
   socket.on('draw:append', ({ id, pts }) => engine.appendStroke(id, pts));
   socket.on('draw:end', ({ id }) => engine.endStroke(id));
+  socket.on('draw:replace', ({ id, pts }) => engine.replaceStroke(id, pts));
   socket.on('draw:fill', (op) => engine.applyFill(op));
   socket.on('canvas:undone', ({ ops }) => engine.replay(ops));
   socket.on('canvas:cleared', () => engine.clear());
@@ -155,7 +156,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
       'state:sync', 'player:joined', 'player:updated', 'player:left',
       'room:settings', 'room:meta', 'host:changed', 'kicked', 'room:replaced', 'turn:choosing', 'turn:clock', 'word:secret', 'suggest:state',
       'turn:drawing', 'hint:reveal', 'turn:end', 'game:end', 'draw:reactions',
-      'draw:start', 'draw:append', 'draw:end', 'draw:fill',
+      'draw:start', 'draw:append', 'draw:end', 'draw:replace', 'draw:fill',
       'canvas:undone', 'canvas:cleared', 'chat:message', 'guess:correct', 'error',
       'chess:state', 'chess:moved', 'chess:over', 'chess:rejected',
       'realms:state', 'realms:hand', 'realms:over', 'realms:rejected',

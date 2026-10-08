@@ -658,6 +658,16 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.io.to(this.code).except(this.socketOf(playerId) ?? '').emit('draw:end', { id });
   }
 
+  /** A stroke of the drawer's own, snapped to a clean shape: its points are
+   *  swapped for the shape's, and everyone else's copy with them. */
+  replaceStroke(playerId: string, id: string, pts: number[]): void {
+    if (!this.isDrawer(playerId)) return;
+    const op = this.ops.find((o) => o.id === id);
+    if (!op || op.kind !== 'stroke' || op.by !== playerId) return;
+    op.pts = [...pts];
+    this.io.to(this.code).except(this.socketOf(playerId) ?? '').emit('draw:replace', { id, pts: op.pts });
+  }
+
   fill(playerId: string, x: number, y: number, color: string): void {
     if (!this.isDrawer(playerId)) return;
     if (this.ops.length >= MAX_OPS_PER_TURN) return;

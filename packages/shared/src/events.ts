@@ -101,6 +101,8 @@ export interface ClientToServerEvents {
   'draw:start': (p: DrawStart) => void;
   'draw:append': (p: { id: string; pts: number[] }) => void;
   'draw:end': (p: { id: string }) => void;
+  /** A stroke snapped to a clean shape: its points, swapped. */
+  'draw:replace': (p: { id: string; pts: number[] }) => void;
   'draw:fill': (p: { x: number; y: number; color: string }) => void;
   'canvas:undo': () => void;
   'canvas:redo': () => void;
@@ -313,6 +315,7 @@ export interface ServerToClientEvents {
   'draw:start': (p: DrawStart & { by: string }) => void;
   'draw:append': (p: { id: string; pts: number[] }) => void;
   'draw:end': (p: { id: string }) => void;
+  'draw:replace': (p: { id: string; pts: number[] }) => void;
   'draw:fill': (p: CanvasOp) => void;
   'canvas:undone': (p: { ops: CanvasOp[] }) => void;
   'canvas:cleared': () => void;

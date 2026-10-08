@@ -97,3 +97,40 @@ describe('stroke colours', () => {
     }
   });
 });
+
+describe('snapping a stroke to a shape', () => {
+  it('swaps the drawer’s stroke for the shape and tells everyone else', () => {
+    const { room, sent, drawer } = drawing();
+    stroke(room, drawer, 'a');
+    sent.length = 0;
+    room.replaceStroke(drawer, 'a', [10, 20, 30, 40]);
+    const op = room.ops.find((o: CanvasOp) => o.id === 'a');
+    expect(op?.kind === 'stroke' && op.pts).toEqual([10, 20, 30, 40]);
+    const told = sent.find((m) => m.event === 'draw:replace');
+    expect(told?.args[0]).toEqual({ id: 'a', pts: [10, 20, 30, 40] });
+  });
+
+  it('is the drawer’s alone, and only for a stroke', () => {
+    const { room, drawer, guesser } = drawing();
+    stroke(room, drawer, 'a');
+    room.fill(drawer, 5, 5, '#ff0000');
+    const fillId = room.ops[1]!.id;
+    room.replaceStroke(guesser, 'a', [1, 1, 2, 2]);
+    room.replaceStroke(drawer, fillId, [1, 1, 2, 2]);
+    room.replaceStroke(drawer, 'missing', [1, 1, 2, 2]);
+    const op = room.ops[0]!;
+    expect(op.kind === 'stroke' && op.pts).toEqual([1, 2]);
+    expect(room.ops[1]!.kind).toBe('fill');
+  });
+
+  it('undo takes the snapped shape, as any stroke', () => {
+    const { room, drawer } = drawing();
+    stroke(room, drawer, 'a');
+    room.replaceStroke(drawer, 'a', [10, 20, 30, 40]);
+    room.undo(drawer);
+    expect(ids(room)).toEqual([]);
+    room.redo(drawer);
+    const op = room.ops[0]!;
+    expect(op.kind === 'stroke' && op.pts).toEqual([10, 20, 30, 40]);
+  });
+});
