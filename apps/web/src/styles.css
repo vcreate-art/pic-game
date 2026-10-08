@@ -874,11 +874,19 @@ button, input { font: inherit; color: inherit; }
 /* The turn marker, quieter here than in the side chat: a small pill on the
    left like the messages, no rules across the drawing, no capitals. */
 .gstage__chat .msg--divider {
-  flex: none; align-self: flex-start; margin: 4px 0 0; padding: 2px 8px; border-radius: 999px;
+  position: relative;
+  /* Square on the left, where the marker joins it: one tab off the edge. */
+  flex: none; align-self: flex-start; margin: 4px 0 0; padding: 2px 8px; border-radius: 0 999px 999px 0;
   background: rgba(255, 255, 255, .7); box-shadow: none;
   font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none;
 }
-.gstage__chat .msg--divider::before, .gstage__chat .msg--divider::after { content: none; }
+.gstage__chat .msg--divider::after { content: none; }
+/* A marker hanging off its left edge, out to the screen's edge, so a new
+   turn stands out in the run of messages without crossing the drawing. */
+.gstage__chat .msg--divider::before {
+  content: ''; flex: none; position: absolute; right: 100%; top: 0; bottom: 0; width: 12px;
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+}
 .gstage__chat .msg--divider span { max-width: none; }
 
 .gstage__form { padding: 8px 12px 6px; }
