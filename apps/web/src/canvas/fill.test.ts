@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fillPixels } from './engine.js';
+import { fillPixels, floodMask } from './engine.js';
 
 const RED: [number, number, number] = [239, 68, 68];
 
@@ -80,5 +80,49 @@ describe('flood fill', () => {
     const d = wall();
     expect(fillPixels(d, W, H, 2, 2, [255, 255, 255])).toBe(false);
     expect(px(d, W, 8, 2)).toEqual([170, 170, 170]);
+  });
+});
+
+describe('the fill preview', () => {
+  // Two shapes and a diagonal stroke, soft-edged, on white: regions of every
+  // kind, inside and out.
+  const W = 60;
+  const H = 40;
+  const drawing = () =>
+    image(W, H, (x, y) => {
+      const ring = Math.abs(Math.hypot(x - 15, y - 20) - 10);
+      if (ring < 1) return 0;
+      if (ring < 2) return 128;
+      if ((x === 35 || x === 50) && y >= 8 && y <= 32) return 0;
+      if ((y === 8 || y === 32) && x >= 35 && x <= 50) return 0;
+      if (Math.abs(x - y - 10) < 1 && x > 52) return 40;
+      return null;
+    });
+
+  for (const [name, sx, sy] of [['inside the circle', 15, 20], ['inside the box', 42, 20], ['outside both', 2, 2]] as const) {
+    it(`covers exactly what the fill floods, ${name}`, () => {
+      const before = drawing();
+      const mask = floodMask(before, W, H, sx, sy, RED)!;
+      expect(mask).not.toBeNull();
+      const after = drawing();
+      fillPixels(after, W, H, sx, sy, RED);
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const i = y * W + x;
+          if (mask[i]) {
+            expect(px(after, W, x, y)).toEqual(RED);
+          } else {
+            // Outside it, only the ring of edge pixels the fill re-blends may change.
+            const nearMask = [-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => mask[(y + dy) * W + (x + dx)] === 1));
+            if (!nearMask) expect(px(after, W, x, y)).toEqual(px(before, W, x, y));
+          }
+        }
+      }
+    });
+  }
+
+  it('shows nothing where the fill would change nothing', () => {
+    const d = image(10, 10, () => null);
+    expect(floodMask(d, 10, 10, 5, 5, [255, 255, 255])).toBeNull();
   });
 });

@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { LOGICAL_H, LOGICAL_W } from '@pic-game/shared';
 import { getSocket } from '../net/socket.js';
 import { selectIsDrawer, useGame } from '../store/game.js';
 import { useTools } from '../store/tools.js';
+import { hexToRgb } from './engine.js';
 import { getEngine } from './engineInstance.js';
 import { DrawInput, type DrawSink } from './input.js';
 import { uid } from '../lib/uid.js';
@@ -60,6 +61,86 @@ export function CanvasBoard() {
     };
   }, []);
 
+  // How many screen px one logical px is, for sizing the brush cursor.
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ro = new ResizeObserver(() => setScale(canvas.getBoundingClientRect().width / LOGICAL_W || 1));
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, []);
+  const { tool, color, size } = useTools();
+  const cursor = useMemo(() => brushCursor(tool, color, size * scale), [tool, color, size, scale]);
+
+  // With the fill tool and a mouse, the area a click would fill, shown in its
+  // colour, faintly, under the pointer: worked out only when the pointer
+  // moves into another area or the picture changes.
+  const previewRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const view = previewRef.current;
+    const ctx = view?.getContext('2d');
+    if (!canvas || !view || !ctx) return;
+    const clear = () => ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
+    if (!isDrawer || tool !== 'fill') {
+      clear();
+      return;
+    }
+    const engine = getEngine();
+    const [r, g, b] = hexToRgb(color);
+    let shown: Uint8Array | null = null;
+    let seenVersion = -1;
+    let at: [number, number] | null = null;
+    let frame = 0;
+    const draw = () => {
+      frame = 0;
+      if (!at) return;
+      const [x, y] = at;
+      const pixel = Math.round(y) * LOGICAL_W + Math.round(x);
+      if (shown?.[pixel] && seenVersion === engine.version) return;
+      shown = engine.fillArea(x, y, color);
+      seenVersion = engine.version;
+      clear();
+      if (!shown) return;
+      const img = ctx.createImageData(LOGICAL_W, LOGICAL_H);
+      for (let i = 0; i < shown.length; i++) {
+        if (!shown[i]) continue;
+        img.data[i * 4] = r;
+        img.data[i * 4 + 1] = g;
+        img.data[i * 4 + 2] = b;
+        img.data[i * 4 + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+    };
+    const look = () => {
+      if (!frame) frame = requestAnimationFrame(draw);
+    };
+    const move = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse') return;
+      const box = canvas.getBoundingClientRect();
+      at = [((e.clientX - box.left) / box.width) * LOGICAL_W, ((e.clientY - box.top) / box.height) * LOGICAL_H];
+      look();
+    };
+    const leave = () => {
+      at = null;
+      shown = null;
+      clear();
+    };
+    // A click fills: look again once the picture has changed under it.
+    const filled = () => setTimeout(look, 30);
+    canvas.addEventListener('pointermove', move);
+    canvas.addEventListener('pointerleave', leave);
+    canvas.addEventListener('pointerup', filled);
+    return () => {
+      cancelAnimationFrame(frame);
+      canvas.removeEventListener('pointermove', move);
+      canvas.removeEventListener('pointerleave', leave);
+      canvas.removeEventListener('pointerup', filled);
+      clear();
+    };
+  }, [isDrawer, tool, color]);
+
   // Re-checked whenever the turn changes, so input dies the instant the turn ends.
   useEffect(() => {
     inputRef.current?.setEnabled(isDrawer);
@@ -71,9 +152,56 @@ export function CanvasBoard() {
         ref={ref}
         className={`board__canvas ${isDrawer ? 'is-drawable' : ''}`}
         // Stops the browser scrolling or text-selecting under a drawing finger.
-        style={{ touchAction: 'none' }}
+        style={{ touchAction: 'none', ...(isDrawer ? { cursor } : {}) }}
       />
+      <canvas ref={previewRef} className="board__preview" width={LOGICAL_W} height={LOGICAL_H} aria-hidden="true" />
       {!isDrawer && <div className="board__lock" aria-hidden="true" />}
     </div>
   );
+}
+
+/** Browsers draw a cursor image up to 128px; the brush ring stays inside it. */
+const CURSOR_MAX = 120;
+
+/**
+ * The cursor while drawing: a ring the size the brush paints at, on screen,
+ * in its colour (grey for the eraser), with a faint dark edge so it shows on
+ * any colour, white included, and a dot in the middle when it's too small
+ * to read as a ring. An image cursor, so the browser draws it with the
+ * pointer, never trailing behind. Fill: the toolbar's paint bucket, its
+ * drip in the colour, pointing at where the fill lands.
+ */
+function brushCursor(tool: string, color: string, diameter: number): string {
+  if (tool === 'fill') return bucketCursor(color);
+  const d = Math.max(4, Math.min(CURSOR_MAX, diameter));
+  const box = Math.ceil(d + 6);
+  const c = box / 2;
+  const r = d / 2;
+  const eraser = tool === 'eraser';
+  const ink = eraser ? '#8a8f9c' : color;
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">` +
+    `<circle cx="${c}" cy="${c}" r="${r + 1}" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="1"/>` +
+    `<circle cx="${c}" cy="${c}" r="${r}" fill="${eraser ? 'rgba(255,255,255,.6)' : 'none'}" stroke="${ink}" stroke-width="1.5"/>` +
+    (d < 10 ? `<circle cx="${c}" cy="${c}" r="1.2" fill="${ink}"/>` : '') +
+    `</svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${Math.round(c)} ${Math.round(c)}, crosshair`;
+}
+
+/** The paint bucket (lucide's, as on the fill button), drawn twice: wide
+ *  and white underneath so it shows on any drawing, then dark on top. Its
+ *  drip is filled with the colour, and its tip is the click point. */
+function bucketCursor(color: string): string {
+  const bucket =
+    '<path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/>' +
+    '<path d="m5 2 5 5"/><path d="M2 13h15"/>';
+  const drip = '<path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/>';
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="-2 -2 28 28" fill="none" stroke-linecap="round" stroke-linejoin="round">' +
+    `<g stroke="#fff" stroke-width="4">${bucket}${drip}</g>` +
+    `<g stroke="#1c1d26" stroke-width="2">${bucket}</g>` +
+    `<g stroke="#1c1d26" stroke-width="1.5" fill="${color}">${drip}</g>` +
+    '</svg>';
+  // The drip's tip, at (20, 22) in the icon, which sits 2px in.
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 22 24, crosshair`;
 }

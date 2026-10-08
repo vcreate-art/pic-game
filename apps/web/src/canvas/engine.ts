@@ -108,7 +108,11 @@ export class CanvasEngine {
     this.octx.restore();
   }
 
+  /** Bumped whenever the picture changes, so a fill preview knows to look again. */
+  version = 0;
+
   private schedule(): void {
+    this.version++;
     if (this.raf) return;
     this.raf = requestAnimationFrame(() => {
       this.raf = 0;
@@ -292,13 +296,26 @@ export class CanvasEngine {
     this.schedule();
   }
 
+  /**
+   * Which pixels a fill at this logical point would cover, without filling:
+   * a mask over the logical canvas, one byte a pixel, or null where a fill
+   * would change nothing (off the canvas, or already that colour). The same
+   * region the fill itself floods, so a preview never promises another.
+   */
+  fillArea(x: number, y: number, color: string): Uint8Array | null {
+    const [sx, sy] = [Math.round(x), Math.round(y)];
+    if (sx < 0 || sy < 0 || sx >= LOGICAL_W || sy >= LOGICAL_H) return null;
+    const d = this.octx.getImageData(0, 0, LOGICAL_W, LOGICAL_H).data;
+    return floodMask(d, LOGICAL_W, LOGICAL_H, sx, sy, hexToRgb(color));
+  }
+
   private paintFill(op: Extract<CanvasOp, { kind: 'fill' }>): void {
     const [fx, fy] = dequantize(op.x, op.y);
     floodFill(this.octx, Math.round(fx), Math.round(fy), op.color);
   }
 }
 
-function hexToRgb(hex: string): [number, number, number] {
+export function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
   const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
   return [
@@ -317,6 +334,42 @@ function floodFill(ctx: CanvasRenderingContext2D, sx: number, sy: number, color:
   if (sx < 0 || sy < 0 || sx >= LOGICAL_W || sy >= LOGICAL_H) return;
   const img = ctx.getImageData(0, 0, LOGICAL_W, LOGICAL_H);
   if (fillPixels(img.data, LOGICAL_W, LOGICAL_H, sx, sy, hexToRgb(color))) ctx.putImageData(img, 0, 0);
+}
+
+/**
+ * The region a fill from (sx, sy) floods, by the same rule as fillPixels'
+ * first pass, without changing a pixel; null if the seed is already the
+ * fill's colour, when the fill does nothing.
+ */
+export function floodMask(
+  d: Uint8ClampedArray, w: number, h: number, sx: number, sy: number, rgb: [number, number, number],
+): Uint8Array | null {
+  const at = (x: number, y: number) => (y * w + x) * 4;
+  const start = at(sx, sy);
+  const tr = d[start]!, tg = d[start + 1]!, tb = d[start + 2]!;
+  const [nr, ng, nb] = rgb;
+  if (Math.abs(tr - nr) < 2 && Math.abs(tg - ng) < 2 && Math.abs(tb - nb) < 2) return null;
+  const matches = (i: number): boolean =>
+    Math.abs(d[i]! - tr) <= FILL_TOLERANCE &&
+    Math.abs(d[i + 1]! - tg) <= FILL_TOLERANCE &&
+    Math.abs(d[i + 2]! - tb) <= FILL_TOLERANCE;
+  const seen = new Uint8Array(w * h);
+  const stack: number[] = [sx, sy];
+  while (stack.length > 0) {
+    const y = stack.pop()!;
+    const x = stack.pop()!;
+    if (seen[y * w + x]) continue;
+    let left = x;
+    while (left > 0 && !seen[y * w + left - 1] && matches(at(left - 1, y))) left--;
+    let right = x;
+    while (right < w - 1 && !seen[y * w + right + 1] && matches(at(right + 1, y))) right++;
+    for (let i = left; i <= right; i++) {
+      seen[y * w + i] = 1;
+      if (y > 0 && !seen[(y - 1) * w + i] && matches(at(i, y - 1))) stack.push(i, y - 1);
+      if (y < h - 1 && !seen[(y + 1) * w + i] && matches(at(i, y + 1))) stack.push(i, y + 1);
+    }
+  }
+  return seen;
 }
 
 /**
