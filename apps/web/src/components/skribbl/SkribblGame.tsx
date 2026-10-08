@@ -10,19 +10,31 @@ import { Toolbar } from '../Toolbar.js';
 import { TurnResult } from '../TurnResult.js';
 import { WordChoice } from '../WordChoice.js';
 import { WordMask } from '../WordMask.js';
+import { GuessStage } from './GuessStage.js';
+import { useMediaQuery } from '../../lib/useMediaQuery.js';
 
 /** The draw-and-guess play surface. The room route picks this or the chess
  *  board off `room.kind`; neither knows the other exists. */
 export function SkribblGame() {
   const room = useGame(selectSkribbl);
   const isDrawer = useGame(selectIsDrawer);
+  const phone = useMediaQuery('(max-width: 640px)');
   if (!room) return null;
   const phase = room.phase;
 
+  // Guessing on a phone is its own screen: the canvas, the chat over it and
+  // the keyboard, with tabs for the rest.
+  if (phone && !isDrawer) {
+    return (
+      <div className="game game--skribbl game--guessing">
+        <GuessStage />
+        <Gallery />
+      </div>
+    );
+  }
+
   return (
-    // Guessers and the drawer get different phone layouts: a guesser's is the
-    // canvas full screen with the chat over it, like a live stream.
-    <div className={`game game--skribbl ${isDrawer ? 'game--drawing' : 'game--guessing'}`}>
+    <div className="game game--skribbl">
       {/* Three tracks, with the word in the middle one, so it centres against
           the header itself rather than against whatever space is left over. */}
       <div className="game__head">
