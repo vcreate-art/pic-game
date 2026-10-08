@@ -47,6 +47,16 @@ const STICK_PX = 24;
 /** How long the chat waits, back at the newest message, before it folds:
  *  a moment for the momentum of a scroll to finish. */
 const FOLD_MS = 500;
+/** As the open chat folds, the lines it's about to hide fade out: the one
+ *  furthest from the guess box fastest, the nearest slowest. */
+const FOLD_OUT_FAST_MS = 150;
+const FOLD_OUT_SLOW_MS = 450;
+/** How long lines that went out, but show again once folded, take to come back. */
+const FOLD_IN_MS = 450;
+/** Opening is the fold in reverse: the older lines it shows fade in, the one
+ *  nearest the guess box fastest, the furthest slowest. */
+const OPEN_IN_FAST_MS = 150;
+const OPEN_IN_SLOW_MS = 450;
 /** How much of the stage the chat may take while someone reads back. */
 const READING_RATIO = 0.7;
 /** How far over the drawing the chat fades out, once it reaches it. */
@@ -113,10 +123,61 @@ export function GuessStage() {
   const touching = useRef(false);
   const byHand = useRef(false);
   const foldTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Folding changes the chat's height and where it's scrolled to at once,
+  // which can't ease as it is. So the lines it's about to hide fade out
+  // first, top to bottom, and it folds once they're gone. Lines that stay
+  // in view stay put; folding from further back, where every line in view
+  // gives way to the newest, all of them go, and the newest fade in.
+  const foldingRows = useRef<HTMLElement[]>([]);
+  /** Scrolled back while a fold was fading lines out: it's off, and they
+   *  come back. */
+  const callOffFold = () => {
+    clearTimeout(foldTimer.current);
+    for (const row of foldingRows.current) {
+      row.style.transition = `opacity ${OPEN_IN_FAST_MS}ms ease`;
+      row.style.opacity = '';
+    }
+    foldingRows.current = [];
+  };
   const fold = () => {
     clearTimeout(foldTimer.current);
-    atBottom.current = true;
-    setReading(false);
+    const el = chatRef.current;
+    if (!reading || !el) {
+      atBottom.current = true;
+      return;
+    }
+    const box = el.getBoundingClientRect();
+    const keep = atBottom.current ? (cramped ? crampedHeight : gap + FADE_PX) : 0;
+    const span = Math.max(1, box.height - keep);
+    const fading: HTMLElement[] = [];
+    for (const row of Array.from(el.children) as HTMLElement[]) {
+      const r = row.getBoundingClientRect();
+      if (r.bottom <= box.top || r.top >= box.bottom) continue;
+      if (r.top >= box.bottom - keep - 1) continue;
+      const far = Math.min(1, Math.max(0, (box.bottom - r.bottom - keep) / span));
+      const ms = Math.round(FOLD_OUT_SLOW_MS - (FOLD_OUT_SLOW_MS - FOLD_OUT_FAST_MS) * far);
+      row.style.transition = `opacity ${ms}ms ease`;
+      row.style.opacity = '0';
+      fading.push(row);
+    }
+    foldingRows.current = fading;
+    foldTimer.current = setTimeout(
+      () => {
+        foldingRows.current = [];
+        atBottom.current = true;
+        setReading(false);
+        // After the fold has rendered: whatever went out and still shows
+        // comes back; the rest is out of view by now.
+        requestAnimationFrame(() => {
+          for (const row of fading) {
+            row.style.transition = `opacity ${FOLD_IN_MS}ms ease`;
+            row.style.opacity = '';
+            row.addEventListener('transitionend', () => (row.style.transition = ''), { once: true });
+          }
+        });
+      },
+      fading.length ? FOLD_OUT_SLOW_MS : 0,
+    );
   };
   /** Folds once they've stayed at the newest, finger lifted, for a moment. */
   const foldAtNewest = () => {
@@ -143,6 +204,45 @@ export function GuessStage() {
     if (atBottom.current) el.scrollTop = el.scrollHeight;
     else if (grew) el.scrollTop -= grew;
   });
+
+  // Opening, the fold in reverse: the lines it brings into view fade in from
+  // the guess box up. Before paint, so they never show at full strength
+  // first. Lines a fold was still fading out come back the same way.
+  useLayoutEffect(() => {
+    const el = chatRef.current;
+    if (!reading || !el) return;
+    const box = el.getBoundingClientRect();
+    const keep = cramped ? crampedHeight : gap + FADE_PX;
+    const span = Math.max(1, box.height - keep);
+    const rows: [HTMLElement, number][] = [];
+    for (const row of Array.from(el.children) as HTMLElement[]) {
+      const r = row.getBoundingClientRect();
+      if (r.bottom <= box.top || r.top >= box.bottom) continue;
+      if (r.top >= box.bottom - keep - 1 && row.style.opacity !== '0') continue;
+      const far = Math.min(1, Math.max(0, (box.bottom - r.bottom - keep) / span));
+      rows.push([row, Math.round(OPEN_IN_FAST_MS + (OPEN_IN_SLOW_MS - OPEN_IN_FAST_MS) * far)]);
+      row.style.transition = 'none';
+      row.style.opacity = '0';
+    }
+    let started = false;
+    const frame = requestAnimationFrame(() => {
+      started = true;
+      for (const [row, ms] of rows) {
+        row.style.transition = `opacity ${ms}ms ease`;
+        row.style.opacity = '';
+        row.addEventListener('transitionend', () => (row.style.transition = ''), { once: true });
+      }
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (started) return;
+      for (const [row] of rows) {
+        row.style.transition = '';
+        row.style.opacity = '';
+      }
+    };
+    // Only as it opens; the sizes are read as they are at that moment.
+  }, [reading]);
 
   // The bottom of the screen is held by the keyboard, or by the sheet that
   // took its place at its height; for a moment during a swap, both.
@@ -265,7 +365,7 @@ export function GuessStage() {
           atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_PX;
           if (!byHand.current) return;
           if (atBottom.current) return foldAtNewest();
-          clearTimeout(foldTimer.current);
+          callOffFold();
           setReading(true);
         }}
         onTouchStart={() => {

@@ -839,7 +839,7 @@ button, input { font: inherit; color: inherit; }
   touch-action: pan-y; overscroll-behavior: contain; scrollbar-width: none;
   -webkit-mask-image: linear-gradient(to top, #000 45%, rgba(0, 0, 0, var(--fade-to)));
   mask-image: linear-gradient(to top, #000 45%, rgba(0, 0, 0, var(--fade-to)));
-  --fade-to: 0; transition: --fade-to .25s ease;
+  --fade-to: 0; transition: --fade-to .45s ease;
 }
 /* While someone reads back through the chat, no fade: the top end goes
    solid too. Registered so it eases; a browser without @property snaps. */
