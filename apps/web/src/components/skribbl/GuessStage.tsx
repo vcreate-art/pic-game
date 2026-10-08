@@ -2,13 +2,14 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Bug, Pencil, SmilePlus, Users } from 'lucide-react';
 import { MAX_CHAT_LEN } from '../../constants.js';
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
+import { totalPlayed, totalWon, useStats } from '../../lib/achievements.js';
 import { isPostHogEnabled } from '../../lib/posthog.js';
 import { useDismiss } from '../../lib/useDismiss.js';
 import { lastKeyboardHeight, useVisualViewport } from '../../lib/useVisualViewport.js';
 import { selectSkribbl, useGame } from '../../store/game.js';
 import { Avatar } from '../Avatar.js';
 import { useGuessBox } from '../Chat.js';
-import { ProfileEditor } from '../ProfileChip.js';
+import { ProfileBadges, ProfileEditor } from '../ProfileChip.js';
 import { Podium } from '../Podium.js';
 import { useReaction } from '../Reactions.js';
 import { RoomMenu } from '../RoomPanel.js';
@@ -126,6 +127,102 @@ export function GuessStage() {
   // The chat scrolls. Cramped, it's as tall as its last few messages; and
   // whoever is reading the newest keeps up with them as more arrive.
   const chatRef = useRef<HTMLDivElement>(null);
+  const meRef = useRef<HTMLButtonElement>(null);
+  const myName = useGame((s) => s.room?.players.find((p) => p.id === s.me)?.name ?? '');
+  const myId = useGame((s) => s.me);
+  // While a sent line is in flight: the newest message when it left. Lines of
+  // yours after that one wait unseen, so the real line, back from the server
+  // before the flight lands, doesn't show twice; it fades in as it lands.
+  const [landing, setLanding] = useState<{ after: string | undefined; landed: boolean } | null>(null);
+  const standIns = useRef<HTMLElement[]>([]);
+  const dropStandIns = () => {
+    for (const el of standIns.current) el.remove();
+    standIns.current = [];
+  };
+  // Landed, the stand-ins give way to the real line in the same frame: it's
+  // in their exact place, so nothing moves or dims. If it isn't back from the
+  // server yet, they wait for it, a while.
+  const realBack =
+    !!landing && messages.findIndex((m) => m.id === landing.after) < messages.findLastIndex((m) => m.playerId === myId);
+  useLayoutEffect(() => {
+    if (!landing?.landed) return;
+    if (realBack) {
+      dropStandIns();
+      setLanding(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      dropStandIns();
+      setLanding(null);
+    }, LANDING_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [landing, realBack]);
+  useEffect(() => dropStandIns, []);
+
+  /**
+   * Sending, shown: the line lifts off the guess box and your avatar off its
+   * button, and both fly up to where the line lands in the chat, the avatar
+   * shrinking into the gutter, then fade as the real line fades in. Stand-ins
+   * on the page's top layer, so nothing in the chat moves for them.
+   */
+  const flySent = () => {
+    const text = box.text.trim();
+    const field = input.current;
+    const chat = chatRef.current;
+    if (!text || box.locked || !field || !chat) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    dropStandIns();
+    const from = field.getBoundingClientRect();
+    const into = chat.getBoundingClientRect();
+    const gutter = parseFloat(getComputedStyle(chat).paddingLeft) || 0;
+    const bottomPad = parseFloat(getComputedStyle(chat).paddingBottom) || 0;
+
+    // The line as it will show, built at its landing spot, then sent back to
+    // the guess box to start from.
+    const line = document.createElement('div');
+    line.className = 'msg msg--chat gstage__flying';
+    const who = document.createElement('strong');
+    who.className = 'msg__name';
+    who.textContent = myName;
+    const said = document.createElement('span');
+    said.className = 'msg__text';
+    said.textContent = text;
+    line.append(who, said);
+    document.body.append(line);
+    const size = line.getBoundingClientRect();
+    const landX = into.left + gutter;
+    const landY = into.bottom - bottomPad - size.height;
+    line.style.left = `${landX}px`;
+    line.style.top = `${landY}px`;
+    standIns.current.push(line);
+    // Held where they land (fill: forwards) until the real line takes over.
+    const fly: KeyframeAnimationOptions = { duration: 340, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'forwards' };
+    setLanding({ after: messages.at(-1)?.id, landed: false });
+    line
+      .animate(
+        [{ transform: `translate(${from.left - landX}px, ${from.top + (from.height - size.height) / 2 - landY}px)`, opacity: 0.6 }, { transform: 'none', opacity: 1 }],
+        fly,
+      )
+      .finished.then(() => setLanding((l) => l && { ...l, landed: true }), () => {});
+
+    // The avatar, from beside the guess box down to gutter size beside the
+    // line, scaled from its corner so it lands exactly on the real one.
+    const face = meRef.current?.querySelector<HTMLElement>('.avatar-wrap');
+    if (!face) return;
+    const start = face.getBoundingClientRect();
+    const ghost = face.cloneNode(true) as HTMLElement;
+    ghost.classList.add('gstage__flying-face');
+    ghost.style.left = `${start.left}px`;
+    ghost.style.top = `${start.top}px`;
+    document.body.append(ghost);
+    standIns.current.push(ghost);
+    const endX = into.left + (gutter - SENDER_AVATAR_PX) / 2;
+    const endY = landY + (size.height - SENDER_AVATAR_PX) / 2;
+    ghost.animate(
+      [{ transform: 'none' }, { transform: `translate(${endX - start.left}px, ${endY - start.top}px) scale(${SENDER_AVATAR_PX / start.width})` }],
+      fly,
+    );
+  };
   const atBottom = useRef(true);
 
   // Scrolling back through the chat opens it: taller, and without the fade,
@@ -420,13 +517,18 @@ export function GuessStage() {
           ['--fade' as string]: `${FADE_PX}px`,
         }}
       >
-        {messages.slice(-50).map((m) =>
+        {messages.slice(-50).map((m, i, shown) =>
           m.kind === 'divider' ? (
             <div key={m.id} className="msg--divider" role="separator">
               <span>{m.text}</span>
             </div>
           ) : (
-            <div key={m.id} className={`msg msg--${m.kind}`}>
+            <div
+              key={m.id}
+              className={`msg msg--${m.kind} ${
+                landing && m.playerId === myId && i > shown.findIndex((x) => x.id === landing.after) ? 'is-landing' : ''
+              }`}
+            >
               <SenderAvatar playerId={m.playerId} />
               {m.kind === 'chat' && <strong className="msg__name">{m.name}</strong>}
               {m.kind === 'secret' && <strong className="msg__name">{m.name} (guessed)</strong>}
@@ -440,9 +542,10 @@ export function GuessStage() {
           cards, addresses) over the keyboard for boxes in a form, whatever
           autocomplete says. Enter, the keyboard's Send, sends instead. */}
       <div className="gstage__form">
+        {/* You, beside the guess box and in line with the senders in the
+            chat's gutter: your profile and the room's controls. */}
+        <MeButton btnRef={meRef} on={sheet === 'me'} onToggle={() => toggleSheet('me')} />
         <div className="chat__field">
-          {/* You, inside the guess box: your profile and the room's controls. */}
-          <MeButton on={sheet === 'me'} onToggle={() => toggleSheet('me')} />
           <GuessField
             inputRef={input}
             text={box.text}
@@ -455,6 +558,7 @@ export function GuessStage() {
             }}
             onEnter={() => {
               fold();
+              flySent();
               box.send();
             }}
           />
@@ -481,22 +585,12 @@ export function GuessStage() {
       </div>
 
       {sheet && (
-        <div className="gsheet" style={{ height: dock }}>
+        <div className={`gsheet ${sheet === 'me' ? 'gsheet--me' : ''}`} style={{ height: dock }}>
           {sheet === 'players' ? (
             <Scoreboard />
           ) : (
             <>
               <SheetMe />
-              {isPostHogEnabled && (
-                <button
-                  type="button"
-                  className="gsheet__row"
-                  onClick={() => document.getElementById('report-bug')?.click()}
-                >
-                  <Bug aria-hidden="true" />
-                  Report a bug
-                </button>
-              )}
               <RoomMenu standings={false} leaveTile />
             </>
           )}
@@ -700,13 +794,22 @@ function useMe() {
   return useGame((s) => s.room?.players.find((p) => p.id === s.me));
 }
 
-/** Your avatar at the start of the guess box: opens the "you" sheet.
+/** Your avatar before the guess box: opens the "you" sheet.
  *  preventDefault on pointerdown keeps it from taking focus off the box. */
-function MeButton({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+function MeButton({
+  btnRef,
+  on,
+  onToggle,
+}: {
+  btnRef: React.RefObject<HTMLButtonElement>;
+  on: boolean;
+  onToggle: () => void;
+}) {
   const me = useMe();
   if (!me) return null;
   return (
     <button
+      ref={btnRef}
       type="button"
       className={`gstage__mebtn ${on ? 'is-on' : ''}`}
       aria-pressed={on}
@@ -714,29 +817,59 @@ function MeButton({ on, onToggle }: { on: boolean; onToggle: () => void }) {
       onPointerDown={(e) => e.preventDefault()}
       onClick={onToggle}
     >
-      <Avatar data={me.avatar} size={26} />
+      <Avatar data={me.avatar} size={ME_AVATAR_PX} />
     </button>
   );
 }
 
-/** You, at the top of the "you" sheet, with a way to change your name and
- *  look; editing takes the row's place. */
+/** You, at the top of the "you" sheet: your record, a way to change your
+ *  name and look (editing takes their place) and to report a bug, then your
+ *  achievements with the three most relevant, as the header menu has them,
+ *  so the sheet fits the keyboard's height without scrolling. */
 function SheetMe() {
   const me = useMe();
   const [editing, setEditing] = useState(false);
+  const stats = useStats();
   if (!me) return null;
   if (editing) return <ProfileEditor className="gsheet__edit" onDone={() => setEditing(false)} />;
+  const played = totalPlayed(stats);
   return (
-    <section className="gsheet__me">
-      <Avatar data={me.avatar} size={36} />
-      <span className="gsheet__mename">{me.name}</span>
-      <button type="button" className="gsheet__edit-btn" onClick={() => setEditing(true)}>
-        <Pencil aria-hidden="true" />
-        Edit name and look
-      </button>
-    </section>
+    <>
+      <section className="gsheet__me">
+        <Avatar data={me.avatar} size={40} />
+        <span className="gsheet__mename">
+          {me.name}
+          <small>{played ? `${played} played, ${totalWon(stats)} won` : 'No games finished yet'}</small>
+        </span>
+        <button type="button" className="gsheet__edit-btn" onClick={() => setEditing(true)}>
+          <Pencil aria-hidden="true" />
+          Edit
+        </button>
+        {isPostHogEnabled && (
+          <button
+            type="button"
+            className="gsheet__edit-btn gsheet__icon-btn"
+            aria-label="Report a bug"
+            title="Report a bug"
+            onClick={() => document.getElementById('report-bug')?.click()}
+          >
+            <Bug aria-hidden="true" />
+          </button>
+        )}
+      </section>
+      <ProfileBadges peek={3} />
+    </>
   );
 }
+
+/** How long sent stand-ins wait, landed, for the real line from the server. */
+const LANDING_WAIT_MS = 1500;
+
+/** Your avatar beside the guess box: the box's height. */
+const ME_AVATAR_PX = 42;
+
+/** How big a sender's avatar is in the chat's gutter. */
+const SENDER_AVATAR_PX = 18;
 
 /** A message's sender, small, in the chat's left gutter. */
 function SenderAvatar({ playerId }: { playerId?: string }) {
@@ -744,7 +877,7 @@ function SenderAvatar({ playerId }: { playerId?: string }) {
   if (!playerId || !avatar) return null;
   return (
     <span className="msg__avatar" aria-hidden="true">
-      <Avatar data={avatar} size={18} />
+      <Avatar data={avatar} size={SENDER_AVATAR_PX} />
     </span>
   );
 }

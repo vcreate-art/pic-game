@@ -893,15 +893,27 @@ button, input { font: inherit; color: inherit; }
 }
 .gstage__chat .msg--divider span { max-width: none; }
 
-/* You, inside the guess box at its start: opens the "you" sheet. */
+/* You, before the guess box and as tall as it: opens the "you" sheet. */
 .gstage__mebtn {
-  position: absolute; left: 8px; top: 50%; z-index: 1; transform: translateY(-50%);
-  display: flex; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer;
+  flex: none; display: flex; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer;
 }
 .gstage__mebtn.is-on { outline: 2px solid var(--accent); outline-offset: 2px; }
 .gstage__mebtn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-.gstage__form .chat__input { padding-left: 42px; }
-.gstage__form .chat__input--editable[data-empty]::before { left: 42px; }
+
+/* A sent line and your avatar on their way from the guess box to the chat
+   (flySent), and each line fading in as it lands, so the two cross. */
+.gstage__flying, .gstage__flying-face { position: fixed; z-index: 40; pointer-events: none; margin: 0; }
+.gstage__flying-face { transform-origin: 0 0; }
+.gstage__flying {
+  max-width: 85vw; background: rgba(255, 255, 255, .86); box-shadow: 0 1px 3px rgba(31, 34, 51, .12);
+}
+.gstage__chat .msg { animation: msg-in .25s ease; }
+/* Yours, back from the server while its stand-in is still flying: unseen
+   until it lands, then shown in the same frame the stand-in goes, exactly
+   in its place. Its fade-in runs out unseen meanwhile, so it doesn't fade. */
+.gstage__chat .msg.is-landing { opacity: 0; }
+@keyframes msg-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .gstage__chat .msg { animation: none; } }
 
 /* The guess box and the room button beside it, last above the keyboard. */
 .gstage__form {
@@ -1003,11 +1015,6 @@ button, input { font: inherit; color: inherit; }
   background: var(--paper); border-top: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 14px;
 }
-.gsheet__row {
-  display: flex; align-items: center; gap: 8px; padding: 8px 0; border: 0; background: none;
-  color: var(--ink-soft); font-size: 14px; font-weight: 600; cursor: pointer;
-}
-.gsheet__row svg { width: 16px; height: 16px; }
 /* The room's controls in the sheet: 4:3 tiles no wider than 80px, centred,
    in a tray of their own across the bottom, apart from the players and
    always in reach while the list scrolls behind it. Last, after the host
@@ -1023,14 +1030,23 @@ button, input { font: inherit; color: inherit; }
 .gsheet .room__ctl { aspect-ratio: 4 / 3; justify-content: center; padding: 4px; }
 /* You, atop the "you" sheet, and the name and look editor in its place. */
 .gsheet__me { display: flex; align-items: center; gap: 10px; }
-.gsheet__mename { flex: 1; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gsheet__mename { flex: 1; min-width: 0; display: flex; flex-direction: column; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gsheet__mename small { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
 .gsheet__edit-btn {
   flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
   border: 1px solid var(--line); border-radius: 999px; background: var(--card);
   color: var(--ink-soft); font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .gsheet__edit-btn svg { width: 14px; height: 14px; }
+.gsheet__icon-btn { padding: 7px; }
+/* The "you" sheet fits the keyboard's height without scrolling: tighter. */
+.gsheet--me { gap: 10px; }
+.gsheet--me .profile__badges { padding-top: 0; }
+.gsheet--me .profile__badges ul { margin-top: 8px; gap: 4px; }
 .gsheet__edit { display: flex; flex-direction: column; gap: 12px; }
+/* The achievements shelf's empty segments are the sheet's own grey, so a
+   shade darker here to show. */
+.gsheet .profile__shelf span:not(.is-earned) { background: var(--line); }
 /* The QR card and the room menu, laid in the sheet rather than popping up. */
 .gsheet .profile__pop { position: static; width: auto; box-shadow: none; }
 /* The players as a list here, not the strip the drawer's phone layout uses. */

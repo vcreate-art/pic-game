@@ -59,7 +59,6 @@ export function ProfileChip() {
 
   const played = totalPlayed(stats);
   const won = totalWon(stats);
-  const earned = ACHIEVEMENTS.filter((a) => stats.unlocked[a.id]).length;
 
   return (
     <div className="profile" ref={box}>
@@ -85,28 +84,7 @@ export function ProfileChip() {
             </button>
           </div>
 
-          <div className="profile__badges">
-            <p className="profile__count">{earned} of {ACHIEVEMENTS.length} achievements</p>
-            {/* One segment per achievement, so the bar is the whole shelf. */}
-            <div className="profile__shelf" aria-hidden="true">
-              {ACHIEVEMENTS.map((a, i) => (
-                <span key={a.id} className={i < earned ? 'is-earned' : ''} />
-              ))}
-            </div>
-            <ul>
-              {byRelevance(stats).slice(0, PEEK).map((a) => {
-                const at = stats.unlocked[a.id];
-                const n = Math.min(a.progress(stats), a.goal);
-                return (
-                  <li key={a.id} className={at ? 'is-earned' : ''}>
-                    <span className="profile__badge" aria-hidden="true">{at ? <Trophy /> : <Lock />}</span>
-                    <span className="profile__badgename">{a.title}</span>
-                    {!at && a.goal > 1 && <span className="profile__badgeat">{n} of {a.goal}</span>}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+          <ProfileBadges peek={PEEK} />
 
           {/* Following a link out of a room would leave it, so not from there. */}
           {inRoom ? (
@@ -180,5 +158,40 @@ export function ProfileEditor({ className, onDone }: { className?: string; onDon
       </div>
       {inRoom && <p className="profile__note">Everyone in the room sees the change.</p>}
     </form>
+  );
+}
+
+/**
+ * Your achievements: how many of them, as a count and a shelf with one
+ * segment each, and the badges, most relevant first. The header menu peeks
+ * at a few; the phone's "you" sheet, which scrolls, shows them all.
+ */
+export function ProfileBadges({ peek }: { peek?: number }) {
+  const stats = useStats();
+  const earned = ACHIEVEMENTS.filter((a) => stats.unlocked[a.id]).length;
+  const badges = byRelevance(stats);
+  return (
+    <div className="profile__badges">
+      <p className="profile__count">{earned} of {ACHIEVEMENTS.length} achievements</p>
+      {/* One segment per achievement, so the bar is the whole shelf. */}
+      <div className="profile__shelf" aria-hidden="true">
+        {ACHIEVEMENTS.map((a, i) => (
+          <span key={a.id} className={i < earned ? 'is-earned' : ''} />
+        ))}
+      </div>
+      <ul>
+        {(peek ? badges.slice(0, peek) : badges).map((a) => {
+          const at = stats.unlocked[a.id];
+          const n = Math.min(a.progress(stats), a.goal);
+          return (
+            <li key={a.id} className={at ? 'is-earned' : ''}>
+              <span className="profile__badge" aria-hidden="true">{at ? <Trophy /> : <Lock />}</span>
+              <span className="profile__badgename">{a.title}</span>
+              {!at && a.goal > 1 && <span className="profile__badgeat">{n} of {a.goal}</span>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
