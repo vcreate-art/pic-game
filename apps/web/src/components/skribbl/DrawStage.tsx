@@ -33,6 +33,9 @@ type Sheet = 'players' | 'me' | null;
 const SHEET_PX = 320;
 const SHEET_RATIO = 0.55;
 
+/** How long the note on a tap of the shut guess box stays. */
+const NO_CHAT_MS = 2200;
+
 /** How long Clear waits for its second tap. */
 const CLEAR_CONFIRM_MS = 3000;
 
@@ -45,6 +48,32 @@ export function DrawStage() {
   const meRef = useRef<HTMLButtonElement>(null);
   const headRef = useRef<HTMLElement>(null);
   const box = useGuessBox();
+  // When the shut box was last tapped: its note shows for a moment after.
+  const [noChat, setNoChat] = useState(0);
+  // Gone after a moment, or as soon as anything else is touched (a sheet
+  // opening, the tools, the drawing) or the page is left, so it never hangs
+  // over what comes next.
+  useEffect(() => {
+    if (!noChat) return;
+    const dismiss = () => setNoChat(0);
+    const t = setTimeout(dismiss, NO_CHAT_MS);
+    const away = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.('.dstage__foot .chat__input')) dismiss();
+    };
+    const hidden = () => document.hidden && dismiss();
+    document.addEventListener('pointerdown', away, true);
+    document.addEventListener('visibilitychange', hidden);
+    window.addEventListener('blur', dismiss);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('pointerdown', away, true);
+      document.removeEventListener('visibilitychange', hidden);
+      window.removeEventListener('blur', dismiss);
+    };
+  }, [noChat]);
+  useEffect(() => {
+    if (sheet) setNoChat(0);
+  }, [sheet]);
 
   if (!room) return null;
   const phase = room.phase;
@@ -125,9 +154,15 @@ export function DrawStage() {
             aria-label="Your guess"
             data-empty=""
             data-placeholder={box.placeholder}
-            // As tapping the guess box does when guessing: back to the chat.
-            onClick={() => setSheet(null)}
+            // As tapping the guess box does when guessing: back to the chat;
+            // with no sheet to close, a word on why it won't type.
+            onClick={() => (sheet ? setSheet(null) : setNoChat(Date.now()))}
           />
+          {noChat > 0 && (
+            <span key={noChat} className="dstage__nochat" role="status">
+              You can’t chat while you’re drawing
+            </span>
+          )}
         </div>
         <button
           type="button"
