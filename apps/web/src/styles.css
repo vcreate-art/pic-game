@@ -828,22 +828,49 @@ button, input { font: inherit; color: inherit; }
 .gstage__foot { position: relative; margin-top: auto; flex: none; }
 
 /* The chat hangs over everything above the guess box: newest at the bottom,
-   older lines fading as they climb. It never takes a tap. */
+   older lines fading as they climb, and a drag scrolls back through them. A
+   tap on it acts as one on the drawing. */
 .gstage__chat {
   position: absolute; left: 0; right: 0; bottom: 100%;
-  display: flex; flex-direction: column; justify-content: flex-end; gap: 4px;
-  padding: 0 12px 8px; overflow: hidden; pointer-events: none;
-  -webkit-mask-image: linear-gradient(to top, #000 45%, transparent);
-  mask-image: linear-gradient(to top, #000 45%, transparent);
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 0 12px 8px; overflow-x: hidden; overflow-y: auto;
+  /* The stage allows no gestures; the chat takes back the vertical drag, and
+     its scroll ends here rather than passing to the page. */
+  touch-action: pan-y; overscroll-behavior: contain; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to top, #000 45%, rgba(0, 0, 0, var(--fade-to)));
+  mask-image: linear-gradient(to top, #000 45%, rgba(0, 0, 0, var(--fade-to)));
+  --fade-to: 0; transition: --fade-to .25s ease;
 }
+/* While someone reads back through the chat, no fade: the top end goes
+   solid too. Registered so it eases; a browser without @property snaps. */
+@property --fade-to { syntax: '<number>'; inherits: false; initial-value: 0; }
+.gstage__chat.is-reading { --fade-to: 1; }
+.gstage__chat::-webkit-scrollbar { display: none; }
+/* Down to the bottom when there's room to spare. Not justify-content:
+   flex-end, which leaves what overflows the top out of reach of the scroll. */
+.gstage__chat > :first-child { margin-top: auto; }
 .gstage__chat .msg {
-  align-self: flex-start; max-width: 85%;
+  flex: none; align-self: flex-start; max-width: 85%;
   background: rgba(255, 255, 255, .86); box-shadow: 0 1px 3px rgba(31, 34, 51, .12);
   -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
 }
 .gstage__chat .msg--correct { background: rgba(220, 252, 231, .94); }
 .gstage__chat .msg--close { background: rgba(254, 243, 199, .94); }
-.gstage__chat .msg--divider { align-self: stretch; }
+/* With the whole screen, solid down the gap under the drawing and fading
+   only over it. */
+.gstage__chat.is-roomy {
+  -webkit-mask-image: linear-gradient(to top, #000 var(--solid), rgba(0, 0, 0, var(--fade-to)) calc(var(--solid) + var(--fade)));
+  mask-image: linear-gradient(to top, #000 var(--solid), rgba(0, 0, 0, var(--fade-to)) calc(var(--solid) + var(--fade)));
+}
+/* The turn marker, quieter here than in the side chat: a small pill on the
+   left like the messages, no rules across the drawing, no capitals. */
+.gstage__chat .msg--divider {
+  flex: none; align-self: flex-start; margin: 4px 0 0; padding: 2px 8px; border-radius: 999px;
+  background: rgba(255, 255, 255, .7); box-shadow: none;
+  font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none;
+}
+.gstage__chat .msg--divider::before, .gstage__chat .msg--divider::after { content: none; }
+.gstage__chat .msg--divider span { max-width: none; }
 
 .gstage__form { padding: 8px 12px 6px; }
 .gstage__form .chat__input { font-size: 16px; background: var(--card); }

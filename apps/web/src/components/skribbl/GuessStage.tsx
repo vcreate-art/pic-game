@@ -37,6 +37,20 @@ const DOCK_HOLD_MS = 600;
 /** How long our own last word on the keyboard outranks the measurement,
  *  which lags behind it while the keys move. */
 const KEYBOARD_GRACE_MS = 600;
+/** How many messages show over the drawing while the keys or a sheet leave
+ *  it little room (older ones are a scroll away); with the whole screen, the
+ *  chat fills the gap instead. */
+const CRAMPED_MESSAGES = 3;
+/** How far from the bottom still counts as reading the newest, so a new
+ *  message scrolls into view rather than waiting under the fold. */
+const STICK_PX = 24;
+/** How long the chat waits, back at the newest message, before it folds:
+ *  a moment for the momentum of a scroll to finish. */
+const FOLD_MS = 500;
+/** How much of the stage the chat may take while someone reads back. */
+const READING_RATIO = 0.7;
+/** How far over the drawing the chat fades out, once it reaches it. */
+const FADE_PX = 96;
 
 export function GuessStage() {
   const room = useGame(selectSkribbl);
@@ -62,6 +76,73 @@ export function GuessStage() {
     if (bar) ro!.observe(bar);
     return () => ro?.disconnect();
   }, []);
+
+  // The drawing's and the foot's heights, for the gap between them: the
+  // room the chat has before it starts covering the drawing.
+  const boardRef = useRef<HTMLDivElement>(null);
+  const footRef = useRef<HTMLDivElement>(null);
+  const [boardHeight, setBoardHeight] = useState(0);
+  const [footHeight, setFootHeight] = useState(0);
+  useLayoutEffect(() => {
+    const board = boardRef.current;
+    const foot = footRef.current;
+    if (!board || !foot) return;
+    const measure = () => {
+      setBoardHeight(board.getBoundingClientRect().height);
+      setFootHeight(foot.getBoundingClientRect().height);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(board);
+    ro.observe(foot);
+    return () => ro.disconnect();
+    // Again once the room arrives: before it, there's nothing to measure.
+  }, [Boolean(room)]);
+
+  // The chat scrolls. Cramped, it's as tall as its last few messages; and
+  // whoever is reading the newest keeps up with them as more arrive.
+  const chatRef = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+
+  // Scrolling back through the chat opens it: taller, and without the fade,
+  // so older lines are readable. It stays open for as long as they read,
+  // and folds once they scroll back down to the newest, or tap, type or send
+  // to get on with guessing. Only their own scrolling opens it: the chat
+  // following new messages doesn't.
+  const [reading, setReading] = useState(false);
+  const touching = useRef(false);
+  const byHand = useRef(false);
+  const foldTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const fold = () => {
+    clearTimeout(foldTimer.current);
+    atBottom.current = true;
+    setReading(false);
+  };
+  /** Folds once they've stayed at the newest, finger lifted, for a moment. */
+  const foldAtNewest = () => {
+    clearTimeout(foldTimer.current);
+    foldTimer.current = setTimeout(() => {
+      if (!touching.current && atBottom.current) fold();
+    }, FOLD_MS);
+  };
+  useEffect(() => () => clearTimeout(foldTimer.current), []);
+  const [crampedHeight, setCrampedHeight] = useState(0);
+  const shownHeight = useRef(0);
+  useLayoutEffect(() => {
+    const el = chatRef.current;
+    if (!el) return;
+    const rows = el.children;
+    const first = rows[Math.max(0, rows.length - CRAMPED_MESSAGES)] as HTMLElement | undefined;
+    const last = rows[rows.length - 1] as HTMLElement | undefined;
+    const pad = parseFloat(getComputedStyle(el).paddingBottom) || 0;
+    setCrampedHeight(first && last ? last.offsetTop + last.offsetHeight - first.offsetTop + pad : 0);
+    // Opening and folding move the chat's top edge; this keeps the lines
+    // where they were on screen, or at the newest for whoever is there.
+    const grew = el.clientHeight - shownHeight.current;
+    shownHeight.current = el.clientHeight;
+    if (atBottom.current) el.scrollTop = el.scrollHeight;
+    else if (grew) el.scrollTop -= grew;
+  });
 
   // The bottom of the screen is held by the keyboard, or by the sheet that
   // took its place at its height; for a moment during a swap, both.
@@ -152,22 +233,66 @@ export function GuessStage() {
   if (!room) return null;
   const phase = room.phase;
   const guessing = !sheet && keyboardIsUp();
+  // With the keys or a sheet up, a few lines over the drawing; with neither,
+  // as many as fit, solid down the gap and fading only once over the drawing.
+  const cramped = dockHeight > 0;
+  const gap = Math.max(0, stageHeight - boardHeight - footHeight);
+  const tapStage = () => {
+    fold();
+    if (sheet) closeSheet();
+    else if (!keyboardIsUp()) focusInput();
+  };
 
   return (
     <div className="gstage" style={{ top: stageTop, height: stageHeight }}>
       {/* A tap on the drawing asks for the keyboard, like tapping a text. */}
-      <div className="gstage__board board__wrap" onClick={() => (sheet ? closeSheet() : !keyboardIsUp() && focusInput())}>
+      <div ref={boardRef} className="gstage__board board__wrap" onClick={tapStage}>
         <CanvasBoard />
         {phase === 'choosing' && <WordChoice />}
         {phase === 'turnEnd' && <TurnResult />}
         {phase === 'gameEnd' && <Podium />}
       </div>
 
-      <div className="gstage__foot">
+      <div ref={footRef} className="gstage__foot">
       {/* Newest at the bottom, just over the guess box; older lines climb and
           fade, over the drawing if they reach it. */}
-      <div className="gstage__chat" aria-live="polite" style={{ maxHeight: Math.round(stageHeight * 0.7) }}>
-        {messages.slice(-30).map((m) =>
+      <div
+        ref={chatRef}
+        className={`gstage__chat ${cramped ? '' : 'is-roomy'} ${reading ? 'is-reading' : ''}`}
+        aria-live="polite"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_PX;
+          if (!byHand.current) return;
+          if (atBottom.current) return foldAtNewest();
+          clearTimeout(foldTimer.current);
+          setReading(true);
+        }}
+        onTouchStart={() => {
+          touching.current = true;
+          byHand.current = true;
+        }}
+        onTouchEnd={() => {
+          touching.current = false;
+          if (atBottom.current) foldAtNewest();
+        }}
+        onTouchCancel={() => {
+          touching.current = false;
+          if (atBottom.current) foldAtNewest();
+        }}
+        onWheel={() => (byHand.current = true)}
+        onClick={tapStage}
+        style={{
+          maxHeight: reading
+            ? Math.max(Math.round(stageHeight * READING_RATIO), cramped ? crampedHeight : gap + FADE_PX)
+            : cramped
+              ? crampedHeight || undefined
+              : gap + FADE_PX,
+          ['--solid' as string]: `${gap}px`,
+          ['--fade' as string]: `${FADE_PX}px`,
+        }}
+      >
+        {messages.slice(-50).map((m) =>
           m.kind === 'divider' ? (
             <div key={m.id} className="msg--divider" role="separator">
               <span>{m.text}</span>
@@ -182,7 +307,13 @@ export function GuessStage() {
         )}
       </div>
 
-      <form className="gstage__form" onSubmit={box.send}>
+      <form
+        className="gstage__form"
+        onSubmit={(e) => {
+          fold();
+          box.send(e);
+        }}
+      >
         <div className="chat__field">
           <input
             ref={input}
@@ -192,7 +323,10 @@ export function GuessStage() {
             disabled={box.locked}
             placeholder={box.placeholder}
             onChange={(e) => box.setText(e.target.value)}
-            onFocus={() => sheet && setSheet(null)}
+            onFocus={() => {
+              fold();
+              if (sheet) setSheet(null);
+            }}
             aria-label="Your guess"
             enterKeyHint="send"
             {...noAutofill}
