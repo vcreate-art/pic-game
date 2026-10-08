@@ -51,6 +51,11 @@ On a desktop, the drawing toolbar gets **icons**, a **brush size picker**,
 brush size, 1–8 and Shift+1–8 colours, Z undo, Shift+Z redo), each shown in
 its tooltip.
 
+Drawing with a mouse, the cursor is a **ring the size and colour of your
+brush** (grey for the eraser). With the fill tool it's a **paint bucket**
+with its drip in your colour, and the **area a click would fill shows**
+under it before you click.
+
 ### Player-suggested words removed
 
 Draw & Guess no longer has the option for the other players to suggest the
