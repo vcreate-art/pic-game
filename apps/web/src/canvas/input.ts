@@ -39,7 +39,8 @@ export class DrawInput {
    *  the hold. */
   private restAt: [number, number] | null = null;
   private holdTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Snapped: the rest of this stroke's movement is ignored until it ends. */
+  /** Snapped: held still since, the stroke is the shape. Drawn on from
+   *  there, it goes back to as drawn, and carries on. */
   private snapped = false;
 
   constructor(
@@ -112,7 +113,13 @@ export class DrawInput {
   private onMove = (e: PointerEvent): void => {
     if (!this.enabled || !this.strokeId || !this.canvas) return;
     e.preventDefault();
-    if (this.snapped) return;
+    if (this.snapped) {
+      // Still holding: the shape stays. Drawing on: back to as drawn, which
+      // goes on from here (and may snap again at the next hold).
+      if (!this.restAt || Math.hypot(e.clientX - this.restAt[0], e.clientY - this.restAt[1]) <= HOLD_SLOP_PX) return;
+      this.snapped = false;
+      this.sink.replace(this.strokeId, [...this.strokePts]);
+    }
 
     // Browsers throttle pointermove to the frame rate but retain the samples in
     // between; taking the coalesced list keeps fast strokes smooth instead of angular.

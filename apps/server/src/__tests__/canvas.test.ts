@@ -123,6 +123,19 @@ describe('snapping a stroke to a shape', () => {
     expect(room.ops[1]!.kind).toBe('fill');
   });
 
+  it('takes the stroke back to as drawn and on, when drawing carries on', () => {
+    const { room, sent, drawer } = drawing();
+    room.strokeStart(drawer, { id: 'a', tool: 'pen', color: '#000000', size: 10, pts: [1, 2] });
+    room.strokeAppend(drawer, 'a', [3, 4, 5, 6]);
+    room.replaceStroke(drawer, 'a', [10, 20, 30, 40]); // snapped
+    room.replaceStroke(drawer, 'a', [1, 2, 3, 4, 5, 6]); // drawn on: back as drawn
+    room.strokeAppend(drawer, 'a', [7, 8]);
+    room.strokeEnd(drawer, 'a');
+    const op = room.ops[0]!;
+    expect(op.kind === 'stroke' && op.pts).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(sent.filter((m) => m.event === 'draw:replace')).toHaveLength(2);
+  });
+
   it('undo takes the snapped shape, as any stroke', () => {
     const { room, drawer } = drawing();
     stroke(room, drawer, 'a');
