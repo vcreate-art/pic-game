@@ -3,6 +3,7 @@ import { LOGICAL_H, LOGICAL_W } from '@pic-game/shared';
 import { getSocket } from '../net/socket.js';
 import { selectIsDrawer, useGame } from '../store/game.js';
 import { useTools } from '../store/tools.js';
+import { hexToRgb } from './engine.js';
 import { getEngine } from './engineInstance.js';
 import { DrawInput, type DrawSink } from './input.js';
 import { uid } from '../lib/uid.js';
@@ -72,6 +73,74 @@ export function CanvasBoard() {
   const { tool, color, size } = useTools();
   const cursor = useMemo(() => brushCursor(tool, color, size * scale), [tool, color, size, scale]);
 
+  // With the fill tool and a mouse, the area a click would fill, shown in its
+  // colour, faintly, under the pointer: worked out only when the pointer
+  // moves into another area or the picture changes.
+  const previewRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const view = previewRef.current;
+    const ctx = view?.getContext('2d');
+    if (!canvas || !view || !ctx) return;
+    const clear = () => ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
+    if (!isDrawer || tool !== 'fill') {
+      clear();
+      return;
+    }
+    const engine = getEngine();
+    const [r, g, b] = hexToRgb(color);
+    let shown: Uint8Array | null = null;
+    let seenVersion = -1;
+    let at: [number, number] | null = null;
+    let frame = 0;
+    const draw = () => {
+      frame = 0;
+      if (!at) return;
+      const [x, y] = at;
+      const pixel = Math.round(y) * LOGICAL_W + Math.round(x);
+      if (shown?.[pixel] && seenVersion === engine.version) return;
+      shown = engine.fillArea(x, y, color);
+      seenVersion = engine.version;
+      clear();
+      if (!shown) return;
+      const img = ctx.createImageData(LOGICAL_W, LOGICAL_H);
+      for (let i = 0; i < shown.length; i++) {
+        if (!shown[i]) continue;
+        img.data[i * 4] = r;
+        img.data[i * 4 + 1] = g;
+        img.data[i * 4 + 2] = b;
+        img.data[i * 4 + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+    };
+    const look = () => {
+      if (!frame) frame = requestAnimationFrame(draw);
+    };
+    const move = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse') return;
+      const box = canvas.getBoundingClientRect();
+      at = [((e.clientX - box.left) / box.width) * LOGICAL_W, ((e.clientY - box.top) / box.height) * LOGICAL_H];
+      look();
+    };
+    const leave = () => {
+      at = null;
+      shown = null;
+      clear();
+    };
+    // A click fills: look again once the picture has changed under it.
+    const filled = () => setTimeout(look, 30);
+    canvas.addEventListener('pointermove', move);
+    canvas.addEventListener('pointerleave', leave);
+    canvas.addEventListener('pointerup', filled);
+    return () => {
+      cancelAnimationFrame(frame);
+      canvas.removeEventListener('pointermove', move);
+      canvas.removeEventListener('pointerleave', leave);
+      canvas.removeEventListener('pointerup', filled);
+      clear();
+    };
+  }, [isDrawer, tool, color]);
+
   // Re-checked whenever the turn changes, so input dies the instant the turn ends.
   useEffect(() => {
     inputRef.current?.setEnabled(isDrawer);
@@ -85,6 +154,7 @@ export function CanvasBoard() {
         // Stops the browser scrolling or text-selecting under a drawing finger.
         style={{ touchAction: 'none', ...(isDrawer ? { cursor } : {}) }}
       />
+      <canvas ref={previewRef} className="board__preview" width={LOGICAL_W} height={LOGICAL_H} aria-hidden="true" />
       {!isDrawer && <div className="board__lock" aria-hidden="true" />}
     </div>
   );
