@@ -115,7 +115,8 @@ export function useMe() {
   return useGame((s) => s.room?.players.find((p) => p.id === s.me));
 }
 
-/** Your avatar before the guess box: opens the "you" sheet.
+/** Your avatar before the guess box, with your place in the game on it as
+ *  a badge: opens the "you" sheet.
  *  preventDefault on pointerdown keeps it from taking focus off the box. */
 export function MeButton({
   btnRef,
@@ -127,6 +128,11 @@ export function MeButton({
   onToggle: () => void;
 }) {
   const me = useMe();
+  // Where you stand, ranked as the players list ranks: by score.
+  const rank = useGame((s) => {
+    const ranked = [...(s.room?.players ?? [])].sort((a, b) => b.score - a.score);
+    return ranked.findIndex((p) => p.id === s.me) + 1;
+  });
   if (!me) return null;
   return (
     <button
@@ -134,11 +140,16 @@ export function MeButton({
       type="button"
       className={`gstage__mebtn ${on ? 'is-on' : ''}`}
       aria-pressed={on}
-      aria-label="You and the room"
+      aria-label={rank ? `You, in place ${rank}, and the room` : 'You and the room'}
       onPointerDown={(e) => e.preventDefault()}
       onClick={onToggle}
     >
       <Avatar data={me.avatar} size={ME_AVATAR_PX} />
+      {rank > 0 && (
+        <span className="gstage__merank" aria-hidden="true">
+          {rank}
+        </span>
+      )}
     </button>
   );
 }
