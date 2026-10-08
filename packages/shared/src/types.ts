@@ -38,15 +38,8 @@ export interface Player {
   connected: boolean;
 }
 
-/** `builtin` draws from the shipped word list; `players` has the non-drawing
- *  players suggest the words the drawer picks from. */
-export type WordMode = 'builtin' | 'players';
-
-export const WORD_MODES: readonly WordMode[] = ['builtin', 'players'];
-
-/** Where the game's own words come from: the shipped list, the host's words
- *  alone, or both together. In players mode these fill the gaps suggestions
- *  leave. */
+/** Where the game's words come from: the shipped list, the host's words
+ *  alone, or both together. */
 export const WORD_SOURCES: readonly WordSource[] = ['builtin', 'mixed', 'custom'];
 
 export const CUSTOM_WORDS = {
@@ -57,11 +50,8 @@ export const CUSTOM_WORDS = {
   minForGame: 10,
 } as const;
 
-/** Seconds the drawer gets to pick, once the options are on the table. */
+/** Seconds the drawer gets to pick a word. */
 export const CHOOSE_SECONDS = 15;
-/** Backstop for the suggestion window. It normally closes early, the moment
- *  every connected player has sent a word. */
-export const SUGGEST_SECONDS = 25;
 
 export interface RoomSettings {
   rounds: number;
@@ -70,7 +60,6 @@ export interface RoomSettings {
   wordChoices: number;
   hints: number;
   maxPlayers: number;
-  wordMode: WordMode;
   wordSource: WordSource;
   /** The host's words. Replaced wholesale via `room:words`, never patched. */
   customWords: string[];
@@ -82,7 +71,6 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   wordChoices: 3,
   hints: 2,
   maxPlayers: 12,
-  wordMode: 'builtin',
   wordSource: 'builtin',
   customWords: [],
 };

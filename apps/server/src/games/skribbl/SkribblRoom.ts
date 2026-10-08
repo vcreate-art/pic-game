@@ -1,15 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import {
-  CUSTOM_WORDS, DEFAULT_SETTINGS, SETTINGS_BOUNDS, WORDS_EN, WORD_MODES, WORD_SOURCES,
-  authorPoints, drawerPoints, guessPoints, judge, maskOf, parseDrawWords, pickHintPositions,
-  suggestionKey, validateSuggestion,
+  CUSTOM_WORDS, DEFAULT_SETTINGS, SETTINGS_BOUNDS, WORDS_EN, WORD_SOURCES,
+  drawerPoints, guessPoints, judge, maskOf, parseDrawWords, pickHintPositions,
+  suggestionKey,
   type CanvasOp, type ChatMessage, type Drawing, type Phase, type Player,
-  type RoomSettings, type RoomState, type SuggestAck, type TurnPublic,
+  type RoomSettings, type RoomState, type TurnPublic,
   type Vote, type WordOption,
 } from '@pic-game/shared';
 import {
   CHOOSE_SECONDS, GAME_END_SECONDS, MAX_CHAT_LEN, MAX_OPS_PER_TURN,
-  SUGGEST_SECONDS, TURN_END_SECONDS, EMPTY_ROOM_TTL_MS,
+  TURN_END_SECONDS, EMPTY_ROOM_TTL_MS,
 } from '../../config.js';
 import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
 import { topScorers } from '../../core/RoomSession.js';
@@ -38,22 +38,9 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
   // ---- current turn (word is private to this object and the drawer's socket) ----
   private word: string | null = null;
-  /** Built-in words offered when there are not enough suggestions to fill the
-   *  list. Indistinguishable from suggestions on the wire — labelling them would
-   *  tell the drawer which options belong to somebody. */
-  private padding: WordOption[] = [];
-  /** playerId -> their current suggestion. A Map keeps insertion order when a
-   *  key is overwritten, so re-suggesting does not jump the list. */
-  private suggestions = new Map<string, WordOption>();
-  /** Every option shown this turn, by id. Append-only, so a pick still resolves
-   *  even after the option scrolled off the drawer's visible list. */
-  private offered = new Map<string, { text: string; authorId: string | null }>();
-  /** Who suggested the chosen word. Null in builtin mode or on a padded pick. */
-  private authorId: string | null = null;
-  /** Within the `choosing` phase: false while suggestions are still being
-   *  collected, true once the drawer has the list in front of them. Always true
-   *  straight away in builtin mode. */
-  private picking = false;
+  /** The words on offer to the drawer this turn, by id. */
+  private offered = new Map<string, string>();
+  private options: WordOption[] = [];
   drawerId: string | null = null;
   private mask = '';
   private revealed: Record<number, string> = {};
@@ -118,7 +105,6 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     }
     if (this.phase === 'drawing') this.startHints();
     this.io.to(this.code).emit('turn:clock', { endsAt: this.endsAt });
-    if (this.phase === 'choosing' && this.playerWords) this.broadcastSuggestState();
   }
 
   protected resetToLobby(): void {
@@ -144,32 +130,18 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     return { ...base, guessedAt: null, placement: null };
   }
 
-  /** A player back mid-window counts again, so the tally has to say so. */
-  protected override onPlayerReconnected(_p: ServerPlayer): void {
-    if (this.phase === 'choosing' && this.playerWords) {
-      queueMicrotask(() => this.broadcastSuggestState());
-    }
-  }
-
   protected override onPlayerDisconnected(p: ServerPlayer): boolean {
     if (this.drawerId === p.id && (this.phase === 'drawing' || this.phase === 'choosing')) {
       this.endTurn('drawer-left');
       return true;
     }
     this.checkTurnComplete();
-    // Nobody waits on a player who dropped out mid-window.
-    this.broadcastSuggestState();
-    this.maybeOpenPicking();
     return true;
   }
 
   protected override onPlayerRemoved(playerId: string): boolean {
     if (this.drawerId === playerId && (this.phase === 'drawing' || this.phase === 'choosing')) {
       this.endTurn('drawer-left');
-    } else if (this.phase === 'choosing') {
-      this.suggestions.delete(playerId);
-      this.broadcastSuggestState();
-      this.maybeOpenPicking();
     }
     return true;
   }
@@ -193,9 +165,6 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
       this.settings[key] = Math.round(Math.max(bounds.min, Math.min(bounds.max, v)));
     }
     // Handled apart from the numeric bounds loop above.
-    if (patch.wordMode && WORD_MODES.includes(patch.wordMode)) {
-      this.settings.wordMode = patch.wordMode;
-    }
     if (patch.wordSource && WORD_SOURCES.includes(patch.wordSource)) {
       this.settings.wordSource = patch.wordSource;
     }
@@ -220,10 +189,6 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
         return [...WORDS_EN, ...custom.filter((w) => !builtin.has(suggestionKey(w)))];
       }
     }
-  }
-
-  private get playerWords(): boolean {
-    return this.settings.wordMode === 'players';
   }
 
   // ------------------------------------------------------------------ game loop
@@ -264,133 +229,32 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.undone = [];
     this.cleared = [];
 
-    // Always stock a full list of built-ins. In players mode these are padding
-    // that suggestions push out; in builtin mode they are the whole list.
-    this.padding = pickWords(this.settings.wordChoices, this.usedWords, this.wordPool() ?? WORDS_EN).map((text) => {
+    this.options = pickWords(this.settings.wordChoices, this.usedWords, this.wordPool() ?? WORDS_EN).map((text) => {
       const id = randomUUID();
-      this.offered.set(id, { text, authorId: null });
+      this.offered.set(id, text);
       return { id, text };
     });
 
     this.io.to(this.code).emit('canvas:cleared');
-
-    if (!this.playerWords) {
-      this.openPicking();
-      return;
-    }
-
-    // Collect first. The drawer is shown nothing until everyone has had their
-    // say, so no one's word can be beaten to the punch by a faster typist.
-    this.picking = false;
-    this.endsAt = Date.now() + SUGGEST_SECONDS * 1000;
+    this.endsAt = Date.now() + CHOOSE_SECONDS * 1000;
     this.io.to(this.code).emit('turn:choosing', {
       drawerId: drawer.id,
       round: this.round,
       endsAt: this.endsAt,
     });
-    this.broadcastSuggestState();
-
-    // Backstop only: the window normally closes early, as soon as everyone is in.
-    this.schedule(SUGGEST_SECONDS * 1000, () => this.openPicking());
-
-    // A room where the drawer is the only one connected has nobody to wait for.
-    this.maybeOpenPicking();
-  }
-
-  /** Connected players who are expected to suggest this turn. */
-  private expectedSuggesters(): ServerPlayer[] {
-    return [...this.players.values()].filter((p) => p.connected && p.id !== this.drawerId);
-  }
-
-  /** Someone who drops out mid-window is no longer waited on. */
-  private everyoneSuggested(): boolean {
-    const expected = this.expectedSuggesters();
-    if (expected.length === 0) return true;
-    return expected.every((p) => this.suggestions.has(p.id));
-  }
-
-  maybeOpenPicking(): void {
-    if (this.phase !== 'choosing' || this.picking || !this.playerWords) return;
-    if (this.everyoneSuggested()) this.openPicking();
-  }
-
-  /** Closes the suggestion window and hands the list to the drawer, restarting
-   *  the clock so they get a full turn to choose however long collecting took. */
-  private openPicking(): void {
-    if (this.phase !== 'choosing' || this.picking || !this.drawerId) return;
-    this.picking = true;
-    this.clearTimers();
-    this.endsAt = Date.now() + CHOOSE_SECONDS * 1000;
-
-    this.io.to(this.code).emit('turn:choosing', {
-      drawerId: this.drawerId,
-      round: this.round,
-      endsAt: this.endsAt,
-    });
     this.sendOptions();
-    if (this.playerWords) this.broadcastSuggestState();
-
     this.schedule(CHOOSE_SECONDS * 1000, () => this.autoChoose());
   }
 
-  /** The drawer's visible list: suggestions first, topped up with padding. */
-  private optionsForDrawer(): WordOption[] {
-    const suggested = [...this.suggestions.values()];
-    const shortfall = Math.max(0, this.settings.wordChoices - suggested.length);
-    return [...suggested, ...this.padding.slice(0, shortfall)];
-  }
-
-  /** Nothing is sent before `picking`: the option list is the one thing that
-   *  must not reach the drawer while people are still writing. */
+  /** The word options, to the drawer's socket alone. */
   private sendOptions(): void {
-    if (!this.drawerId || this.phase !== 'choosing' || !this.picking) return;
+    if (!this.drawerId || this.phase !== 'choosing') return;
     this.emitTo(this.drawerId, 'turn:choosing', {
       drawerId: this.drawerId,
       round: this.round,
       endsAt: this.endsAt,
-      words: this.optionsForDrawer(),
+      words: this.options,
     });
-  }
-
-  private broadcastSuggestState(): void {
-    this.io.to(this.code).emit('suggest:state', {
-      open: this.phase === 'choosing' && this.playerWords && !this.picking,
-      endsAt: this.endsAt,
-      count: this.suggestions.size,
-      expected: this.expectedSuggesters().length,
-      ready: this.picking,
-    });
-  }
-
-  /**
-   * Records a player's word for this turn. Replacing an earlier suggestion keeps
-   * the old id registered in `offered` rather than deleting it, so a pick that
-   * crosses in flight still resolves instead of silently failing.
-   */
-  suggestWord(playerId: string, raw: unknown): SuggestAck {
-    if (!this.playerWords) return { ok: false, message: 'This room uses the built-in words.' };
-    if (this.phase !== 'choosing' || this.picking) {
-      return { ok: false, message: 'Not taking suggestions right now.' };
-    }
-    if (playerId === this.drawerId) return { ok: false, message: "You're picking this turn, not suggesting." };
-    if (!this.players.has(playerId)) return { ok: false, message: 'You are not in this room.' };
-
-    const taken = new Set<string>();
-    for (const [pid, opt] of this.suggestions) {
-      if (pid !== playerId) taken.add(suggestionKey(opt.text));
-    }
-
-    const result = validateSuggestion(raw, taken);
-    if (!result.ok) return { ok: false, message: result.message };
-
-    const id = randomUUID();
-    this.offered.set(id, { text: result.text, authorId: playerId });
-    this.suggestions.set(playerId, { id, text: result.text });
-
-    this.broadcastSuggestState();
-    // Last one in closes the window immediately rather than burning the backstop.
-    this.maybeOpenPicking();
-    return { ok: true, text: result.text };
   }
 
   private nextConnectedDrawer(): ServerPlayer | null {
@@ -407,42 +271,27 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
   chooseWord(playerId: string, id: string): void {
     if (this.phase !== 'choosing' || playerId !== this.drawerId) return;
-    const option = this.offered.get(id);
-    if (!option) return;
-    this.commitWord(option);
+    const word = this.offered.get(id);
+    if (!word) return;
+    this.commitWord(word);
   }
 
-  /**
-   * Deadline reached with no pick from the drawer.
-   *
-   * Real suggestions win over padding whenever any exist: the built-ins are only
-   * there so the drawer always has something to choose between, and letting them
-   * take the auto-pick would throw away a word somebody bothered to write — with
-   * one suggestion against two padded slots, it would do so two times in three.
-   *
-   * Random within that set rather than first, so suggesting early cannot farm a
-   * predictable slot.
-   */
+  /** Deadline reached with no pick from the drawer: one of the options, at random. */
   private autoChoose(): void {
     if (this.phase !== 'choosing') return;
-    const suggested = [...this.suggestions.values()];
-    const options = suggested.length > 0 ? suggested : this.optionsForDrawer();
-    const pick = options[Math.floor(Math.random() * options.length)];
-    const option = pick ? this.offered.get(pick.id) : undefined;
-    if (!option) {
+    const pick = this.options[Math.floor(Math.random() * this.options.length)];
+    if (!pick) {
       this.abortToLobby();
       return;
     }
-    this.commitWord(option);
+    this.commitWord(pick.text);
   }
 
-  private commitWord(option: { text: string; authorId: string | null }): void {
+  private commitWord(word: string): void {
     const playerId = this.drawerId;
     if (!playerId) return;
-    const word = option.text;
 
     this.clearTimers();
-    this.authorId = option.authorId;
     this.word = word;
     this.usedWords.add(word);
     this.mask = maskOf(word);
@@ -456,7 +305,6 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
     // The one place the word leaves this object, addressed to a single socket.
     this.emitTo(playerId, 'word:secret', { word });
-    if (this.playerWords) this.broadcastSuggestState();
     const turn = this.turnPublic();
     if (turn) this.io.to(this.code).emit('turn:drawing', turn);
 
@@ -485,8 +333,6 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.clearTimers();
     const word = this.word ?? '';
 
-    const authorId = this.authorId;
-
     if (reason !== 'drawer-left' && this.drawerId) {
       const guessers = this.eligibleGuessers();
       const got = guessers.filter((p) => p.guessedAt !== null).length;
@@ -496,17 +342,6 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
         const pts = drawerPoints(got, guessers.length);
         drawer.score += pts;
         this.deltas[drawer.id] = (this.deltas[drawer.id] ?? 0) + pts;
-      }
-
-      // Pays more the fewer people cracked it, and nothing at all when nobody
-      // did — which is what stops "submit gibberish" being the winning play.
-      const author = authorId ? this.players.get(authorId) : undefined;
-      if (author) {
-        const pts = authorPoints(got, guessers.length);
-        if (pts > 0) {
-          author.score += pts;
-          this.deltas[author.id] = (this.deltas[author.id] ?? 0) + pts;
-        }
       }
     }
 
@@ -529,8 +364,6 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
       deltas: this.deltas,
       players: this.publicPlayers(),
       reason,
-      // First and only moment authorship becomes public.
-      ...(authorId ? { authorId } : {}),
     });
     this.word = null;
     this.schedule(TURN_END_SECONDS * 1000, () => this.nextTurn());
@@ -575,17 +408,14 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
   private resetTurnState(): void {
     this.word = null;
-    this.padding = [];
-    this.suggestions.clear();
+    this.options = [];
     this.offered.clear();
-    this.authorId = null;
     this.drawerId = null;
     this.mask = '';
     this.revealed = {};
     this.hintPositions = [];
     this.hintsShown = 0;
     this.deltas = {};
-    this.picking = false;
     this.openStrokes.clear();
     this.reactions = { likes: new Set(), dislikes: new Set() };
     for (const p of this.players.values()) {
@@ -793,19 +623,6 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
       return;
     }
 
-    // The author wrote this word, so typing it is not a guess. It is swallowed
-    // rather than rejected: falling through would broadcast it as ordinary chat
-    // and print the answer to everyone still guessing.
-    if (playerId === this.authorId && judge(text, this.word) === 'correct') {
-      this.emitTo(playerId, 'chat:message', {
-        id: randomUUID(),
-        kind: 'close',
-        text: "That's your own word — you can't score it, but you earn points if others get it.",
-        at: Date.now(),
-      });
-      return;
-    }
-
     const verdict = judge(text, this.word);
 
     if (verdict === 'correct') {
@@ -843,16 +660,9 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.checkTurnComplete();
   }
 
-  /**
-   * Who can actually win points this turn. The author is excluded along with the
-   * drawer — they already know the word. Leaving them in would also stop the
-   * "everybody guessed" early end from ever firing, since they never register a
-   * correct guess.
-   */
+  /** Who can win points this turn: everyone connected but the drawer. */
   private eligibleGuessers(): ServerPlayer[] {
-    return [...this.players.values()].filter(
-      (p) => p.id !== this.drawerId && p.id !== this.authorId && p.connected,
-    );
+    return [...this.players.values()].filter((p) => p.id !== this.drawerId && p.connected);
   }
 
   /** Once nobody is left guessing, sitting out the remaining clock is dead time. */
@@ -916,9 +726,6 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     }
     if (this.phase === 'choosing' && this.drawerId === playerId) {
       this.sendOptions();
-    }
-    if (this.phase === 'choosing' && this.playerWords) {
-      this.broadcastSuggestState();
     }
   }
 }

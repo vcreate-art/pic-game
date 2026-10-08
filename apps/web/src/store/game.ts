@@ -13,7 +13,6 @@ const MAX_MESSAGES = 200;
  *  switches to a different game, so nothing of the last one leaks into it. */
 const noGamePrivate = (): Partial<GameStore> => ({
   secret: null, choices: null, chooseEndsAt: null,
-  suggest: null, mySuggestion: null, suggestError: null,
   turnResult: null, final: null,
   realmsHand: [], realmsOwed: 0, spiesKey: null, bingoCard: null, cryptidClue: null,
   gallery: null, galleryOpen: false,
@@ -24,18 +23,6 @@ export interface TurnResult {
   deltas: Record<string, number>;
   players: Player[];
   reason: 'timeout' | 'all-guessed' | 'drawer-left';
-  /** Present only in the player-suggested mode, and only once the turn is over. */
-  authorId?: string;
-}
-
-export interface SuggestState {
-  open: boolean;
-  endsAt: number;
-  count: number;
-  /** Connected non-drawers still expected to send a word. */
-  expected: number;
-  /** Everyone is in: the drawer may pick. */
-  ready: boolean;
 }
 
 interface GameStore {
@@ -48,10 +35,6 @@ interface GameStore {
   /** Populated only on the drawer's client. */
   choices: WordOption[] | null;
   chooseEndsAt: number | null;
-  suggest: SuggestState | null;
-  /** Our own submitted word, echoed back by the server. Nobody else's. */
-  mySuggestion: string | null;
-  suggestError: string | null;
   messages: ChatMessage[];
   turnResult: TurnResult | null;
   final: Player[] | null;
@@ -87,9 +70,6 @@ interface GameStore {
   /** Moves the turn's deadline, after a pause pushed it back. */
   setTurnClock: (endsAt: number) => void;
   beginChoosing: (p: { drawerId: string; round: number; endsAt: number; words?: WordOption[] }) => void;
-  setSuggest: (s: SuggestState) => void;
-  setMySuggestion: (text: string | null) => void;
-  setSuggestError: (e: string | null) => void;
   setSecret: (w: string) => void;
   beginDrawing: (turn: NonNullable<SkribblRoomState['turn']>) => void;
   reveal: (index: number, char: string) => void;
@@ -135,9 +115,6 @@ export const useGame = create<GameStore>((set) => ({
   secret: null,
   choices: null,
   chooseEndsAt: null,
-  suggest: null,
-  mySuggestion: null,
-  suggestError: null,
   messages: [],
   turnResult: null,
   final: null,
@@ -191,7 +168,6 @@ export const useGame = create<GameStore>((set) => ({
   setTurnClock: (endsAt) =>
     set((s) => ({
       chooseEndsAt: s.chooseEndsAt === null ? null : endsAt,
-      suggest: s.suggest ? { ...s.suggest, endsAt } : null,
       room: s.room?.kind === 'skribbl' && s.room.turn ? { ...s.room, turn: { ...s.room.turn, endsAt } } : s.room,
     })),
 
@@ -203,8 +179,6 @@ export const useGame = create<GameStore>((set) => ({
       chooseEndsAt: p.endsAt,
       secret: null,
       turnResult: null,
-      mySuggestion: null,
-      suggestError: null,
       room: s.room?.kind === 'skribbl'
         ? {
             ...s.room,
@@ -228,15 +202,10 @@ export const useGame = create<GameStore>((set) => ({
 
   setSecret: (secret) => set({ secret }),
 
-  setSuggest: (suggest) => set({ suggest }),
-  setMySuggestion: (mySuggestion) => set({ mySuggestion, suggestError: null }),
-  setSuggestError: (suggestError) => set({ suggestError }),
-
   beginDrawing: (turn) =>
     set((s) => ({
       choices: null,
       chooseEndsAt: null,
-      suggest: null,
       room: s.room?.kind === 'skribbl' ? { ...s.room, phase: 'drawing', turn } : s.room,
     })),
 

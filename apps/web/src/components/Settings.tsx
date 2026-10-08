@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  CUSTOM_WORDS, SETTINGS_BOUNDS, WORDS_EN, type RoomSettings, type WordMode, type WordSource,
+  CUSTOM_WORDS, SETTINGS_BOUNDS, WORDS_EN, type RoomSettings, type WordSource,
 } from '@pic-game/shared';
 import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { getSocket } from '../net/socket.js';
@@ -65,38 +65,7 @@ export function Settings() {
         );
       })}
       <div className="settings__modes">
-        <span className="settings__label">Words</span>
-        <div className="modes">
-          {(
-            [
-              ['builtin', 'Built-in list', 'The game picks the words.'],
-              ['players', 'Players suggest', 'Everyone else proposes a word for the drawer.'],
-            ] as Array<[WordMode, string, string]>
-          ).map(([mode, label, blurb]) => (
-            <button
-              key={mode}
-              type="button"
-              className={`mode ${settings.wordMode === mode ? 'is-active' : ''}`}
-              disabled={!isHost}
-              aria-pressed={settings.wordMode === mode}
-              onClick={() => updateSettings({ wordMode: mode }, 'word_mode')}
-            >
-              <strong>{label}</strong>
-              <span>{blurb}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      {settings.wordMode === 'players' && (
-        <p className="settings__note">
-          Whoever suggests the chosen word can’t score it, but earns points when others
-          guess it. Works best with 4 or more players.
-        </p>
-      )}
-      <div className="settings__modes">
-        <span className="settings__label">
-          {settings.wordMode === 'players' ? 'Words to fill the gaps' : 'Word pool'}
-        </span>
+        <span className="settings__label">Word pool</span>
         <div className="modes modes--3">
           {SOURCES.map(([source, label, blurb]) => (
             <button

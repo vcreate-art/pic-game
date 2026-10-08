@@ -15,8 +15,6 @@ export function TurnResult() {
   const me = useGame((s) => s.me);
   if (!result) return null;
 
-  const author = players.find((p) => p.id === result.authorId);
-
   const scored = players
     .map((p) => ({ ...p, delta: result.deltas[p.id] ?? 0 }))
     .sort((a, b) => b.delta - a.delta);
@@ -28,11 +26,6 @@ export function TurnResult() {
         <h3 className="overlay__title">
           The word was <span className="reveal">{result.word}</span>
         </h3>
-        {author && (
-          <p className="overlay__hint">
-            Suggested by <strong>{author.id === me ? 'you' : author.name}</strong>
-          </p>
-        )}
         <ul className="deltas">
           {scored.map((p) => (
             <li key={p.id} className="deltas__row">

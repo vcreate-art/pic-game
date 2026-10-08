@@ -36,10 +36,6 @@ export type JoinAck = JoinOk | JoinErr;
 /** A seat picked up by QR code, with the achievements the other device sent. */
 export type PickupAck = (JoinOk & { stats: string | null }) | JoinErr;
 
-export type SuggestAck =
-  | { ok: true; text: string }
-  | { ok: false; message: string };
-
 export interface DrawStart {
   id: string;
   tool: PenTool;
@@ -96,7 +92,6 @@ export interface ClientToServerEvents {
    *  can point at a different word by the time it arrives. */
   'word:choose': (p: { id: string }) => void;
   /** One per player per turn; sending again replaces the previous suggestion. */
-  'word:suggest': (p: { text: string }, cb?: (r: SuggestAck) => void) => void;
 
   'draw:start': (p: DrawStart) => void;
   'draw:append': (p: { id: string; pts: number[] }) => void;
@@ -281,19 +276,6 @@ export interface ServerToClientEvents {
      *  authorship — otherwise the drawer could hand a turn to a friend. */
     words?: WordOption[];
   }) => void;
-  /** Suggestion window status. Carries COUNTS, never the suggested words —
-   *  those go to the drawer alone, and only once `ready` is true. A sender's own
-   *  word comes back in the ack. */
-  'suggest:state': (p: {
-    open: boolean;
-    endsAt: number;
-    /** How many have been sent. */
-    count: number;
-    /** How many are still expected, i.e. connected non-drawers. */
-    expected: number;
-    /** Everyone is in (or timed out): the drawer may now pick. */
-    ready: boolean;
-  }) => void;
   /** Emitted to the drawer's socket alone. Never broadcast. */
   'word:secret': (p: { word: string }) => void;
   /** The turn's new deadline, after a pause pushed it back. */
@@ -305,8 +287,6 @@ export interface ServerToClientEvents {
     deltas: Record<string, number>;
     players: Player[];
     reason: 'timeout' | 'all-guessed' | 'drawer-left';
-    /** Who suggested the word, revealed only now that the turn is over. */
-    authorId?: string;
   }) => void;
   'game:end': (p: { players: Player[]; gallery: Drawing[] }) => void;
   /** The current drawing's reactions, whenever they change. */
