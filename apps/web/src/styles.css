@@ -1261,22 +1261,19 @@ button, input { font: inherit; color: inherit; }
 /* The players as a list here, not the strip the drawer's phone layout uses. */
 .game--skribbl .gsheet .scores { padding: 0; background: none; border: 0; }
 .game--skribbl .gsheet .scores .card__title { display: none; }
-.game--skribbl .gsheet .scores__list { flex-direction: column; overflow: visible; gap: 2px; }
-/* Compact rows, since the sheet is only the keyboard's height: a smaller
-   avatar, and the tags beside the name rather than under it. The host's
-   rows have a fifth column, for the remove button. */
+.game--skribbl .gsheet .scores__list { flex-direction: column; overflow: visible; }
+/* Full rows, as in the desktop's sidebar: the avatar at its size, the tags
+   under the name. The host's rows have a fifth column, for the remove
+   button. */
 .game--skribbl .gsheet .scores__row {
-  width: auto; grid-template-columns: 16px auto minmax(0, 1fr) auto; justify-items: stretch; gap: 9px; padding: 4px 8px;
+  width: auto; grid-template-columns: 16px auto minmax(0, 1fr) auto; justify-items: stretch; gap: 9px; padding: 6px 8px;
 }
 .game--skribbl .gsheet .scores__list.is-host .scores__row {
-  width: auto; grid-template-columns: 16px auto minmax(0, 1fr) auto auto; justify-items: stretch; gap: 9px; padding: 4px 8px;
+  width: auto; grid-template-columns: 16px auto minmax(0, 1fr) auto auto; justify-items: stretch; gap: 9px; padding: 6px 8px;
 }
-.game--skribbl .gsheet .scores__row .avatar-wrap { width: 28px !important; height: 28px !important; }
-.game--skribbl .gsheet .scores__row .avatar { font-size: 10px !important; }
 .game--skribbl .gsheet .scores__rank, .game--skribbl .gsheet .scores__tags { display: revert; }
-.game--skribbl .gsheet .scores__meta { flex-direction: row; align-items: center; gap: 6px; }
-.game--skribbl .gsheet .scores__tags { display: flex; flex-wrap: nowrap; }
-.game--skribbl .gsheet .scores__name { text-align: left; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.game--skribbl .gsheet .scores__meta { align-items: flex-start; }
+.game--skribbl .gsheet .scores__name { text-align: left; font-size: 14px; }
 
 /* Cards stay put at the top; the Leave button sits in the middle of whatever
    height is left below them. The min-height keeps a gap from the cards on short
