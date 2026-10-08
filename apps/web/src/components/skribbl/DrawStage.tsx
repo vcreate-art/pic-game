@@ -18,10 +18,10 @@ import { MeButton, SenderAvatar, SheetMe, StageHead, useStageChrome } from './st
 /**
  * Drawing on a phone. The guessing stage's header (with the word you're
  * drawing in place of the blanks), the canvas as wide as the screen, the
- * guesses coming in below it rather than over it, with your avatar and the
- * players button in their corner, and the tools along the bottom: the whole
- * palette, then the brush, pen, fill and eraser, undo and redo, and clear,
- * grouped by spacing. There's no keyboard to make room for; the sheets rise
+ * tools right under it (the whole palette, then the brush, pen, fill and
+ * eraser, undo and redo, and clear, grouped by spacing), and the guesses
+ * filling the rest, down to the bottom, with your avatar and the players
+ * button in their corner. There's no keyboard to make room for; the sheets rise
  * over the tools, and a tap above one closes it.
  * Nothing scrolls, so a stroke never moves the page.
  */
@@ -60,6 +60,14 @@ export function DrawStage() {
         {phase === 'gameEnd' && <Podium />}
       </div>
 
+      {/* The tools right under the drawing, where the hand already is. */}
+      {phase === 'drawing' && (
+        <div className="dtools">
+          <DrawTools />
+          <DrawActions />
+        </div>
+      )}
+
       {/* The guesses, newest at the bottom, under the drawing, never on it;
           you and the players in the corner, clear of the tools. */}
       <div className="dstage__middle">
@@ -94,12 +102,6 @@ export function DrawStage() {
       </div>
       </div>
 
-      {phase === 'drawing' && (
-        <div className="dtools">
-          <DrawTools />
-          <DrawActions />
-        </div>
-      )}
 
       {sheet && (
         <>
