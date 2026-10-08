@@ -994,23 +994,40 @@ button, input { font: inherit; color: inherit; }
   color: var(--ink-soft); font-size: 14px; font-weight: 600; cursor: pointer;
 }
 .gsheet__row svg { width: 16px; height: 16px; }
-/* The room's controls in the sheet: 4:3 tiles no wider than 96px, centred,
-   at the bottom of the sheet. */
-.gsheet .room__controls { grid-auto-columns: minmax(0, 96px); justify-content: center; margin-top: auto; }
+/* The room's controls in the sheet: 4:3 tiles no wider than 80px, centred,
+   in a tray of their own across the bottom, apart from the players and
+   always in reach while the list scrolls behind it. Last, after the host
+   note, whatever order the room menu gives them in. */
+.gsheet .room__controls {
+  order: 2; grid-auto-columns: minmax(0, 80px); justify-content: center;
+  position: sticky; bottom: calc(-14px - env(safe-area-inset-bottom));
+  margin: auto -16px calc(-14px - env(safe-area-inset-bottom));
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+  background: var(--card); border-top: 1px solid var(--line);
+}
+.gsheet .room__note { order: 1; margin: 0; }
 .gsheet .room__ctl { aspect-ratio: 4 / 3; justify-content: center; padding: 4px; }
 /* The QR card and the room menu, laid in the sheet rather than popping up. */
 .gsheet .profile__pop { position: static; width: auto; box-shadow: none; }
 /* The players as a list here, not the strip the drawer's phone layout uses. */
 .game--skribbl .gsheet .scores { padding: 0; background: none; border: 0; }
 .game--skribbl .gsheet .scores .card__title { display: none; }
-.game--skribbl .gsheet .scores__list { flex-direction: column; overflow: visible; }
-.game--skribbl .gsheet .scores__row,
-.game--skribbl .gsheet .scores__list.is-host .scores__row {
-  width: auto; grid-template-columns: 16px auto minmax(0, 1fr) auto; justify-items: stretch; gap: 9px; padding: 6px 8px;
+.game--skribbl .gsheet .scores__list { flex-direction: column; overflow: visible; gap: 2px; }
+/* Compact rows, since the sheet is only the keyboard's height: a smaller
+   avatar, and the tags beside the name rather than under it. The host's
+   rows have a fifth column, for the remove button. */
+.game--skribbl .gsheet .scores__row {
+  width: auto; grid-template-columns: 16px auto minmax(0, 1fr) auto; justify-items: stretch; gap: 9px; padding: 4px 8px;
 }
+.game--skribbl .gsheet .scores__list.is-host .scores__row {
+  width: auto; grid-template-columns: 16px auto minmax(0, 1fr) auto auto; justify-items: stretch; gap: 9px; padding: 4px 8px;
+}
+.game--skribbl .gsheet .scores__row .avatar-wrap { width: 28px !important; height: 28px !important; }
+.game--skribbl .gsheet .scores__row .avatar { font-size: 10px !important; }
 .game--skribbl .gsheet .scores__rank, .game--skribbl .gsheet .scores__tags { display: revert; }
-.game--skribbl .gsheet .scores__meta { align-items: flex-start; }
-.game--skribbl .gsheet .scores__name { text-align: left; font-size: 14px; }
+.game--skribbl .gsheet .scores__meta { flex-direction: row; align-items: center; gap: 6px; }
+.game--skribbl .gsheet .scores__tags { display: flex; flex-wrap: nowrap; }
+.game--skribbl .gsheet .scores__name { text-align: left; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Cards stay put at the top; the Leave button sits in the middle of whatever
    height is left below them. The min-height keeps a gap from the cards on short
