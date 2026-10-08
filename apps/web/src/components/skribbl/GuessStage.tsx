@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Keyboard, Smile, Timer as TimerIcon, Users } from 'lucide-react';
 import { MAX_CHAT_LEN } from '../../constants.js';
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
-import { noAutofill } from '../../lib/noAutofill.js';
 import { lastKeyboardHeight, useVisualViewport } from '../../lib/useVisualViewport.js';
 import { selectSkribbl, useGame } from '../../store/game.js';
 import { useGuessBox } from '../Chat.js';
@@ -72,7 +71,7 @@ export function GuessStage() {
   const [sheet, setSheet] = useState<Sheet>(null);
   const [dock, setDock] = useState(0);
   const [held, setHeld] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLDivElement>(null);
   const wanted = useRef(false);
   const changedAt = useRef(0);
 
@@ -420,27 +419,20 @@ export function GuessStage() {
           autocomplete says. Enter, the keyboard's Send, sends instead. */}
       <div className="gstage__form">
         <div className="chat__field">
-          <input
-            ref={input}
-            className="chat__input"
-            value={box.text}
-            maxLength={MAX_CHAT_LEN}
+          <GuessField
+            inputRef={input}
+            text={box.text}
+            setText={box.setText}
             disabled={box.locked}
             placeholder={box.placeholder}
-            onChange={(e) => box.setText(e.target.value)}
             onFocus={() => {
               fold();
               if (sheet) setSheet(null);
             }}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
-              e.preventDefault();
+            onEnter={() => {
               fold();
               box.send();
             }}
-            aria-label="Your guess"
-            enterKeyHint="send"
-            {...noAutofill}
           />
           {box.showCount && (
             <span className={`chat__count ${box.matches ? 'is-match' : ''}`}>
@@ -499,5 +491,108 @@ export function GuessStage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Whether this browser takes contenteditable="plaintext-only" (Firefox only
+ *  since 136); setting a value it doesn't know throws. */
+const PLAINTEXT_ONLY = (() => {
+  try {
+    const probe = document.createElement('div');
+    probe.contentEditable = 'plaintext-only';
+    return probe.contentEditable === 'plaintext-only';
+  } catch {
+    return false;
+  }
+})();
+
+function caretToEnd(el: HTMLElement) {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+}
+
+/**
+ * The guess box, as an editable div rather than an input. Chrome on Android
+ * puts its autofill bar (passwords, cards, addresses) over the keyboard for
+ * text inputs, form or no form and whatever autocomplete says, and sometimes
+ * without telling the page, so it covered the tabs. It leaves editable divs
+ * alone. What an input did by itself is done here: one line of plain text,
+ * the length limit, the placeholder, and Enter (the keyboard's Send) sends.
+ */
+function GuessField({
+  inputRef,
+  text,
+  setText,
+  disabled,
+  placeholder,
+  onFocus,
+  onEnter,
+}: {
+  inputRef: React.RefObject<HTMLDivElement>;
+  text: string;
+  setText: (t: string) => void;
+  disabled: boolean;
+  placeholder: string;
+  onFocus: () => void;
+  onEnter: () => void;
+}) {
+  // The box holds its own text; this brings it in step when the text changes
+  // from outside, as when a send clears it. Typing already matches.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el || el.textContent === text) return;
+    el.textContent = text;
+    if (document.activeElement === el) caretToEnd(el);
+  }, [text, inputRef]);
+
+  return (
+    <div
+      ref={inputRef}
+      className="chat__input chat__input--editable"
+      contentEditable={disabled ? false : PLAINTEXT_ONLY ? 'plaintext-only' : true}
+      suppressContentEditableWarning
+      role="textbox"
+      aria-label="Your guess"
+      aria-placeholder={placeholder}
+      aria-disabled={disabled || undefined}
+      data-placeholder={placeholder}
+      data-empty={text === '' || undefined}
+      enterKeyHint="send"
+      inputMode="text"
+      autoCorrect="off"
+      spellCheck={false}
+      onFocus={() => {
+        // A focus() from code puts the caret at the start.
+        const el = inputRef.current;
+        if (el?.textContent) caretToEnd(el);
+        onFocus();
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter') return;
+        // Never a new line; mid-word, the keyboard finishes the word first.
+        e.preventDefault();
+        if (!e.nativeEvent.isComposing) onEnter();
+      }}
+      onPaste={(e) => {
+        // Plain text only, on one line, wherever it was copied from.
+        e.preventDefault();
+        const pasted = e.clipboardData.getData('text/plain').replace(/\s+/g, ' ');
+        document.execCommand('insertText', false, pasted);
+      }}
+      onInput={(e) => {
+        const el = e.currentTarget;
+        let t = (el.textContent ?? '').replace(/\n/g, ' ');
+        if (t.length > MAX_CHAT_LEN) t = t.slice(0, MAX_CHAT_LEN);
+        if (t !== el.textContent) {
+          el.textContent = t;
+          caretToEnd(el);
+        }
+        setText(t);
+      }}
+    />
   );
 }

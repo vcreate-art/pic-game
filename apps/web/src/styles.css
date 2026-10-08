@@ -883,6 +883,22 @@ button, input { font: inherit; color: inherit; }
 
 .gstage__form { padding: 8px 12px 6px; }
 .gstage__form .chat__input { font-size: 16px; background: var(--card); }
+/* The guess box is an editable div here (see GuessField): one line that
+   scrolls sideways, an input's placeholder, and its disabled look. */
+.chat__input--editable {
+  white-space: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  position: relative; line-height: 1.25; cursor: text; user-select: text; -webkit-user-select: text;
+  /* An input's height even when empty: a line, the padding, the border. */
+  min-height: calc(1.25em + 22px);
+}
+.chat__input--editable::-webkit-scrollbar { display: none; }
+.chat__input--editable[data-empty]::before {
+  /* Out of the text's flow, so the caret sits at the start, not after it. */
+  position: absolute; left: 12px; right: 62px; top: 50%; transform: translateY(-50%);
+  overflow: hidden; text-overflow: ellipsis;
+  content: attr(data-placeholder); color: var(--ink-soft); pointer-events: none;
+}
+.chat__input--editable[aria-disabled] { opacity: .6; cursor: default; }
 
 /* The tabs, just above the keyboard. */
 .gstage__tabs { display: flex; gap: 6px; padding: 4px 12px calc(8px + env(safe-area-inset-bottom)); }
