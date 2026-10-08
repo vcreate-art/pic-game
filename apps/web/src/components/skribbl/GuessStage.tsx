@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Bug, Pencil, SmilePlus, Users } from 'lucide-react';
 import { MAX_CHAT_LEN } from '../../constants.js';
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
-import { totalPlayed, totalWon, useStats } from '../../lib/achievements.js';
+import { ACHIEVEMENTS, totalPlayed, totalWon, useStats } from '../../lib/achievements.js';
 import { isPostHogEnabled } from '../../lib/posthog.js';
 import { useDismiss } from '../../lib/useDismiss.js';
 import { lastKeyboardHeight, useVisualViewport } from '../../lib/useVisualViewport.js';
@@ -839,26 +839,39 @@ function SheetMe() {
           this sheet is open. */}
       <section className="gsheet__me">
         <span className="gsheet__mename">
-          {me.name}
+          <span className="gsheet__nameline">
+            <span className="gsheet__name">{me.name}</span>
+            <button
+              type="button"
+              className="gsheet__icon-btn"
+              aria-label="Edit name and look"
+              title="Edit name and look"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil aria-hidden="true" />
+            </button>
+            {isPostHogEnabled && (
+              <button
+                type="button"
+                className="gsheet__icon-btn"
+                aria-label="Report a bug"
+                title="Report a bug"
+                onClick={() => document.getElementById('report-bug')?.click()}
+              >
+                <Bug aria-hidden="true" />
+              </button>
+            )}
+          </span>
           <small>{played ? `${played} played, ${totalWon(stats)} won` : 'No games finished yet'}</small>
         </span>
-        <button type="button" className="gsheet__edit-btn" onClick={() => setEditing(true)}>
-          <Pencil aria-hidden="true" />
-          Edit
-        </button>
-        {isPostHogEnabled && (
-          <button
-            type="button"
-            className="gsheet__edit-btn gsheet__icon-btn"
-            aria-label="Report a bug"
-            title="Report a bug"
-            onClick={() => document.getElementById('report-bug')?.click()}
-          >
-            <Bug aria-hidden="true" />
-          </button>
-        )}
+        <span className="gsheet__count">
+          <b>
+            {ACHIEVEMENTS.filter((a) => stats.unlocked[a.id]).length} of {ACHIEVEMENTS.length}
+          </b>
+          <small>achievements</small>
+        </span>
       </section>
-      <ProfileBadges peek={3} />
+      <ProfileBadges peek={3} shelf={false} count={false} />
     </div>
   );
 }

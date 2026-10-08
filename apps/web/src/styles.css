@@ -1029,7 +1029,14 @@ button, input { font: inherit; color: inherit; }
 .gsheet .room__ctl { justify-content: center; min-height: 54px; padding: 5px 4px; }
 /* You, atop the "you" sheet, and the name and look editor in its place. */
 .gsheet__me { display: flex; align-items: center; gap: 10px; }
-.gsheet__mename { flex: 1; min-width: 0; display: flex; flex-direction: column; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gsheet__mename { flex: 1; min-width: 0; display: flex; flex-direction: column; font-weight: 700; }
+/* Your name with small edit (and bug report) buttons right beside it. */
+.gsheet__nameline { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.gsheet__name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 4px; }
+/* How many achievements, where the edit button was: the count big, the word small. */
+.gsheet__count { flex: none; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.gsheet__count b { font-family: var(--display); font-size: 18px; font-weight: 800; }
+.gsheet__count small { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
 .gsheet__mename small { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
 .gsheet__edit-btn {
   flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
@@ -1037,7 +1044,12 @@ button, input { font: inherit; color: inherit; }
   color: var(--ink-soft); font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .gsheet__edit-btn svg { width: 14px; height: 14px; }
-.gsheet__icon-btn { padding: 7px; }
+.gsheet__icon-btn {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: 8px; background: none; color: var(--ink-soft); cursor: pointer;
+}
+.gsheet__icon-btn svg { width: 15px; height: 15px; }
+.gsheet__icon-btn:hover { background: var(--paper); color: var(--ink); }
 /* The "you" sheet fits the keyboard's height without scrolling: tighter,
    with you and your achievements together on a plain white card. */
 .gsheet--me { gap: 10px; }
@@ -1048,9 +1060,6 @@ button, input { font: inherit; color: inherit; }
 .gsheet--me .profile__badges { padding-top: 0; }
 .gsheet--me .profile__badges ul { margin-top: 8px; gap: 4px; }
 .gsheet__edit { display: flex; flex-direction: column; gap: 12px; }
-/* The achievements shelf's empty segments are the sheet's own grey, so a
-   shade darker here to show. */
-.gsheet .profile__shelf span:not(.is-earned) { background: var(--line); }
 /* The QR card and the room menu, laid in the sheet rather than popping up. */
 .gsheet .profile__pop { position: static; width: auto; box-shadow: none; }
 /* The players as a list here, not the strip the drawer's phone layout uses. */

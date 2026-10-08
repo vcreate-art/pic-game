@@ -163,22 +163,32 @@ export function ProfileEditor({ className, onDone }: { className?: string; onDon
 
 /**
  * Your achievements: how many of them, as a count and a shelf with one
- * segment each, and the badges, most relevant first. The header menu peeks
- * at a few; the phone's "you" sheet, which scrolls, shows them all.
+ * segment each, and the badges, most relevant first, or the first few.
  */
-export function ProfileBadges({ peek }: { peek?: number }) {
+export function ProfileBadges({
+  peek,
+  shelf = true,
+  count = true,
+}: {
+  peek?: number;
+  shelf?: boolean;
+  /** The "N of M achievements" line; off where it's shown elsewhere. */
+  count?: boolean;
+}) {
   const stats = useStats();
   const earned = ACHIEVEMENTS.filter((a) => stats.unlocked[a.id]).length;
   const badges = byRelevance(stats);
   return (
     <div className="profile__badges">
-      <p className="profile__count">{earned} of {ACHIEVEMENTS.length} achievements</p>
+      {count && <p className="profile__count">{earned} of {ACHIEVEMENTS.length} achievements</p>}
       {/* One segment per achievement, so the bar is the whole shelf. */}
-      <div className="profile__shelf" aria-hidden="true">
-        {ACHIEVEMENTS.map((a, i) => (
-          <span key={a.id} className={i < earned ? 'is-earned' : ''} />
-        ))}
-      </div>
+      {shelf && (
+        <div className="profile__shelf" aria-hidden="true">
+          {ACHIEVEMENTS.map((a, i) => (
+            <span key={a.id} className={i < earned ? 'is-earned' : ''} />
+          ))}
+        </div>
+      )}
       <ul>
         {(peek ? badges.slice(0, peek) : badges).map((a) => {
           const at = stats.unlocked[a.id];
