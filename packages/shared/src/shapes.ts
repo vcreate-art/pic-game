@@ -222,9 +222,26 @@ function asEllipse(ps: readonly P[]): SnapShape | null {
   return { kind: round ? 'circle' : 'ellipse', pts: toWire(out) };
 }
 
-/** The clean shape a stroke is close to, or null if it's none of them. */
+/** How close, in logical px, the jitter of a held end stays to where the
+ *  stroke stopped. */
+const HELD_END = 8;
+/** Points a stroke is spaced out to before it's read. */
+const READ_POINTS = 96;
+
+/**
+ * The clean shape a stroke is close to, or null if it's none of them. Read
+ * as drawn, not as sampled: the held end's jitter (many points on one spot)
+ * is trimmed, and the rest spaced evenly along it, so neither a pause nor a
+ * hand slowing through part of a loop pulls its centre or its size.
+ */
 export function recognizeShape(pts: readonly number[]): SnapShape | null {
-  const ps = toLogical(pts);
-  if (ps.length < 3) return null;
+  const drawn = toLogical(pts);
+  const end = drawn[drawn.length - 1];
+  if (!end) return null;
+  let last = drawn.length - 1;
+  while (last > 0 && dist(drawn[last - 1]!, end) < HELD_END) last--;
+  const kept = [...drawn.slice(0, last), end];
+  if (kept.length < 3) return null;
+  const ps = resample(kept, READ_POINTS);
   return asLine(ps) ?? asEllipse(ps);
 }

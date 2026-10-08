@@ -66,6 +66,20 @@ describe('shape snapping', () => {
     expect(recognizeShape(wire(loop(400, 300, 40, 38, { lumps: 0.08 })))?.kind).toBe('circle');
   });
 
+  it('reads a circle drawn as a finger draws one: uneven speed, then a held end', () => {
+    // Slow through one side and fast through the other...
+    const uneven = Array.from({ length: 60 }, (_, i) => {
+      const u = i / 59;
+      const t = (u + 0.12 * Math.sin(2 * Math.PI * u)) * 2 * Math.PI;
+      const k = 1 + 0.06 * Math.sin(3 * t + 1);
+      return [400 + 120 * k * Math.cos(t), 300 + 120 * k * Math.sin(t)] as [number, number];
+    });
+    // ...then held at the end, a fingertip wandering a few px for half a second.
+    const [ex, ey] = uneven[uneven.length - 1]!;
+    const held = Array.from({ length: 40 }, (_, i) => [ex + Math.sin(i * 2.1) * 2, ey + Math.cos(i * 1.7) * 2] as [number, number]);
+    expect(recognizeShape(wire([...uneven, ...held]))?.kind).toBe('circle');
+  });
+
   it('reads a long loop as an ellipse, tilt and all', () => {
     expect(recognizeShape(wire(loop(400, 300, 200, 90, { lumps: 0.05 })))?.kind).toBe('ellipse');
     expect(recognizeShape(wire(loop(400, 300, 200, 90, { lumps: 0.05, tilt: 0.6 })))?.kind).toBe('ellipse');
