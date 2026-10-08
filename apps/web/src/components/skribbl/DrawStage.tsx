@@ -50,11 +50,30 @@ export function DrawStage() {
   const box = useGuessBox();
   // When the shut box was last tapped: its note shows for a moment after.
   const [noChat, setNoChat] = useState(0);
+  // Gone after a moment, or as soon as anything else is touched (a sheet
+  // opening, the tools, the drawing) or the page is left, so it never hangs
+  // over what comes next.
   useEffect(() => {
     if (!noChat) return;
-    const t = setTimeout(() => setNoChat(0), NO_CHAT_MS);
-    return () => clearTimeout(t);
+    const dismiss = () => setNoChat(0);
+    const t = setTimeout(dismiss, NO_CHAT_MS);
+    const away = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.('.dstage__foot .chat__input')) dismiss();
+    };
+    const hidden = () => document.hidden && dismiss();
+    document.addEventListener('pointerdown', away, true);
+    document.addEventListener('visibilitychange', hidden);
+    window.addEventListener('blur', dismiss);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('pointerdown', away, true);
+      document.removeEventListener('visibilitychange', hidden);
+      window.removeEventListener('blur', dismiss);
+    };
   }, [noChat]);
+  useEffect(() => {
+    if (sheet) setNoChat(0);
+  }, [sheet]);
 
   if (!room) return null;
   const phase = room.phase;
