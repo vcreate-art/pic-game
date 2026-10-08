@@ -103,7 +103,7 @@ export default function DrawGuessPreview() {
     g.sync(state);
     if (as === 'drawer') g.setSecret(WORD);
     if (!g.messages.length) {
-      for (const m of [say('', 'Ana is drawing', 'divider'), say('Ben', 'a bird'), say('Priya', 'is it a duck?'), say('', 'Ben guessed the word!', 'correct')]) {
+      for (const m of [say('', 'Ana is drawing', 'divider'), say('Ben', 'a bird'), say('Priya', 'is it a duck?'), say('Ben', 'Ben guessed the word!', 'correct')]) {
         g.pushMessage(m);
       }
     }

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Bug, SmilePlus, Users } from 'lucide-react';
+import { Bug, Pencil, SmilePlus, Users } from 'lucide-react';
 import { MAX_CHAT_LEN } from '../../constants.js';
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
 import { isPostHogEnabled } from '../../lib/posthog.js';
 import { useDismiss } from '../../lib/useDismiss.js';
 import { lastKeyboardHeight, useVisualViewport } from '../../lib/useVisualViewport.js';
 import { selectSkribbl, useGame } from '../../store/game.js';
+import { Avatar } from '../Avatar.js';
 import { useGuessBox } from '../Chat.js';
+import { ProfileEditor } from '../ProfileChip.js';
 import { Podium } from '../Podium.js';
 import { useReaction } from '../Reactions.js';
 import { RoomMenu } from '../RoomPanel.js';
@@ -18,12 +20,14 @@ import { Slots } from '../WordMask.js';
 
 /**
  * Guessing on a phone. A header of its own in place of the app's (the round,
- * the timer, the blanks and the reactions, always in sight), the canvas, the
- * chat rising over it and fading as it climbs, and the guess box with the
- * room button beside it; under them the keyboard, which is up by default, or
- * the room sheet that button swaps in for it: the players, and what the
- * app's header held (reporting a bug, the room menu). Not playing on your
- * phone: this is the phone.
+ * the blanks and the timer, always in sight), the canvas, the chat rising
+ * over it and fading as it climbs, each line with its sender's avatar in the
+ * gutter, and the guess box, with your avatar inside it and the players
+ * button beside it; under them the keyboard, which is up by default, or the
+ * sheet one of those swaps in for it. The players button's is the scores;
+ * your avatar's is you (your name and look) and what the app's header held:
+ * reporting a bug and the room menu. Not playing on your phone: this is the
+ * phone.
  *
  * The keyboard handling is the toys repo's mobile editor's: the stage is sized
  * to what the keyboard leaves, so the browser never scrolls anything under the
@@ -31,7 +35,9 @@ import { Slots } from '../WordMask.js';
  * sent away, so swapping one for the other moves nothing.
  */
 
-type Sheet = 'room' | null;
+/** 'players' is the scores; 'me' is you and the room's controls, behind your
+ *  own avatar so a look at the scores never puts Leave under a thumb. */
+type Sheet = 'players' | 'me' | null;
 
 /** A sheet's height before any keyboard has been seen: phone keyboards run
  *  about 260 to 340px. Capped against the screen for short windows. */
@@ -345,7 +351,7 @@ export function GuessStage() {
     changedAt.current = performance.now();
   }
 
-  const toggleRoom = () => (sheet ? closeSheet() : openSheet('room'));
+  const toggleSheet = (kind: Exclude<Sheet, null>) => (sheet === kind ? closeSheet() : openSheet(kind));
 
   if (!room) return null;
   const phase = room.phase;
@@ -421,6 +427,7 @@ export function GuessStage() {
             </div>
           ) : (
             <div key={m.id} className={`msg msg--${m.kind}`}>
+              <SenderAvatar playerId={m.playerId} />
               {m.kind === 'chat' && <strong className="msg__name">{m.name}</strong>}
               {m.kind === 'secret' && <strong className="msg__name">{m.name} (guessed)</strong>}
               <span className="msg__text">{m.text}</span>
@@ -434,6 +441,8 @@ export function GuessStage() {
           autocomplete says. Enter, the keyboard's Send, sends instead. */}
       <div className="gstage__form">
         <div className="chat__field">
+          {/* You, inside the guess box: your profile and the room's controls. */}
+          <MeButton on={sheet === 'me'} onToggle={() => toggleSheet('me')} />
           <GuessField
             inputRef={input}
             text={box.text}
@@ -459,11 +468,11 @@ export function GuessStage() {
             pointerdown keeps it from taking focus off the guess box. */}
         <button
           type="button"
-          className={`gstage__roombtn ${sheet ? 'is-on' : ''}`}
-          aria-pressed={!!sheet}
-          aria-label="Room: players and more"
+          className={`gstage__roombtn ${sheet === 'players' ? 'is-on' : ''}`}
+          aria-pressed={sheet === 'players'}
+          aria-label="Players and scores"
           onPointerDown={(e) => e.preventDefault()}
-          onClick={toggleRoom}
+          onClick={() => toggleSheet('players')}
         >
           <Users aria-hidden="true" />
           <span className="gstage__roomcount">{room.players.length}</span>
@@ -473,18 +482,24 @@ export function GuessStage() {
 
       {sheet && (
         <div className="gsheet" style={{ height: dock }}>
-          <Scoreboard />
-          {isPostHogEnabled && (
-            <button
-              type="button"
-              className="gsheet__row"
-              onClick={() => document.getElementById('report-bug')?.click()}
-            >
-              <Bug aria-hidden="true" />
-              Report a bug
-            </button>
+          {sheet === 'players' ? (
+            <Scoreboard />
+          ) : (
+            <>
+              <SheetMe />
+              {isPostHogEnabled && (
+                <button
+                  type="button"
+                  className="gsheet__row"
+                  onClick={() => document.getElementById('report-bug')?.click()}
+                >
+                  <Bug aria-hidden="true" />
+                  Report a bug
+                </button>
+              )}
+              <RoomMenu standings={false} leaveTile />
+            </>
           )}
-          <RoomMenu standings={false} leaveTile />
         </div>
       )}
     </div>
@@ -677,5 +692,59 @@ function ReactButton() {
         {mine ? <span aria-hidden="true">{mine === 'like' ? '👍' : '👎'}</span> : <SmilePlus aria-hidden="true" />}
       </button>
     </div>
+  );
+}
+
+/** You, as the room has you: your name and look as everyone sees them. */
+function useMe() {
+  return useGame((s) => s.room?.players.find((p) => p.id === s.me));
+}
+
+/** Your avatar at the start of the guess box: opens the "you" sheet.
+ *  preventDefault on pointerdown keeps it from taking focus off the box. */
+function MeButton({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  const me = useMe();
+  if (!me) return null;
+  return (
+    <button
+      type="button"
+      className={`gstage__mebtn ${on ? 'is-on' : ''}`}
+      aria-pressed={on}
+      aria-label="You and the room"
+      onPointerDown={(e) => e.preventDefault()}
+      onClick={onToggle}
+    >
+      <Avatar data={me.avatar} size={26} />
+    </button>
+  );
+}
+
+/** You, at the top of the "you" sheet, with a way to change your name and
+ *  look; editing takes the row's place. */
+function SheetMe() {
+  const me = useMe();
+  const [editing, setEditing] = useState(false);
+  if (!me) return null;
+  if (editing) return <ProfileEditor className="gsheet__edit" onDone={() => setEditing(false)} />;
+  return (
+    <section className="gsheet__me">
+      <Avatar data={me.avatar} size={36} />
+      <span className="gsheet__mename">{me.name}</span>
+      <button type="button" className="gsheet__edit-btn" onClick={() => setEditing(true)}>
+        <Pencil aria-hidden="true" />
+        Edit name and look
+      </button>
+    </section>
+  );
+}
+
+/** A message's sender, small, in the chat's left gutter. */
+function SenderAvatar({ playerId }: { playerId?: string }) {
+  const avatar = useGame((s) => s.room?.players.find((p) => p.id === playerId)?.avatar);
+  if (!playerId || !avatar) return null;
+  return (
+    <span className="msg__avatar" aria-hidden="true">
+      <Avatar data={avatar} size={18} />
+    </span>
   );
 }

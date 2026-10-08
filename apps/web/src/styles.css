@@ -842,7 +842,8 @@ button, input { font: inherit; color: inherit; }
 .gstage__chat {
   position: absolute; left: 0; right: 0; bottom: 100%;
   display: flex; flex-direction: column; gap: 4px;
-  padding: 0 12px 8px; overflow-x: hidden; overflow-y: auto;
+  /* The left gutter holds each line's sender, and the turn marker's tab. */
+  padding: 0 12px 8px 32px; overflow-x: hidden; overflow-y: auto;
   /* The stage allows no gestures; the chat takes back the vertical drag, and
      its scroll ends here rather than passing to the page. */
   touch-action: pan-y; overscroll-behavior: contain; scrollbar-width: none;
@@ -858,6 +859,9 @@ button, input { font: inherit; color: inherit; }
 /* Down to the bottom when there's room to spare. Not justify-content:
    flex-end, which leaves what overflows the top out of reach of the scroll. */
 .gstage__chat > :first-child { margin-top: auto; }
+.gstage__chat .msg { position: relative; }
+/* The sender, small, centred in the gutter beside their line. */
+.msg__avatar { position: absolute; left: -25px; top: 50%; transform: translateY(-50%); display: flex; }
 .gstage__chat .msg {
   flex: none; align-self: flex-start; max-width: 85%;
   background: rgba(255, 255, 255, .86); box-shadow: 0 1px 3px rgba(31, 34, 51, .12);
@@ -884,10 +888,20 @@ button, input { font: inherit; color: inherit; }
 /* A marker hanging off its left edge, out to the screen's edge, so a new
    turn stands out in the run of messages without crossing the drawing. */
 .gstage__chat .msg--divider::before {
-  content: ''; flex: none; position: absolute; right: 100%; top: 0; bottom: 0; width: 12px;
+  content: ''; flex: none; position: absolute; right: 100%; top: 0; bottom: 0; width: 32px;
   background: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .gstage__chat .msg--divider span { max-width: none; }
+
+/* You, inside the guess box at its start: opens the "you" sheet. */
+.gstage__mebtn {
+  position: absolute; left: 8px; top: 50%; z-index: 1; transform: translateY(-50%);
+  display: flex; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer;
+}
+.gstage__mebtn.is-on { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gstage__mebtn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.gstage__form .chat__input { padding-left: 42px; }
+.gstage__form .chat__input--editable[data-empty]::before { left: 42px; }
 
 /* The guess box and the room button beside it, last above the keyboard. */
 .gstage__form {
@@ -1007,6 +1021,16 @@ button, input { font: inherit; color: inherit; }
 }
 .gsheet .room__note { order: 1; margin: 0; }
 .gsheet .room__ctl { aspect-ratio: 4 / 3; justify-content: center; padding: 4px; }
+/* You, atop the "you" sheet, and the name and look editor in its place. */
+.gsheet__me { display: flex; align-items: center; gap: 10px; }
+.gsheet__mename { flex: 1; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gsheet__edit-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  color: var(--ink-soft); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.gsheet__edit-btn svg { width: 14px; height: 14px; }
+.gsheet__edit { display: flex; flex-direction: column; gap: 12px; }
 /* The QR card and the room menu, laid in the sheet rather than popping up. */
 .gsheet .profile__pop { position: static; width: auto; box-shadow: none; }
 /* The players as a list here, not the strip the drawer's phone layout uses. */
