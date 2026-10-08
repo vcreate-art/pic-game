@@ -826,6 +826,15 @@ button, input { font: inherit; color: inherit; }
 .gstage__board { position: relative; flex: none; }
 .gstage__board .board { border: 0; border-radius: 0; }
 .gstage__foot { position: relative; margin-top: auto; flex: none; }
+/* Over the drawing, under the open chat: the drawing stays in sight, faint,
+   and the lines read against the veil. Fades with the lines. Taps go
+   through to the drawing, which folds the chat. */
+.gstage__veil {
+  position: absolute; inset: 0; pointer-events: none;
+  background: color-mix(in srgb, color-mix(in srgb, var(--ink) 14%, var(--card)) 72%, transparent);
+  opacity: 0; transition: opacity .45s ease;
+}
+.gstage__veil.is-on { opacity: 1; }
 
 /* The chat hangs over everything above the guess box: newest at the bottom,
    older lines fading as they climb, and a drag scrolls back through them. A

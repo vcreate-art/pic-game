@@ -120,6 +120,10 @@ export function GuessStage() {
   // to get on with guessing. Only their own scrolling opens it: the chat
   // following new messages doesn't.
   const [reading, setReading] = useState(false);
+  // A light veil over the drawing while the chat is open, so the lines read
+  // against it rather than the drawing. It goes as soon as a fold starts,
+  // not once the fold is done.
+  const [veiled, setVeiled] = useState(false);
   const touching = useRef(false);
   const byHand = useRef(false);
   const foldTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -141,6 +145,7 @@ export function GuessStage() {
   };
   const fold = () => {
     clearTimeout(foldTimer.current);
+    setVeiled(false);
     const el = chatRef.current;
     if (!reading || !el) {
       atBottom.current = true;
@@ -353,6 +358,8 @@ export function GuessStage() {
         {phase === 'gameEnd' && <Podium />}
       </div>
 
+      <div className={`gstage__veil ${veiled ? 'is-on' : ''}`} aria-hidden="true" />
+
       <div ref={footRef} className="gstage__foot">
       {/* Newest at the bottom, just over the guess box; older lines climb and
           fade, over the drawing if they reach it. */}
@@ -367,6 +374,7 @@ export function GuessStage() {
           if (atBottom.current) return foldAtNewest();
           callOffFold();
           setReading(true);
+          setVeiled(true);
         }}
         onTouchStart={() => {
           touching.current = true;
