@@ -889,7 +889,50 @@ button, input { font: inherit; color: inherit; }
 }
 .gstage__chat .msg--divider span { max-width: none; }
 
-.gstage__form { padding: 8px 12px 6px; }
+/* The guess box and the room button beside it, last above the keyboard. */
+.gstage__form {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+}
+.gstage__form .chat__field { flex: 1; min-width: 0; }
+.gstage__roombtn {
+  position: relative; flex: none; display: grid; place-items: center; width: 44px; height: 44px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink-soft); cursor: pointer;
+}
+.gstage__roombtn svg { width: 20px; height: 20px; }
+.gstage__roombtn.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.gstage__roombtn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.gstage__roomcount {
+  position: absolute; top: -6px; right: -6px; min-width: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--ink); color: var(--card); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+}
+
+/* The stage's own header: round and timer, the blanks, the reactions. The
+   app's header steps aside while the stage is up (hidden, not removed: its
+   bug button is what the bug-report survey listens to). */
+.has-gstage .topbar { visibility: hidden; }
+/* Paused, the pause screen covers the stage, its header and its room
+   button; the app's header comes back over it so the host can resume. */
+.has-gstage:has(.paused) .topbar { visibility: visible; }
+.gstage__head {
+  position: relative; z-index: 1; flex: none; display: flex; align-items: center; gap: 8px;
+  min-height: 52px; padding: 6px 12px; background: var(--card); border-bottom: 1px solid var(--line);
+}
+.gstage__round {
+  flex: none; display: flex; flex-direction: column; align-items: center; line-height: 1.1;
+  font-family: var(--display); font-weight: 800; font-size: 15px;
+}
+.gstage__round small { font-family: inherit; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
+.gstage__head .timer { width: 36px; height: 36px; }
+.gstage__head .timer__num { font-size: 13px; }
+/* The blanks take what's left and shrink before anything wraps. */
+.gstage__word { flex: 1; min-width: 0; display: flex; justify-content: center; overflow: hidden; }
+.gstage__head .wordmask__slots { flex-wrap: nowrap; gap: 3px; min-width: 0; }
+.gstage__head .wordmask__slot { flex: 0 1 14px; min-width: 7px; width: auto; height: 22px; border-bottom-width: 2px; font-size: 15px; }
+.gstage__head .wordmask__gap { flex: 0 1 8px; width: auto; }
+.gstage__status { font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gstage__head .reactions { margin-left: 0; gap: 4px; flex: none; }
+.gstage__head .reactions__btn { padding: 2px 8px; font-size: 13px; gap: 3px; }
 .gstage__form .chat__input { font-size: 16px; background: var(--card); }
 /* The guess box is an editable div here (see GuessField): one line that
    scrolls sideways, an input's placeholder, and its disabled look. */
@@ -908,18 +951,7 @@ button, input { font: inherit; color: inherit; }
 }
 .chat__input--editable[aria-disabled] { opacity: .6; cursor: default; }
 
-/* The tabs, just above the keyboard. */
-.gstage__tabs { display: flex; gap: 6px; padding: 4px 12px calc(8px + env(safe-area-inset-bottom)); }
-.gstage__tab {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 6px 4px; border: 0; border-radius: 10px; background: none;
-  color: var(--ink-soft); font-size: 11px; font-weight: 600; cursor: pointer;
-}
-.gstage__tab svg { width: 20px; height: 20px; }
-.gstage__tab.is-on { background: var(--accent-soft); color: var(--accent); }
-.gstage__tab:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-
-/* A tab's sheet, in the keyboard's place and at its height. */
+/* The room sheet, in the keyboard's place and at its height. */
 .gsheet {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; overflow-y: auto;
   /* Scrolls itself, and only itself: pan-y has to be on the sheet, since the
@@ -928,11 +960,21 @@ button, input { font: inherit; color: inherit; }
   touch-action: pan-y; overscroll-behavior: contain;
   padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
   background: var(--paper); border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 14px;
 }
-.gsheet__label { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--ink-soft); text-align: center; }
-.gsheet__round, .gsheet__react { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-.gsheet .reactions { margin-left: 0; }
-.gsheet .reactions__btn { padding: 10px 18px; font-size: 18px; }
+/* You: avatar, name and record, and moving to another phone. */
+.gsheet__me { display: flex; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.gsheet__mename { flex: 1; min-width: 0; display: flex; flex-direction: column; font-weight: 700; }
+.gsheet__mename small { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+.gsheet__phone { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; font-size: 13px; }
+.gsheet__phone svg { width: 16px; height: 16px; }
+.gsheet__row {
+  display: flex; align-items: center; gap: 8px; padding: 8px 0; border: 0; background: none;
+  color: var(--ink-soft); font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.gsheet__row svg { width: 16px; height: 16px; }
+/* The QR card and the room menu, laid in the sheet rather than popping up. */
+.gsheet .profile__pop { position: static; width: auto; box-shadow: none; }
 /* The players as a list here, not the strip the drawer's phone layout uses. */
 .game--skribbl .gsheet .scores { padding: 0; background: none; border: 0; }
 .game--skribbl .gsheet .scores .card__title { display: none; }

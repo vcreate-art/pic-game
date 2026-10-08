@@ -1,22 +1,31 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Keyboard, Smile, Timer as TimerIcon, Users } from 'lucide-react';
+import { Bug, Smartphone, Users } from 'lucide-react';
 import { MAX_CHAT_LEN } from '../../constants.js';
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
+import { totalPlayed, totalWon, useStats } from '../../lib/achievements.js';
+import { isPostHogEnabled } from '../../lib/posthog.js';
 import { lastKeyboardHeight, useVisualViewport } from '../../lib/useVisualViewport.js';
+import { PROFILE_EVENT, loadProfile, type Profile } from '../../net/socket.js';
 import { selectSkribbl, useGame } from '../../store/game.js';
+import { Avatar } from '../Avatar.js';
 import { useGuessBox } from '../Chat.js';
+import { PhoneHandoff } from '../PhoneHandoff.js';
 import { Podium } from '../Podium.js';
 import { Reactions } from '../Reactions.js';
+import { RoomMenu } from '../RoomPanel.js';
 import { Scoreboard } from '../Scoreboard.js';
 import { Timer } from '../Timer.js';
 import { TurnResult } from '../TurnResult.js';
 import { WordChoice } from '../WordChoice.js';
-import { WordMask } from '../WordMask.js';
+import { Slots } from '../WordMask.js';
 
 /**
- * Guessing on a phone. The canvas across the top, the chat rising over it
- * and fading as it climbs, the guess box, and a strip of tabs; under them the
- * keyboard, which is up by default, or the sheet a tab swapped in for it.
+ * Guessing on a phone. A header of its own in place of the app's (the round,
+ * the timer, the blanks and the reactions, always in sight), the canvas, the
+ * chat rising over it and fading as it climbs, and the guess box with the
+ * room button beside it; under them the keyboard, which is up by default, or
+ * the room sheet that button swaps in for it: the players, you, and what the
+ * app's header held (the room menu, playing on your phone, reporting a bug).
  *
  * The keyboard handling is the toys repo's mobile editor's: the stage is sized
  * to what the keyboard leaves, so the browser never scrolls anything under the
@@ -24,7 +33,7 @@ import { WordMask } from '../WordMask.js';
  * sent away, so swapping one for the other moves nothing.
  */
 
-type Sheet = 'players' | 'round' | 'react' | null;
+type Sheet = 'room' | null;
 
 /** A sheet's height before any keyboard has been seen: phone keyboards run
  *  about 260 to 340px. Capped against the screen for short windows. */
@@ -75,33 +84,35 @@ export function GuessStage() {
   const wanted = useRef(false);
   const changedAt = useRef(0);
 
-  // Where the app's top bar ends: the stage starts under it.
-  const [top, setTop] = useState(0);
-  useLayoutEffect(() => {
-    const bar = document.querySelector('.topbar');
-    const measure = () => setTop(bar ? bar.getBoundingClientRect().height : 0);
-    measure();
-    const ro = bar ? new ResizeObserver(measure) : null;
-    if (bar) ro!.observe(bar);
-    return () => ro?.disconnect();
+  // The stage has its own header, so the app's steps aside while it's up.
+  // Hidden rather than removed: its bug button is still what the bug-report
+  // survey listens to, and the room sheet clicks it.
+  useEffect(() => {
+    document.documentElement.classList.add('has-gstage');
+    return () => document.documentElement.classList.remove('has-gstage');
   }, []);
 
   // The drawing's and the foot's heights, for the gap between them: the
   // room the chat has before it starts covering the drawing.
+  const headRef = useRef<HTMLElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const footRef = useRef<HTMLDivElement>(null);
+  const [headHeight, setHeadHeight] = useState(0);
   const [boardHeight, setBoardHeight] = useState(0);
   const [footHeight, setFootHeight] = useState(0);
   useLayoutEffect(() => {
+    const head = headRef.current;
     const board = boardRef.current;
     const foot = footRef.current;
-    if (!board || !foot) return;
+    if (!head || !board || !foot) return;
     const measure = () => {
+      setHeadHeight(head.getBoundingClientRect().height);
       setBoardHeight(board.getBoundingClientRect().height);
       setFootHeight(foot.getBoundingClientRect().height);
     };
     measure();
     const ro = new ResizeObserver(measure);
+    ro.observe(head);
     ro.observe(board);
     ro.observe(foot);
     return () => ro.disconnect();
@@ -251,7 +262,7 @@ export function GuessStage() {
   // The bottom of the screen is held by the keyboard, or by the sheet that
   // took its place at its height; for a moment during a swap, both.
   const dockHeight = Math.max(vv.keyboardInset, sheet || held ? dock : 0);
-  const stageTop = Math.max(vv.offsetTop, top);
+  const stageTop = vv.offsetTop;
   const stageBottom = vv.offsetTop + vv.height - (dockHeight - vv.keyboardInset);
   const stageHeight = Math.max(0, stageBottom - stageTop);
 
@@ -327,20 +338,14 @@ export function GuessStage() {
     focusInput();
   }
 
-  const toggle = (kind: Exclude<Sheet, null>) => (sheet === kind ? closeSheet() : openSheet(kind));
-  const toggleKeyboard = () => {
-    if (sheet) return closeSheet();
-    if (keyboardIsUp()) dismissKeyboard();
-    else focusInput();
-  };
+  const toggleRoom = () => (sheet ? closeSheet() : openSheet('room'));
 
   if (!room) return null;
   const phase = room.phase;
-  const guessing = !sheet && keyboardIsUp();
   // With the keys or a sheet up, a few lines over the drawing; with neither,
   // as many as fit, solid down the gap and fading only once over the drawing.
   const cramped = dockHeight > 0;
-  const gap = Math.max(0, stageHeight - boardHeight - footHeight);
+  const gap = Math.max(0, stageHeight - headHeight - boardHeight - footHeight);
   const tapStage = () => {
     fold();
     if (sheet) closeSheet();
@@ -349,6 +354,8 @@ export function GuessStage() {
 
   return (
     <div className="gstage" style={{ top: stageTop, height: stageHeight }}>
+      <StageHead headRef={headRef} />
+
       {/* A tap on the drawing asks for the keyboard, like tapping a text. */}
       <div ref={boardRef} className="gstage__board board__wrap" onClick={tapStage}>
         <CanvasBoard />
@@ -440,54 +447,37 @@ export function GuessStage() {
             </span>
           )}
         </div>
+        {/* Swaps the keyboard for the room sheet, and back. preventDefault on
+            pointerdown keeps it from taking focus off the guess box. */}
+        <button
+          type="button"
+          className={`gstage__roombtn ${sheet ? 'is-on' : ''}`}
+          aria-pressed={!!sheet}
+          aria-label="Room: players and more"
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={toggleRoom}
+        >
+          <Users aria-hidden="true" />
+          <span className="gstage__roomcount">{room.players.length}</span>
+        </button>
       </div>
-
-      {/* The tabs. Each swaps the keyboard for its sheet; tapped again, or
-          Guess, brings the keyboard back. preventDefault on pointerdown keeps a
-          tab from taking focus off the guess box on its way. */}
-      <nav className="gstage__tabs" aria-label="Game">
-        {(
-          [
-            ['guess', 'Guess', Keyboard],
-            ['players', 'Players', Users],
-            ['round', 'Round', TimerIcon],
-            ['react', 'React', Smile],
-          ] as const
-        ).map(([kind, label, Icon]) => {
-          const on = kind === 'guess' ? guessing : sheet === kind;
-          return (
-            <button
-              key={kind}
-              type="button"
-              className={`gstage__tab ${on ? 'is-on' : ''}`}
-              aria-pressed={on}
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={() => (kind === 'guess' ? toggleKeyboard() : toggle(kind))}
-            >
-              <Icon aria-hidden="true" />
-              <span>{label}</span>
-            </button>
-          );
-        })}
-      </nav>
       </div>
 
       {sheet && (
         <div className="gsheet" style={{ height: dock }}>
-          {sheet === 'players' && <Scoreboard />}
-          {sheet === 'round' && (
-            <div className="gsheet__round">
-              <p className="gsheet__label">Round {room.round} of {room.settings.rounds}</p>
-              <WordMask />
-              {phase === 'drawing' && room.turn && <Timer endsAt={room.turn.endsAt} total={room.settings.drawTime} />}
-            </div>
+          <Scoreboard />
+          <SheetProfile />
+          {isPostHogEnabled && (
+            <button
+              type="button"
+              className="gsheet__row"
+              onClick={() => document.getElementById('report-bug')?.click()}
+            >
+              <Bug aria-hidden="true" />
+              Report a bug
+            </button>
           )}
-          {sheet === 'react' && (
-            <div className="gsheet__react">
-              <p className="gsheet__label">What do you think of this drawing?</p>
-              <Reactions />
-            </div>
-          )}
+          <RoomMenu standings={false} />
         </div>
       )}
     </div>
@@ -594,5 +584,68 @@ function GuessField({
         setText(t);
       }}
     />
+  );
+}
+
+/**
+ * The stage's header, in place of the app's: the round and the timer, the
+ * blanks with any hint letters, and the reactions, all in sight while the
+ * keyboard is up. Between turns it says what's happening instead.
+ */
+function StageHead({ headRef }: { headRef: React.RefObject<HTMLElement> }) {
+  const room = useGame(selectSkribbl);
+  if (!room) return <header ref={headRef} className="gstage__head" />;
+  const { phase, turn } = room;
+  const drawer = room.players.find((p) => p.id === turn?.drawerId)?.name ?? 'The drawer';
+  const status =
+    phase === 'choosing' ? `${drawer} is choosing a word` : phase === 'gameEnd' ? 'Game over' : phase === 'turnEnd' ? 'Turn over' : '';
+
+  return (
+    <header ref={headRef} className="gstage__head">
+      <span className="gstage__round" aria-label={`Round ${room.round} of ${room.settings.rounds}`}>
+        <small>Round</small>
+        {room.round}/{room.settings.rounds}
+      </span>
+      {phase === 'drawing' && turn && <Timer endsAt={turn.endsAt} total={room.settings.drawTime} />}
+      <div className="gstage__word">
+        {phase === 'drawing' && turn?.mask ? (
+          <Slots mask={turn.mask} revealed={turn.revealed} />
+        ) : (
+          <span className="gstage__status">{status}</span>
+        )}
+      </div>
+      <Reactions />
+    </header>
+  );
+}
+
+/**
+ * You, in the room sheet: what the app header's profile chip showed, and
+ * moving your seat to another phone. Editing your name stays with the chip,
+ * on screens with the app's header.
+ */
+function SheetProfile() {
+  const [profile, setProfile] = useState<Profile | null>(() => loadProfile());
+  const [phone, setPhone] = useState(false);
+  const stats = useStats();
+  useEffect(() => {
+    const on = (e: Event) => setProfile((e as CustomEvent<Profile>).detail);
+    window.addEventListener(PROFILE_EVENT, on);
+    return () => window.removeEventListener(PROFILE_EVENT, on);
+  }, []);
+  if (!profile) return null;
+  if (phone) return <PhoneHandoff onBack={() => setPhone(false)} />;
+  const played = totalPlayed(stats);
+  return (
+    <section className="gsheet__me">
+      <Avatar data={profile.avatar} size={36} />
+      <span className="gsheet__mename">
+        {profile.name}
+        <small>{played ? `${played} played, ${totalWon(stats)} won` : 'No games finished yet'}</small>
+      </span>
+      <button type="button" className="btn btn--outline gsheet__phone" onClick={() => setPhone(true)}>
+        <Smartphone aria-hidden="true" /> Play on your phone
+      </button>
+    </section>
   );
 }

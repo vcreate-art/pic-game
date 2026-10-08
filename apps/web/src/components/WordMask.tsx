@@ -22,7 +22,7 @@ function EyeIcon({ off }: { off: boolean }) {
 }
 
 /** The blanks, with any revealed hint letters filled in. */
-function Slots({ mask, revealed }: { mask: string; revealed: Record<number, string> }) {
+export function Slots({ mask, revealed }: { mask: string; revealed: Record<number, string> }) {
   return (
     <span className="wordmask__slots">
       {[...mask].map((c, i) => {
