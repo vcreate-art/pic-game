@@ -120,6 +120,7 @@ export function GuessStage() {
   // whoever is reading the newest keeps up with them as more arrive.
   const chatRef = useRef<HTMLDivElement>(null);
   const meRef = useRef<HTMLButtonElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const myName = useGame((s) => s.room?.players.find((p) => p.id === s.me)?.name ?? '');
   const myId = useGame((s) => s.me);
   // While a sent line is in flight: the newest message when it left. Lines of
@@ -180,7 +181,9 @@ export function GuessStage() {
     said.className = 'msg__text';
     said.textContent = text;
     line.append(who, said);
-    document.body.append(line);
+    // Inside the stage, so its overlays (a turn's result, say) cover them.
+    const host = stageRef.current ?? document.body;
+    host.append(line);
     const size = line.getBoundingClientRect();
     const landX = into.left + gutter;
     const landY = into.bottom - bottomPad - size.height;
@@ -206,7 +209,7 @@ export function GuessStage() {
     ghost.classList.add('gstage__flying-face');
     ghost.style.left = `${start.left}px`;
     ghost.style.top = `${start.top}px`;
-    document.body.append(ghost);
+    host.append(ghost);
     standIns.current.push(ghost);
     const endX = into.left + (gutter - SENDER_AVATAR_PX) / 2;
     const endY = landY + (size.height - SENDER_AVATAR_PX) / 2;
@@ -400,6 +403,10 @@ export function GuessStage() {
     if (!el) return;
     if (overlaid) {
       if (document.activeElement === el) dismissKeyboard();
+      // A send still in flight (the last guess, which ends the turn) is
+      // done: the stand-ins go and the real line shows where it landed.
+      dropStandIns();
+      setLanding(null);
       return;
     }
     if (!sheet && document.activeElement !== el) {
@@ -454,7 +461,7 @@ export function GuessStage() {
   };
 
   return (
-    <div className="gstage" style={{ top: stageTop, height: stageHeight }}>
+    <div ref={stageRef} className="gstage" style={{ top: stageTop, height: stageHeight }}>
       <StageHead headRef={headRef} />
 
       {/* A tap on the drawing asks for the keyboard, like tapping a text. */}
