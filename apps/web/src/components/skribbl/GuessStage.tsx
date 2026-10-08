@@ -334,9 +334,18 @@ export function GuessStage() {
 
   /** Hands the space back to the keyboard, straight from the closing tap. */
   function closeSheet() {
+    handBack();
+    focusInput();
+  }
+
+  /** The sheet goes and its space stays held for the keys on their way, so
+   *  the guess box waits where it is. Also from a tap on the guess box
+   *  itself, which focuses it and so is already asking for the keys. */
+  function handBack() {
     setSheet(null);
     setHeld(true);
-    focusInput();
+    wanted.current = true;
+    changedAt.current = performance.now();
   }
 
   const toggleRoom = () => (sheet ? closeSheet() : openSheet('room'));
@@ -436,7 +445,7 @@ export function GuessStage() {
             placeholder={box.placeholder}
             onFocus={() => {
               fold();
-              if (sheet) setSheet(null);
+              if (sheet) handBack();
             }}
             onEnter={() => {
               fold();
