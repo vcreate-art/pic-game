@@ -834,7 +834,7 @@ function SheetMe() {
   if (editing) return <ProfileEditor className="gsheet__edit" onDone={() => setEditing(false)} />;
   const played = totalPlayed(stats);
   return (
-    <>
+    <div className="gsheet__card">
       {/* No avatar here: yours is on the button just above, ringed while
           this sheet is open. */}
       <section className="gsheet__me">
@@ -859,7 +859,7 @@ function SheetMe() {
         )}
       </section>
       <ProfileBadges peek={3} />
-    </>
+    </div>
   );
 }
 

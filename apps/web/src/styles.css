@@ -1020,12 +1020,13 @@ button, input { font: inherit; color: inherit; }
   background: var(--paper); border-top: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 14px;
 }
-/* The room's controls in the sheet: 4:3 tiles no wider than 80px, centred
-   at the bottom. Last, after the host note, whatever order the room menu
+/* The room's controls in the sheet: equal tiles filling the bottom row
+   (the host's Pause, Restart, Lobby and Leave; for anyone else, Leave
+   alone, across). Last, after the host note, whatever order the room menu
    gives them in. */
-.gsheet .room__controls { order: 2; grid-auto-columns: minmax(0, 80px); justify-content: center; margin-top: auto; }
+.gsheet .room__controls { order: 2; grid-auto-columns: minmax(0, 1fr); margin-top: auto; }
 .gsheet .room__note { order: 1; margin: 0; }
-.gsheet .room__ctl { aspect-ratio: 4 / 3; justify-content: center; padding: 4px; }
+.gsheet .room__ctl { justify-content: center; min-height: 54px; padding: 5px 4px; }
 /* You, atop the "you" sheet, and the name and look editor in its place. */
 .gsheet__me { display: flex; align-items: center; gap: 10px; }
 .gsheet__mename { flex: 1; min-width: 0; display: flex; flex-direction: column; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1037,8 +1038,13 @@ button, input { font: inherit; color: inherit; }
 }
 .gsheet__edit-btn svg { width: 14px; height: 14px; }
 .gsheet__icon-btn { padding: 7px; }
-/* The "you" sheet fits the keyboard's height without scrolling: tighter. */
+/* The "you" sheet fits the keyboard's height without scrolling: tighter,
+   with you and your achievements together on a plain white card. */
 .gsheet--me { gap: 10px; }
+.gsheet__card {
+  display: flex; flex-direction: column; gap: 10px; padding: 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+}
 .gsheet--me .profile__badges { padding-top: 0; }
 .gsheet--me .profile__badges ul { margin-top: 8px; gap: 4px; }
 .gsheet__edit { display: flex; flex-direction: column; gap: 12px; }

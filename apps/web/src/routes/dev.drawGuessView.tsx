@@ -64,7 +64,7 @@ function room(phase: Phase, drawer: string, count: number): SkribblRoomState {
     serverTime: now,
     meta: {
       stage: 'playing', paused: null, countdown: null, wins: {}, winsByGame: {}, played: {}, games: 0,
-      can: { pause: false, restart: true, toLobby: true, switch: true },
+      can: { pause: true, restart: true, toLobby: true, switch: true },
     },
     phase,
     settings: DEFAULT_SETTINGS,
