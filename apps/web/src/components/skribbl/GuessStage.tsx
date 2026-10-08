@@ -1,23 +1,18 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Bug, Pencil, SmilePlus, Users } from 'lucide-react';
+import { SmilePlus, Users } from 'lucide-react';
 import { MAX_CHAT_LEN } from '../../constants.js';
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
-import { ACHIEVEMENTS, totalPlayed, totalWon, useStats } from '../../lib/achievements.js';
-import { isPostHogEnabled } from '../../lib/posthog.js';
 import { useDismiss } from '../../lib/useDismiss.js';
 import { lastKeyboardHeight, useVisualViewport } from '../../lib/useVisualViewport.js';
 import { selectSkribbl, useGame } from '../../store/game.js';
-import { Avatar } from '../Avatar.js';
 import { useGuessBox } from '../Chat.js';
-import { ProfileBadges, ProfileEditor } from '../ProfileChip.js';
 import { Podium } from '../Podium.js';
 import { useReaction } from '../Reactions.js';
 import { RoomMenu } from '../RoomPanel.js';
 import { Scoreboard } from '../Scoreboard.js';
-import { Timer } from '../Timer.js';
 import { TurnResult } from '../TurnResult.js';
 import { WordChoice } from '../WordChoice.js';
-import { Slots } from '../WordMask.js';
+import { MeButton, SENDER_AVATAR_PX, SenderAvatar, SheetMe, StageHead, useStageChrome } from './stage.js';
 
 /**
  * Guessing on a phone. A header of its own in place of the app's (the round,
@@ -89,13 +84,7 @@ export function GuessStage() {
   const wanted = useRef(false);
   const changedAt = useRef(0);
 
-  // The stage has its own header, so the app's steps aside while it's up.
-  // Hidden rather than removed: its bug button is still what the bug-report
-  // survey listens to, and the room sheet clicks it.
-  useEffect(() => {
-    document.documentElement.classList.add('has-gstage');
-    return () => document.documentElement.classList.remove('has-gstage');
-  }, []);
+  useStageChrome();
 
   // The drawing's and the foot's heights, for the gap between them: the
   // room the chat has before it starts covering the drawing.
@@ -397,26 +386,6 @@ export function GuessStage() {
   const keyboardIsUp = () =>
     performance.now() - changedAt.current < KEYBOARD_GRACE_MS ? wanted.current : keyboardOpen;
 
-  // Nothing under the stage may scroll while it's up. With the keyboard open
-  // the visible window is smaller than the page, and a drag that pans it
-  // makes Chrome's address bar collapse and expand, which moves everything.
-  // As toys' storefront does for its stage; overscroll-behavior also keeps
-  // pull-to-refresh and the rubber band out of a game in progress. Put back
-  // as it was when the stage goes, so other pages scroll as normal.
-  useEffect(() => {
-    const els = [document.documentElement, document.body];
-    const before = els.map((el) => [el.style.overflow, el.style.overscrollBehavior] as const);
-    for (const el of els) {
-      el.style.overflow = 'hidden';
-      el.style.overscrollBehavior = 'none';
-    }
-    return () =>
-      els.forEach((el, i) => {
-        el.style.overflow = before[i]![0];
-        el.style.overscrollBehavior = before[i]![1];
-      });
-  }, []);
-
   // Best effort on arrival: a desktop browser focuses; a phone waits for the
   // first tap, since it won't raise the keyboard without one.
   useEffect(() => {
@@ -703,38 +672,6 @@ function GuessField({
   );
 }
 
-/**
- * The stage's header, in place of the app's: the round, the blanks with any
- * hint letters, and the timer, all in sight while the
- * keyboard is up. Between turns it says what's happening instead.
- */
-function StageHead({ headRef }: { headRef: React.RefObject<HTMLElement> }) {
-  const room = useGame(selectSkribbl);
-  if (!room) return <header ref={headRef} className="gstage__head" />;
-  const { phase, turn } = room;
-  const drawer = room.players.find((p) => p.id === turn?.drawerId)?.name ?? 'The drawer';
-  const status =
-    phase === 'choosing' ? `${drawer} is choosing a word` : phase === 'gameEnd' ? 'Game over' : phase === 'turnEnd' ? 'Turn over' : '';
-
-  return (
-    <header ref={headRef} className="gstage__head">
-      <span className="gstage__round" aria-label={`Round ${room.round} of ${room.settings.rounds}`}>
-        {room.round}
-        <small>/{room.settings.rounds}</small>
-      </span>
-      <div className="gstage__word">
-        {phase === 'drawing' && turn?.mask ? (
-          <Slots mask={turn.mask} revealed={turn.revealed} />
-        ) : (
-          <span className="gstage__status">{status}</span>
-        )}
-      </div>
-      <div className="gstage__clock">
-        {phase === 'drawing' && turn && <Timer endsAt={turn.endsAt} total={room.settings.drawTime} />}
-      </div>
-    </header>
-  );
-}
 
 /**
  * Thumbs up or down, as one button in the drawing's top corner: faint until
@@ -789,109 +726,6 @@ function ReactButton() {
   );
 }
 
-/** You, as the room has you: your name and look as everyone sees them. */
-function useMe() {
-  return useGame((s) => s.room?.players.find((p) => p.id === s.me));
-}
-
-/** Your avatar before the guess box: opens the "you" sheet.
- *  preventDefault on pointerdown keeps it from taking focus off the box. */
-function MeButton({
-  btnRef,
-  on,
-  onToggle,
-}: {
-  btnRef: React.RefObject<HTMLButtonElement>;
-  on: boolean;
-  onToggle: () => void;
-}) {
-  const me = useMe();
-  if (!me) return null;
-  return (
-    <button
-      ref={btnRef}
-      type="button"
-      className={`gstage__mebtn ${on ? 'is-on' : ''}`}
-      aria-pressed={on}
-      aria-label="You and the room"
-      onPointerDown={(e) => e.preventDefault()}
-      onClick={onToggle}
-    >
-      <Avatar data={me.avatar} size={ME_AVATAR_PX} />
-    </button>
-  );
-}
-
-/** You, at the top of the "you" sheet: your record, a way to change your
- *  name and look (editing takes their place) and to report a bug, then your
- *  achievements with the three most relevant, as the header menu has them,
- *  so the sheet fits the keyboard's height without scrolling. */
-function SheetMe() {
-  const me = useMe();
-  const [editing, setEditing] = useState(false);
-  const stats = useStats();
-  if (!me) return null;
-  if (editing) return <ProfileEditor className="gsheet__edit" onDone={() => setEditing(false)} />;
-  const played = totalPlayed(stats);
-  return (
-    <div className="gsheet__card">
-      {/* No avatar here: yours is on the button just above, ringed while
-          this sheet is open. */}
-      <section className="gsheet__me">
-        <span className="gsheet__mename">
-          <span className="gsheet__nameline">
-            <span className="gsheet__name">{me.name}</span>
-            <button
-              type="button"
-              className="gsheet__icon-btn"
-              aria-label="Edit name and look"
-              title="Edit name and look"
-              onClick={() => setEditing(true)}
-            >
-              <Pencil aria-hidden="true" />
-            </button>
-            {isPostHogEnabled && (
-              <button
-                type="button"
-                className="gsheet__icon-btn"
-                aria-label="Report a bug"
-                title="Report a bug"
-                onClick={() => document.getElementById('report-bug')?.click()}
-              >
-                <Bug aria-hidden="true" />
-              </button>
-            )}
-          </span>
-          <small>{played ? `${played} played, ${totalWon(stats)} won` : 'No games finished yet'}</small>
-        </span>
-        <span className="gsheet__count">
-          <b>
-            {ACHIEVEMENTS.filter((a) => stats.unlocked[a.id]).length} of {ACHIEVEMENTS.length}
-          </b>
-          <small>achievements</small>
-        </span>
-      </section>
-      <ProfileBadges peek={3} shelf={false} count={false} />
-    </div>
-  );
-}
 
 /** How long sent stand-ins wait, landed, for the real line from the server. */
 const LANDING_WAIT_MS = 1500;
-
-/** Your avatar beside the guess box. */
-const ME_AVATAR_PX = 34;
-
-/** How big a sender's avatar is in the chat's gutter. */
-const SENDER_AVATAR_PX = 18;
-
-/** A message's sender, small, in the chat's left gutter. */
-function SenderAvatar({ playerId }: { playerId?: string }) {
-  const avatar = useGame((s) => s.room?.players.find((p) => p.id === playerId)?.avatar);
-  if (!playerId || !avatar) return null;
-  return (
-    <span className="msg__avatar" aria-hidden="true">
-      <Avatar data={avatar} size={SENDER_AVATAR_PX} />
-    </span>
-  );
-}

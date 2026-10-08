@@ -1018,6 +1018,71 @@ button, input { font: inherit; color: inherit; }
 }
 .chat__input--editable[aria-disabled] { opacity: .6; cursor: default; }
 
+/* ------------------------------------ draw & guess on a phone: drawing */
+
+/* The drawer's word in the stage's header, and the eye that hides it. */
+.gstage__drawword { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.gstage__secret {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--display); font-size: 22px; font-weight: 800;
+}
+.gstage__eye {
+  flex: none; display: grid; place-items: center; width: 30px; height: 30px; padding: 0;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--card); color: var(--ink-soft); cursor: pointer;
+}
+.gstage__eye svg { width: 16px; height: 16px; }
+
+/* DrawStage: the canvas, the guesses under it, the tools along the bottom.
+   The stage is grey and the canvas white, so it's plain where a stroke
+   counts and where it doesn't. */
+.dstage { background: var(--paper); }
+.dstage .gstage__board { flex: none; }
+.dstage .gstage__board .board { border-bottom: 1px solid var(--line); }
+/* The guesses take whatever height is left, newest at the bottom, older ones
+   fading as they climb; under the drawing, so they never cover it. */
+.dstage__feed {
+  position: static; flex: 1; min-height: 0; max-height: none; overflow: hidden;
+  justify-content: flex-end; padding-top: 6px; pointer-events: none;
+}
+.dstage__feed > :first-child { margin-top: auto; }
+/* What everyone thinks of the drawing, read-only, in its top corner. */
+.dstage__tally {
+  position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+  background: rgba(255, 255, 255, .86); font-size: 13px; opacity: .8; pointer-events: none;
+}
+.dstage__tally b { margin-right: 4px; font-size: 12px; }
+.dstage__tally b:last-child { margin-right: 0; }
+
+.dtools {
+  flex: none; display: flex; flex-direction: column; gap: 8px;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom)) 6px;
+  border-top: 1px solid var(--line); background: var(--card);
+}
+.dtools__palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; padding-left: 2px; }
+.dtools__palette .swatch { width: auto; height: 28px; border-radius: 8px; }
+.dtools__palette .swatch.is-active { transform: none; box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ink); }
+.dtools__row { display: flex; align-items: center; gap: 5px; }
+.dtools__spacer { flex: 1; }
+.dtools__btn {
+  position: relative; flex: none; display: grid; place-items: center; width: 36px; height: 36px; padding: 0;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); cursor: pointer;
+}
+.dtools__btn svg { width: 18px; height: 18px; }
+.dtools__btn.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.dtools__btn--danger { color: var(--warn); }
+.dtools__btn--danger.is-asking { border-color: var(--warn); background: var(--warn-wash); }
+/* Clear's second-tap prompt, over the button. */
+.dtools__ask {
+  position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  padding: 3px 8px; border-radius: 6px; background: var(--warn); color: #fff;
+  font-size: 12px; font-weight: 700; white-space: nowrap; pointer-events: none;
+}
+.dtools__dot { display: block; border-radius: 50%; }
+.dtools .gstage__roombtn { width: 36px; height: 36px; }
+/* Above an open sheet, over the canvas: a tap here closes it, never draws. */
+.dstage__scrim { position: fixed; inset: 0; z-index: 30; background: rgba(31, 34, 51, .12); }
+
 /* The room sheet, in the keyboard's place and at its height. */
 .gsheet {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; overflow-y: auto;

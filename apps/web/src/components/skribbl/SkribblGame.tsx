@@ -10,6 +10,7 @@ import { Toolbar } from '../Toolbar.js';
 import { TurnResult } from '../TurnResult.js';
 import { WordChoice } from '../WordChoice.js';
 import { WordMask } from '../WordMask.js';
+import { DrawStage } from './DrawStage.js';
 import { GuessStage } from './GuessStage.js';
 import { useMediaQuery } from '../../lib/useMediaQuery.js';
 
@@ -22,12 +23,11 @@ export function SkribblGame() {
   if (!room) return null;
   const phase = room.phase;
 
-  // Guessing on a phone is its own screen: the canvas, the chat over it and
-  // the keyboard, with tabs for the rest.
-  if (phone && !isDrawer) {
+  // On a phone, guessing and drawing are each a screen of their own.
+  if (phone) {
     return (
-      <div className="game game--skribbl game--guessing">
-        <GuessStage />
+      <div className={`game game--skribbl ${isDrawer ? 'game--drawing' : 'game--guessing'}`}>
+        {isDrawer ? <DrawStage /> : <GuessStage />}
         <Gallery />
       </div>
     );
