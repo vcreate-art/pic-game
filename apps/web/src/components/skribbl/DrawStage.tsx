@@ -9,6 +9,7 @@ import { getSocket } from '../../net/socket.js';
 import { selectSkribbl, useGame } from '../../store/game.js';
 import { useTools } from '../../store/tools.js';
 import { Podium } from '../Podium.js';
+import { useReaction } from '../Reactions.js';
 import { RoomMenu } from '../RoomPanel.js';
 import { Scoreboard } from '../Scoreboard.js';
 import { TurnResult } from '../TurnResult.js';
@@ -56,6 +57,7 @@ export function DrawStage() {
       <div className="gstage__board board__wrap">
         <CanvasBoard />
         {phase === 'drawing' && <ColorBar />}
+        <Tally />
         {phase === 'choosing' && <WordChoice />}
         {phase === 'turnEnd' && <TurnResult />}
         {phase === 'gameEnd' && <Podium />}
@@ -322,6 +324,29 @@ function ColorBar() {
     >
       <span className="colorbar__thumb" style={{ top: `${at * 100}%`, background: color }} />
       {dragging && <span className="colorbar__drop" style={{ top: `${at * 100}%`, background: color }} />}
+    </div>
+  );
+}
+
+/** What everyone thinks of your drawing, faint in its top-left corner, the
+ *  one the colour bar leaves free. Only once someone has reacted, and only
+ *  the counts that aren't zero. Yours to see, not to vote on; strokes pass
+ *  through it. */
+function Tally() {
+  const r = useReaction();
+  if (!r || !r.isDrawer || r.likes + r.dislikes === 0) return null;
+  return (
+    <div className="dstage__tally" aria-label={`${r.likes} likes, ${r.dislikes} dislikes`}>
+      {r.likes > 0 && (
+        <span>
+          <span aria-hidden="true">👍</span> {r.likes}
+        </span>
+      )}
+      {r.dislikes > 0 && (
+        <span>
+          <span aria-hidden="true">👎</span> {r.dislikes}
+        </span>
+      )}
     </div>
   );
 }

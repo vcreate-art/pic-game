@@ -1122,6 +1122,14 @@ button, input { font: inherit; color: inherit; }
   justify-content: flex-end; padding-top: 6px; pointer-events: none;
 }
 .dstage__feed > :first-child { margin-top: auto; }
+/* The likes and dislikes, faint in the drawing's top-left corner; strokes
+   pass through. */
+.dstage__tally {
+  position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; gap: 10px;
+  padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+  background: rgba(255, 255, 255, .86); font-size: 13px; font-weight: 700;
+  opacity: .85; pointer-events: none;
+}
 /* The colour bar down the drawing's right edge (ColorBar): a thin line,
    with a white rim and a shadow so it reads on any drawing, inside a wide
    invisible catch area, 40px across, for a thumb. */

@@ -14,7 +14,8 @@ import { useGame } from '../store/game.js';
  *
  * ?as=guesser|drawer and ?phase=choosing|drawing|turnEnd set the scene,
  * ?players=N (up to 16) fills the room, ?word= sets the word (spaces and
- * hyphens show as in a real one, for trying long answers), and
+ * hyphens show as in a real one, for trying long answers), ?likes=N and
+ * ?dislikes=N set the drawing's reactions, and
  * the panel in the corner changes them, adds guesses, or keeps a stream of
  * them coming. Guesses you type show up locally, since nothing is listening.
  */
@@ -55,7 +56,7 @@ function people(count: number): Player[] {
   return [...PEOPLE, ...extra];
 }
 
-function room(phase: Phase, drawer: string, count: number, word: string): SkribblRoomState {
+function room(phase: Phase, drawer: string, count: number, word: string, votes: [number, number]): SkribblRoomState {
   const now = Date.now();
   return {
     kind: 'skribbl',
@@ -73,7 +74,9 @@ function room(phase: Phase, drawer: string, count: number, word: string): Skribb
     turn: {
       drawerId: drawer, round: 1, turnIndex: 0,
       mask: maskOf(word), revealed: /[^\s-]/.test(word[2] ?? ' ') ? { 2: word[2]! } : {},
-      endsAt: now + 70_000, guessed: ['ben'], likes: [], dislikes: [],
+      endsAt: now + 70_000, guessed: ['ben'],
+      likes: people(count).slice(1, 1 + votes[0]).map((p) => p.id),
+      dislikes: people(count).slice(1 + votes[0], 1 + votes[0] + votes[1]).map((p) => p.id),
     },
     ops: sampleOps(),
     gallery: [],
@@ -86,7 +89,9 @@ const say = (name: string, text: string, kind: ChatMessage['kind'] = 'chat'): Ch
 });
 
 export default function DrawGuessPreview() {
-  const search = useSearch({ strict: false }) as { as?: string; phase?: string; players?: string; word?: string };
+  const search = useSearch({ strict: false }) as {
+    as?: string; phase?: string; players?: string; word?: string; likes?: string; dislikes?: string;
+  };
   const navigate = useNavigate();
   const as = search.as === 'drawer' ? 'drawer' : 'guesser';
   const phase = (['choosing', 'drawing', 'turnEnd'].includes(search.phase ?? '') ? search.phase : 'drawing') as Phase;
@@ -94,7 +99,12 @@ export default function DrawGuessPreview() {
   const [open, setOpen] = useState(false);
   const count = Math.min(16, Math.max(PEOPLE.length, Number(search.players) || PEOPLE.length));
   const word = (search.word?.trim() || WORD).toLowerCase();
-  const state = useMemo(() => room(phase, as === 'drawer' ? ME : 'ana', count, word), [as, phase, count, word]);
+  const likes = Math.max(0, Number(search.likes) || 0);
+  const dislikes = Math.max(0, Number(search.dislikes) || 0);
+  const state = useMemo(
+    () => room(phase, as === 'drawer' ? ME : 'ana', count, word, [likes, dislikes]),
+    [as, phase, count, word, likes, dislikes],
+  );
 
   // The scene: the room, who we are, what's been said, and the word if ours.
   useEffect(() => {
