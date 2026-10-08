@@ -91,27 +91,79 @@ describe('shape snapping', () => {
     expect(recognizeShape(wire(loop(400, 300, 100, 100, { turns: 0.9 })))?.kind).toBe('circle');
   });
 
-  it('leaves an open curve, a lumpy loop, and shapes with corners alone', () => {
+  it('leaves an open curve and a lumpy loop alone', () => {
     expect(recognizeShape(wire(loop(400, 300, 100, 100, { turns: 0.6 })))).toBeNull();
     expect(recognizeShape(wire(loop(400, 300, 120, 120, { lumps: 0.4 })))).toBeNull();
-    const square: [number, number][] = [
-      ...line([200, 200], [400, 200], 0, 15), ...line([400, 200], [400, 400], 0, 15),
-      ...line([400, 400], [200, 400], 0, 15), ...line([200, 400], [200, 200], 0, 15),
-    ];
-    expect(recognizeShape(wire(square))).toBeNull();
-    const shaky: [number, number][] = [
-      ...line([200, 200], [400, 200], 3, 15), ...line([400, 200], [400, 400], 3, 15),
-      ...line([400, 400], [200, 400], 3, 15), ...line([200, 400], [200, 200], 3, 15),
-    ];
-    expect(recognizeShape(wire(shaky))).toBeNull();
-    const rect: [number, number][] = [
-      ...line([200, 200], [500, 200], 0, 15), ...line([500, 200], [500, 320], 0, 15),
-      ...line([500, 320], [200, 320], 0, 15), ...line([200, 320], [200, 200], 0, 15),
-    ];
-    expect(recognizeShape(wire(rect))).toBeNull();
-    const triangle: [number, number][] = [
-      ...line([400, 150], [550, 400], 0, 15), ...line([550, 400], [250, 400], 0, 15), ...line([250, 400], [400, 150], 0, 15),
-    ];
-    expect(recognizeShape(wire(triangle))).toBeNull();
+  });
+});
+
+/** A closed path through corners, as a hand draws one: each side a run of
+ *  points, a little shaky. */
+function polygon(corners: [number, number][], shake = 0, per = 15): [number, number][] {
+  const out: [number, number][] = [];
+  corners.forEach((c, i) => out.push(...line(c, corners[(i + 1) % corners.length]!, shake, per).slice(i ? 1 : 0)));
+  return out;
+}
+const corners = (pts: number[]) => {
+  const out: [number, number][] = [];
+  for (let i = 0; i + 1 < pts.length; i += 2) out.push(dequantize(pts[i]!, pts[i + 1]!).map(Math.round) as [number, number]);
+  return out;
+};
+
+describe('snapping to shapes with corners', () => {
+  it('reads a triangle, its corners where they were drawn', () => {
+    const s = recognizeShape(wire(polygon([[400, 150], [550, 400], [250, 400]], 2)));
+    expect(s?.kind).toBe('triangle');
+    const c = corners(s!.pts);
+    expect(c).toHaveLength(4); // closed: back to the first corner
+    const drawn: [number, number][] = [[400, 150], [550, 400], [250, 400]];
+    drawn.forEach(([x, y], i) => expect(Math.hypot(c[i]![0] - x, c[i]![1] - y)).toBeLessThan(10));
+  });
+
+  it('squares up a rough rectangle, and a near-square to a square', () => {
+    const rect = recognizeShape(wire(polygon([[200, 200], [500, 205], [497, 330], [203, 322]], 2)));
+    expect(rect?.kind).toBe('rectangle');
+    const c = corners(rect!.pts).slice(0, 4);
+    // Right angles: opposite sides equal, diagonals equal.
+    const d = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    expect(Math.abs(d(c[0]!, c[1]!) - d(c[2]!, c[3]!))).toBeLessThan(3);
+    expect(Math.abs(d(c[0]!, c[2]!) - d(c[1]!, c[3]!))).toBeLessThan(3);
+    expect(recognizeShape(wire(polygon([[200, 200], [400, 204], [396, 398], [203, 392]], 2)))?.kind).toBe('square');
+  });
+
+  it('squares up a long thin rectangle drawn shakily', () => {
+    expect(recognizeShape(wire(polygon([[120, 480], [420, 486], [418, 560], [118, 556]], 3)))?.kind).toBe('rectangle');
+  });
+
+  it('keeps a rectangle at the angle it was drawn', () => {
+    const tilt = 0.4;
+    const at = (x: number, y: number): [number, number] => [400 + x * Math.cos(tilt) - y * Math.sin(tilt), 300 + x * Math.sin(tilt) + y * Math.cos(tilt)];
+    const s = recognizeShape(wire(polygon([at(-150, -60), at(150, -60), at(150, 60), at(-150, 60)], 2)));
+    expect(s?.kind).toBe('rectangle');
+    const [a, b] = corners(s!.pts);
+    expect(Math.abs(Math.atan2(b![1] - a![1], b![0] - a![0]) - tilt)).toBeLessThan(0.05);
+  });
+
+  it('reads a square begun mid-side, drawn shakily, and held at the end', () => {
+    const sides = polygon([[300, 200], [500, 200], [500, 400], [300, 400]], 3);
+    const midSide = [...sides.slice(7), ...sides.slice(1, 8)];
+    const [ex, ey] = midSide[midSide.length - 1]!;
+    const held = Array.from({ length: 30 }, (_, i) => [ex + Math.sin(i * 2.1) * 2, ey + Math.cos(i * 1.7) * 2] as [number, number]);
+    expect(recognizeShape(wire([...midSide, ...held]))?.kind).toBe('square');
+  });
+
+  it('straightens a four-sided shape that isn’t a rectangle', () => {
+    expect(recognizeShape(wire(polygon([[400, 150], [550, 300], [400, 450], [250, 300]], 2)))?.kind).toBe('square');
+    expect(recognizeShape(wire(polygon([[300, 200], [500, 200], [580, 400], [220, 400]], 2)))?.kind).toBe('quadrilateral');
+  });
+
+  it('leaves five or more corners, and an open zigzag, alone', () => {
+    const pentagon = Array.from({ length: 5 }, (_, i) => [400 + 150 * Math.cos((i * 2 * Math.PI) / 5), 300 + 150 * Math.sin((i * 2 * Math.PI) / 5)] as [number, number]);
+    expect(recognizeShape(wire(polygon(pentagon, 1)))).toBeNull();
+    expect(recognizeShape(wire(line([100, 100], [300, 300], 0, 12).concat(line([300, 300], [500, 100], 0, 12))))).toBeNull();
+  });
+
+  it('still reads circles as circles, not polygons', () => {
+    expect(recognizeShape(wire(loop(400, 300, 120, 110, { lumps: 0.1 })))?.kind).toBe('circle');
   });
 });

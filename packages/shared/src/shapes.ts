@@ -3,12 +3,13 @@ import { dequantize, quantize } from './protocol.js';
 
 /**
  * Shape snapping, as Apple Notes does it: a stroke held still at its end is
- * read as a straight line, a circle or an ellipse if it's close enough to
+ * read as a straight line, a circle or an ellipse, a triangle, or a
+ * rectangle or square (or another four-sided shape) if it's close enough to
  * one, and swapped for a clean one. Points are the wire's flat quantized
  * pairs in and out; the reading is done on the logical canvas, 800 × 600.
  */
 
-export type SnapKind = 'line' | 'circle' | 'ellipse';
+export type SnapKind = 'line' | 'circle' | 'ellipse' | 'triangle' | 'rectangle' | 'square' | 'quadrilateral';
 
 export interface SnapShape {
   kind: SnapKind;
@@ -90,6 +91,12 @@ function resample(ps: readonly P[], n: number): P[] {
 /** How many points it takes to trace the stroke with straight sides, none
  *  straying more than `within` from it (Douglas–Peucker). */
 function straightSides(ps: readonly P[], within: number): number {
+  return traced(ps, within).length;
+}
+
+/** The points kept when tracing the stroke with straight sides, none
+ *  straying more than `within` from it (Douglas–Peucker), in order. */
+function traced(ps: readonly P[], within: number): number[] {
   const keep = new Array<boolean>(ps.length).fill(false);
   keep[0] = keep[ps.length - 1] = true;
   const split = (i: number, j: number) => {
@@ -120,7 +127,7 @@ function straightSides(ps: readonly P[], within: number): number {
   } else {
     split(0, ps.length - 1);
   }
-  return keep.filter(Boolean).length;
+  return keep.flatMap((k, i) => (k ? [i] : []));
 }
 
 function pathLength(ps: readonly P[]): number {
@@ -222,6 +229,119 @@ function asEllipse(ps: readonly P[]): SnapShape | null {
   return { kind: round ? 'circle' : 'ellipse', pts: toWire(out) };
 }
 
+/** A corner turns at least this far (in radians, about 30°); a shallower
+ *  bend in a traced side is the hand, and is smoothed away. */
+const CORNER_TURN = 0.52;
+/** Each of a rectangle's corners within this of a right angle (about 15°). */
+const RIGHT_ANGLE_SLACK = 0.26;
+/** A shape with corners is traced within this share of its longer side,
+ *  as well as CORNER_FIT of its shorter. */
+const LONG_SIDE_FIT = 0.035;
+/** A rectangle with sides within this ratio of each other is a square. */
+const SQUARE = 1.15;
+
+/** Turn, in radians, from a→b to b→c: 0 straight on, π back on itself. */
+function turn(a: P, b: P, c: P): number {
+  let d = Math.atan2(c[1] - b[1], c[0] - b[0]) - Math.atan2(b[1] - a[1], b[0] - a[0]);
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  return Math.abs(d);
+}
+
+/**
+ * A closed loop of straight sides: a triangle, or a rectangle (a square if
+ * its sides are near equal), or another four-sided shape. Its corners are
+ * where the traced sides turn sharply; the point the stroke began at is a
+ * corner only if it is one, and gentle bends along a side don't count.
+ * Begun at the corner nearest where the stroke began, and run the way it
+ * was drawn.
+ */
+function asPolygon(ps: readonly P[]): SnapShape | null {
+  const xs = ps.map((p) => p[0]);
+  const ys = ps.map((p) => p[1]);
+  const w = Math.max(...xs) - Math.min(...xs);
+  const h = Math.max(...ys) - Math.min(...ys);
+  if (Math.max(w, h) < MIN_SPAN || Math.min(w, h) < MIN_SPAN / 2) return null;
+  // Closed: it ends near where it began.
+  if (dist(ps[0]!, ps[ps.length - 1]!) > LOOP_GAP * Math.max(w, h)) return null;
+
+  // The traced sides, as a ring (the end and the start are the same place).
+  // As shaky along a long side as a short one: a thin rectangle's long sides
+  // wobble as much as its ends do.
+  const within = Math.max(LINE_SLACK_MIN, CORNER_FIT * Math.min(w, h), LONG_SIDE_FIT * Math.max(w, h));
+  const kept = traced(ps, within).map((i) => ps[i]!);
+  let ring = kept.slice(0, -1);
+  // Drop gentle bends, the start among them if it was mid-side, until only
+  // corners are left.
+  for (let changed = true; changed && ring.length > 2; ) {
+    changed = false;
+    for (let i = 0; i < ring.length; i++) {
+      const n = ring.length;
+      if (turn(ring[(i - 1 + n) % n]!, ring[i]!, ring[(i + 1) % n]!) < CORNER_TURN) {
+        ring.splice(i, 1);
+        changed = true;
+        break;
+      }
+    }
+  }
+  if (ring.length !== 3 && ring.length !== 4) return null;
+  // Every point of the stroke near a side: no bulge the corners don't explain.
+  const slack = 1.6 * within;
+  for (const p of ps) {
+    let near = Infinity;
+    for (let i = 0; i < ring.length; i++) near = Math.min(near, toSegment(p, ring[i]!, ring[(i + 1) % ring.length]!));
+    if (near > slack) return null;
+  }
+
+  // Begun at the corner nearest where the stroke began.
+  let first = 0;
+  for (let i = 1; i < ring.length; i++) if (dist(ring[i]!, ps[0]!) < dist(ring[first]!, ps[0]!)) first = i;
+  ring = [...ring.slice(first), ...ring.slice(0, first)];
+
+  if (ring.length === 3) return { kind: 'triangle', pts: toWire([...ring, ring[0]!]) };
+
+  const n = ring.length;
+  const right = ring.every((b, i) => Math.abs(turn(ring[(i - 1 + n) % n]!, b, ring[(i + 1) % n]!) - Math.PI / 2) < RIGHT_ANGLE_SLACK);
+  if (!right) return { kind: 'quadrilateral', pts: toWire([...ring, ring[0]!]) };
+
+  // Squared up: its angle the sides' average (each folded to a quarter turn),
+  // its size the corners' extent along it.
+  let sx = 0, sy = 0;
+  for (let i = 0; i < n; i++) {
+    const a = ring[i]!;
+    const b = ring[(i + 1) % n]!;
+    const t = 4 * Math.atan2(b[1] - a[1], b[0] - a[0]);
+    sx += Math.cos(t);
+    sy += Math.sin(t);
+  }
+  const angle = Math.atan2(sy, sx) / 4;
+  const [c, s2] = [Math.cos(angle), Math.sin(angle)];
+  const along = ring.map(([x, y]) => [x * c + y * s2, -x * s2 + y * c] as P);
+  const u0 = Math.min(...along.map((p) => p[0]));
+  const u1 = Math.max(...along.map((p) => p[0]));
+  const v0 = Math.min(...along.map((p) => p[1]));
+  const v1 = Math.max(...along.map((p) => p[1]));
+  let [uw, vh] = [u1 - u0, v1 - v0];
+  const [mu, mv] = [(u0 + u1) / 2, (v0 + v1) / 2];
+  const square = Math.max(uw, vh) / Math.min(uw, vh) <= SQUARE;
+  if (square) uw = vh = (uw + vh) / 2;
+  // Each drawn corner to the matching corner of the squared shape.
+  const box = along.map(([u, v]) => [mu + (u < mu ? -uw : uw) / 2, mv + (v < mv ? -vh : vh) / 2] as P);
+  const back = box.map(([u, v]) => [
+    Math.min(LOGICAL_W, Math.max(0, u * c - v * s2)),
+    Math.min(LOGICAL_H, Math.max(0, u * s2 + v * c)),
+  ] as P);
+  return { kind: square ? 'square' : 'rectangle', pts: toWire([...back, back[0]!]) };
+}
+
+/** Distance from p to the segment a–b. */
+function toSegment(p: P, a: P, b: P): number {
+  const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+  const len2 = dx * dx + dy * dy;
+  const t = len2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2)) : 0;
+  return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
+}
+
 /** How close, in logical px, the jitter of a held end stays to where the
  *  stroke stopped. */
 const HELD_END = 8;
@@ -243,5 +363,5 @@ export function recognizeShape(pts: readonly number[]): SnapShape | null {
   const kept = [...drawn.slice(0, last), end];
   if (kept.length < 3) return null;
   const ps = resample(kept, READ_POINTS);
-  return asLine(ps) ?? asEllipse(ps);
+  return asLine(ps) ?? asEllipse(ps) ?? asPolygon(ps);
 }
