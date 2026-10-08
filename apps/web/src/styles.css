@@ -1122,32 +1122,47 @@ button, input { font: inherit; color: inherit; }
 .dstage__tally b { margin-right: 4px; font-size: 12px; }
 .dstage__tally b:last-child { margin-right: 0; }
 
+/* The middle: the guesses, and you and the players in the corner. */
+.dstage__middle { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.dstage__middle .dstage__feed { padding-right: 96px; }
+.dstage__corner { position: absolute; right: 10px; bottom: 10px; z-index: 2; display: flex; align-items: center; gap: 8px; }
+
+/* The tools: room to breathe and thumb-sized targets, the palette across
+   in two rows, then the groups spread across under it. */
 .dtools {
-  flex: none; display: flex; flex-direction: column; gap: 8px;
-  padding: 8px 8px calc(8px + env(safe-area-inset-bottom)) 6px;
+  flex: none; display: flex; flex-direction: column; gap: 12px;
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--line); background: var(--card);
 }
-.dtools__palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; padding-left: 2px; }
-.dtools__palette .swatch { width: auto; height: 28px; border-radius: 8px; }
+.dtools__palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+.dtools__palette .swatch { width: auto; height: 34px; border-radius: 9px; }
 .dtools__palette .swatch.is-active { transform: none; box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ink); }
-.dtools__row { display: flex; align-items: center; gap: 5px; }
-.dtools__spacer { flex: 1; }
+.dtools__row { display: flex; align-items: center; justify-content: space-between; }
+.dtools__group { display: flex; gap: 4px; }
 .dtools__btn {
-  position: relative; flex: none; display: grid; place-items: center; width: 36px; height: 36px; padding: 0;
-  border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); cursor: pointer;
+  position: relative; flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); cursor: pointer;
 }
-.dtools__btn svg { width: 18px; height: 18px; }
-.dtools__btn.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.dtools__btn svg { width: 20px; height: 20px; }
+.dtools__btn.is-active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.dtools__btn.is-on { border-color: var(--accent); background: var(--accent-soft); }
 .dtools__btn--danger { color: var(--warn); }
 .dtools__btn--danger.is-asking { border-color: var(--warn); background: var(--warn-wash); }
 /* Clear's second-tap prompt, over the button. */
 .dtools__ask {
-  position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  position: absolute; bottom: calc(100% + 6px); right: 0;
   padding: 3px 8px; border-radius: 6px; background: var(--warn); color: #fff;
   font-size: 12px; font-weight: 700; white-space: nowrap; pointer-events: none;
 }
 .dtools__dot { display: block; border-radius: 50%; }
-.dtools .gstage__roombtn { width: 36px; height: 36px; }
+/* The brush sizes, opened above the brush button. */
+.dtools .brushpick { position: relative; }
+.dtools__sizes {
+  position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 5; display: flex; gap: 6px; padding: 6px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 24px rgba(31, 34, 51, .16);
+}
+.dtools__sizes .dtools__btn.is-active { background: var(--accent-soft); color: inherit; }
+
 /* Above an open sheet, over the canvas: a tap here closes it, never draws. */
 .dstage__scrim { position: fixed; inset: 0; z-index: 30; background: rgba(31, 34, 51, .12); }
 

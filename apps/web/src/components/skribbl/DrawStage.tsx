@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import { Eraser, PaintBucket, Pencil, Trash2, Undo2, Users } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Eraser, PaintBucket, Pencil, Redo2, Trash2, Undo2, Users } from 'lucide-react';
 import { BRUSH_SIZES, PALETTE } from '@pic-game/shared';
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
+import { useDismiss } from '../../lib/useDismiss.js';
 import { useVisualViewport } from '../../lib/useVisualViewport.js';
 import { getSocket } from '../../net/socket.js';
 import { selectSkribbl, useGame } from '../../store/game.js';
@@ -17,10 +18,11 @@ import { MeButton, SenderAvatar, SheetMe, StageHead, useStageChrome } from './st
 /**
  * Drawing on a phone. The guessing stage's header (with the word you're
  * drawing in place of the blanks), the canvas as wide as the screen, the
- * guesses coming in below it rather than over it, and the tools along the
- * bottom: the whole palette, then the brush, pen, fill, eraser, undo and
- * clear, and your avatar and the players button. There's no keyboard to make
- * room for; the sheets rise over the tools, and a tap above one closes it.
+ * guesses coming in below it rather than over it, with your avatar and the
+ * players button in their corner, and the tools along the bottom: the whole
+ * palette, then the brush, pen, fill and eraser, undo and redo, and clear,
+ * grouped by spacing. There's no keyboard to make room for; the sheets rise
+ * over the tools, and a tap above one closes it.
  * Nothing scrolls, so a stroke never moves the page.
  */
 
@@ -58,7 +60,9 @@ export function DrawStage() {
         {phase === 'gameEnd' && <Podium />}
       </div>
 
-      {/* The guesses, newest at the bottom, under the drawing, never on it. */}
+      {/* The guesses, newest at the bottom, under the drawing, never on it;
+          you and the players in the corner, clear of the tools. */}
+      <div className="dstage__middle">
       <div className="gstage__chat dstage__feed" aria-live="polite">
         {messages.slice(-30).map((m) =>
           m.kind === 'divider' ? (
@@ -75,25 +79,27 @@ export function DrawStage() {
           ),
         )}
       </div>
-
-      <div className="dtools">
-        {phase === 'drawing' && <DrawTools />}
-        <div className="dtools__row">
-          {phase === 'drawing' && <DrawActions />}
-          <span className="dtools__spacer" />
-          <MeButton btnRef={meRef} on={sheet === 'me'} onToggle={() => toggle('me')} />
-          <button
-            type="button"
-            className={`gstage__roombtn dtools__players ${sheet === 'players' ? 'is-on' : ''}`}
-            aria-pressed={sheet === 'players'}
-            aria-label="Players and scores"
-            onClick={() => toggle('players')}
-          >
-            <Users aria-hidden="true" />
-            <span className="gstage__roomcount">{room.players.length}</span>
-          </button>
-        </div>
+      <div className="dstage__corner">
+        <MeButton btnRef={meRef} on={sheet === 'me'} onToggle={() => toggle('me')} />
+        <button
+          type="button"
+          className={`gstage__roombtn ${sheet === 'players' ? 'is-on' : ''}`}
+          aria-pressed={sheet === 'players'}
+          aria-label="Players and scores"
+          onClick={() => toggle('players')}
+        >
+          <Users aria-hidden="true" />
+          <span className="gstage__roomcount">{room.players.length}</span>
+        </button>
       </div>
+      </div>
+
+      {phase === 'drawing' && (
+        <div className="dtools">
+          <DrawTools />
+          <DrawActions />
+        </div>
+      )}
 
       {sheet && (
         <>
@@ -138,70 +144,96 @@ function DrawTools() {
 }
 
 /**
- * The brush (a tap steps through the sizes, shown as a dot in the colour),
- * pen, fill and eraser, undo, and clear, which wants a second tap within a
- * few seconds, since it can't be undone.
+ * The brush (a tap opens its sizes above it), pen, fill and eraser, undo and
+ * redo, and clear, which wants a second tap within a few seconds, since it
+ * can't be undone. Grouped by spacing, spread across the screen.
  */
 function DrawActions() {
   const { tool, color, size, setTool, setSize } = useTools();
+  const socket = getSocket();
   const [clearing, setClearing] = useState(false);
+  const [sizes, setSizes] = useState(false);
+  const pick = useRef<HTMLDivElement>(null);
+  const closeSizes = useCallback(() => setSizes(false), []);
+  useDismiss(pick, sizes, closeSizes);
   useEffect(() => {
     if (!clearing) return;
     const t = setTimeout(() => setClearing(false), CLEAR_CONFIRM_MS);
     return () => clearTimeout(t);
   }, [clearing]);
-  const next = BRUSH_SIZES[(BRUSH_SIZES.indexOf(size as (typeof BRUSH_SIZES)[number]) + 1) % BRUSH_SIZES.length]!;
-  const dot = Math.max(4, Math.min(22, size / 1.6));
+  const ink = tool === 'eraser' ? '#94a3b8' : color;
+  const dot = (s: number) => Math.max(4, Math.min(24, s / 1.5));
+  const toolBtn = (t: 'pen' | 'fill' | 'eraser', label: string, Icon: typeof Pencil) => (
+    <button
+      type="button"
+      className={`dtools__btn ${tool === t ? 'is-active' : ''}`}
+      aria-label={label}
+      aria-pressed={tool === t}
+      onClick={() => setTool(t)}
+    >
+      <Icon aria-hidden="true" />
+    </button>
+  );
 
   return (
-    <>
-      <button type="button" className="dtools__btn" aria-label={`Brush size ${size}, tap for ${next}`} onClick={() => setSize(next)}>
-        <span className="dtools__dot" style={{ width: dot, height: dot, background: tool === 'eraser' ? '#94a3b8' : color }} />
-      </button>
-      <button
-        type="button"
-        className={`dtools__btn ${tool === 'pen' ? 'is-active' : ''}`}
-        aria-label="Pen"
-        aria-pressed={tool === 'pen'}
-        onClick={() => setTool('pen')}
-      >
-        <Pencil aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className={`dtools__btn ${tool === 'fill' ? 'is-active' : ''}`}
-        aria-label="Fill"
-        aria-pressed={tool === 'fill'}
-        onClick={() => setTool('fill')}
-      >
-        <PaintBucket aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className={`dtools__btn ${tool === 'eraser' ? 'is-active' : ''}`}
-        aria-label="Eraser"
-        aria-pressed={tool === 'eraser'}
-        onClick={() => setTool('eraser')}
-      >
-        <Eraser aria-hidden="true" />
-      </button>
-      <button type="button" className="dtools__btn" aria-label="Undo" onClick={() => getSocket().emit('canvas:undo')}>
-        <Undo2 aria-hidden="true" />
-      </button>
+    <div className="dtools__row">
+      <div className="dtools__group brushpick" ref={pick}>
+        <button
+          type="button"
+          className={`dtools__btn ${sizes ? 'is-on' : ''}`}
+          aria-label={`Brush size ${size}`}
+          aria-expanded={sizes}
+          onClick={() => setSizes(!sizes)}
+        >
+          <span className="dtools__dot" style={{ width: dot(size), height: dot(size), background: ink }} />
+        </button>
+        {sizes && (
+          <div className="dtools__sizes" role="group" aria-label="Brush size">
+            {BRUSH_SIZES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={`dtools__btn ${size === s ? 'is-active' : ''}`}
+                aria-label={`Brush size ${s}`}
+                aria-pressed={size === s}
+                onClick={() => {
+                  setSize(s);
+                  closeSizes();
+                }}
+              >
+                <span className="dtools__dot" style={{ width: dot(s), height: dot(s), background: ink }} />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="dtools__group" role="group" aria-label="Drawing tool">
+        {toolBtn('pen', 'Pen', Pencil)}
+        {toolBtn('fill', 'Fill', PaintBucket)}
+        {toolBtn('eraser', 'Eraser', Eraser)}
+      </div>
+      <div className="dtools__group" role="group" aria-label="History">
+        <button type="button" className="dtools__btn" aria-label="Undo" onClick={() => socket.emit('canvas:undo')}>
+          <Undo2 aria-hidden="true" />
+        </button>
+        <button type="button" className="dtools__btn" aria-label="Redo" onClick={() => socket.emit('canvas:redo')}>
+          <Redo2 aria-hidden="true" />
+        </button>
+      </div>
       <button
         type="button"
         className={`dtools__btn dtools__btn--danger ${clearing ? 'is-asking' : ''}`}
         aria-label={clearing ? 'Tap again to clear the drawing' : 'Clear the drawing'}
         onClick={() => {
           if (!clearing) return setClearing(true);
-          getSocket().emit('canvas:clear');
+          socket.emit('canvas:clear');
           setClearing(false);
         }}
       >
         <Trash2 aria-hidden="true" />
         {clearing && <span className="dtools__ask">Clear?</span>}
       </button>
-    </>
+    </div>
   );
 }
 
