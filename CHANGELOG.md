@@ -4,7 +4,7 @@ What changed for players, newest first. Each entry is one feature merged
 into `develop`; a push to `develop` deploys it to
 [game-night.vcreate.art](https://game-night.vcreate.art).
 
-## Unreleased
+## 2026-10-09
 
 ### Shape snapping in Draw & Guess
 
