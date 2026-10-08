@@ -72,6 +72,9 @@ const FADE_PX = 96;
 
 export function GuessStage() {
   const room = useGame(selectSkribbl);
+  const phaseNow = room?.phase;
+  const countdown = useGame((s) => !!s.room?.meta.countdown);
+  const paused = useGame((s) => !!s.room?.meta.paused);
   const messages = useGame((s) => s.messages);
   const box = useGuessBox();
   const vv = useVisualViewport();
@@ -386,12 +389,26 @@ export function GuessStage() {
   const keyboardIsUp = () =>
     performance.now() - changedAt.current < KEYBOARD_GRACE_MS ? wanted.current : keyboardOpen;
 
-  // Best effort on arrival: a desktop browser focuses; a phone waits for the
-  // first tap, since it won't raise the keyboard without one.
+  // The guess box takes the keys only while there's a drawing to guess: not
+  // under the 3-2-1, a pause, the word choice (which may want its own field)
+  // or a turn's result. Under one, the keys go away; when it clears, the box
+  // asks for them back, best effort (a desktop focuses; a phone may want a
+  // tap first). A box tapped into under an overlay is left alone.
+  const overlaid = countdown || paused || phaseNow !== 'drawing';
   useEffect(() => {
     const el = input.current;
-    if (el && document.activeElement !== el) el.focus({ preventScroll: true });
-  }, []);
+    if (!el) return;
+    if (overlaid) {
+      if (document.activeElement === el) dismissKeyboard();
+      return;
+    }
+    if (!sheet && document.activeElement !== el) {
+      wanted.current = true;
+      changedAt.current = performance.now();
+      el.focus({ preventScroll: true });
+    }
+    // Only as overlays come and go.
+  }, [overlaid]);
 
   /** Measure, then build, then blur: the sheet takes the keyboard's exact
    *  height before the keys are told to go, so nothing above it moves. */
