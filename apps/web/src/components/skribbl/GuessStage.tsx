@@ -450,7 +450,7 @@ export function GuessStage() {
   const cramped = dockHeight > 0;
   const gap = Math.max(0, stageHeight - headHeight - boardHeight - footHeight);
   /** A tap on the drawing or the chat: back to typing. Not a tap inside an
-   *  overlay's card (picking a word, suggesting one), which is the card's,
+   *  overlay's card (picking a word), which is the card's,
    *  nor while an overlay is up at all: picking a word would raise the keys
    *  only for the drawing stage, which has no box, to drop them again. */
   const tapStage = (e: React.MouseEvent) => {

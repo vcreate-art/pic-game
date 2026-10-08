@@ -1,38 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  authorPoints, suggestionKey, tidySuggestion, validateSuggestion,
-  AUTHOR_FLOOR, CUSTOM_WORDS, maskOf, judge, parseDrawWords, WORDS_EN,
+  suggestionKey, tidySuggestion, validateSuggestion,
+  CUSTOM_WORDS, maskOf, judge, parseDrawWords, WORDS_EN,
 } from '../index.js';
-
-describe('authorPoints', () => {
-  it('pays nothing when nobody cracked the word', () => {
-    // The whole reason this is zero: on a purely decreasing curve, submitting
-    // gibberish would be the highest-scoring play in the game.
-    expect(authorPoints(0, 5)).toBe(0);
-    expect(authorPoints(0, 1)).toBe(0);
-  });
-
-  it('pays more the fewer people solved it', () => {
-    expect(authorPoints(1, 8)).toBeGreaterThan(authorPoints(4, 8));
-    expect(authorPoints(4, 8)).toBeGreaterThan(authorPoints(8, 8));
-  });
-
-  it('bottoms out at the floor when everybody got it', () => {
-    expect(authorPoints(8, 8)).toBe(AUTHOR_FLOOR);
-  });
-
-  it('never beats a hard-won guess, so suggesting is not the best way to score', () => {
-    // A fast first guess is worth 275; the author cap must sit below that or
-    // players would rather suggest than play.
-    expect(authorPoints(1, 100)).toBeLessThan(275);
-  });
-
-  it('survives degenerate rooms', () => {
-    expect(authorPoints(0, 0)).toBe(0);
-    expect(authorPoints(3, 0)).toBe(0);
-    expect(authorPoints(9, 4)).toBe(AUTHOR_FLOOR); // more solvers than eligible
-  });
-});
 
 describe('tidySuggestion', () => {
   it('trims and collapses whitespace without touching case', () => {

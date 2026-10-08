@@ -5,7 +5,7 @@ import {
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
 import {
-  CHAT_BUCKET, DRAW_BUCKET, FIGHT_INPUT_BUCKET, MAX_NAME_LEN, MAZE_INPUT_BUCKET, RACE_POS_BUCKET, SUGGEST_BUCKET,
+  CHAT_BUCKET, DRAW_BUCKET, FIGHT_INPUT_BUCKET, MAX_NAME_LEN, MAZE_INPUT_BUCKET, RACE_POS_BUCKET,
 } from '../config.js';
 import type { CorePlayer, Moved } from '../core/BaseRoom.js';
 import type { AnyRoom, RoomManager } from '../core/RoomManager.js';
@@ -40,7 +40,6 @@ interface Session {
   playerId: string | null;
   chat: TokenBucket;
   draw: TokenBucket;
-  suggest: TokenBucket;
   fight: TokenBucket;
   race: TokenBucket;
   maze: TokenBucket;
@@ -110,7 +109,6 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       playerId: null,
       chat: new TokenBucket(CHAT_BUCKET.capacity, CHAT_BUCKET.refillPerSec),
       draw: new TokenBucket(DRAW_BUCKET.capacity, DRAW_BUCKET.refillPerSec),
-      suggest: new TokenBucket(SUGGEST_BUCKET.capacity, SUGGEST_BUCKET.refillPerSec),
       fight: new TokenBucket(FIGHT_INPUT_BUCKET.capacity, FIGHT_INPUT_BUCKET.refillPerSec),
       race: new TokenBucket(RACE_POS_BUCKET.capacity, RACE_POS_BUCKET.refillPerSec),
       maze: new TokenBucket(MAZE_INPUT_BUCKET.capacity, MAZE_INPUT_BUCKET.refillPerSec),
@@ -279,17 +277,6 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       room.chooseWord(s.playerId, p.id);
     });
 
-    socket.on('word:suggest', (p, cb) => {
-      const room = skribbl();
-      if (!room || !s.playerId) return;
-      if (!s.suggest.tryTake()) {
-        if (typeof cb === 'function') cb({ ok: false, message: 'Slow down a little.' });
-        return;
-      }
-      // Validation lives in the room so it can see what is already suggested.
-      const result = room.suggestWord(s.playerId, p?.text);
-      if (typeof cb === 'function') cb(result);
-    });
 
     socket.on('draw:start', (p) => {
       const room = skribbl();
