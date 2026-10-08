@@ -835,8 +835,9 @@ function SheetMe() {
   const played = totalPlayed(stats);
   return (
     <>
+      {/* No avatar here: yours is on the button just above, ringed while
+          this sheet is open. */}
       <section className="gsheet__me">
-        <Avatar data={me.avatar} size={40} />
         <span className="gsheet__mename">
           {me.name}
           <small>{played ? `${played} played, ${totalWon(stats)} won` : 'No games finished yet'}</small>
