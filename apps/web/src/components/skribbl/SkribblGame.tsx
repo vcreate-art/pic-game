@@ -23,11 +23,14 @@ export function SkribblGame() {
   if (!room) return null;
   const phase = room.phase;
 
-  // On a phone, guessing and drawing are each a screen of their own.
+  // On a phone, drawing and guessing are each a screen of their own. The
+  // drawing one only while there's drawing to do: choosing a word, and
+  // between turns, the drawer can chat like anyone, so has the guessing one.
   if (phone) {
+    const drawing = isDrawer && phase === 'drawing';
     return (
-      <div className={`game game--skribbl ${isDrawer ? 'game--drawing' : 'game--guessing'}`}>
-        {isDrawer ? <DrawStage /> : <GuessStage />}
+      <div className={`game game--skribbl ${drawing ? 'game--drawing' : 'game--guessing'}`}>
+        {drawing ? <DrawStage /> : <GuessStage />}
         <Gallery />
       </div>
     );
