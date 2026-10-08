@@ -1194,11 +1194,14 @@ button, input { font: inherit; color: inherit; }
 }
 .dtools__sizes .dtools__btn.is-active { background: var(--accent-soft); color: inherit; }
 
-/* A sheet opens under the bottom row, in the stage's flow: the guesses
-   give it their room, and the row stays above it as its header. Both sit
-   over the scrim. */
-.dstage .dstage__sheet { position: relative; left: auto; right: auto; bottom: auto; flex: 0 1 auto; min-height: 0; }
-.dstage.has-sheet .dstage__foot { position: relative; z-index: 31; padding-bottom: 8px; }
+/* A sheet opens just above the chat bar, in the stage's flow, taking the
+   guesses' room; the chat bar stays put at the bottom. Both sit over the
+   scrim. */
+.dstage .dstage__sheet {
+  position: relative; left: auto; right: auto; bottom: auto; flex: 0 1 auto; min-height: 0;
+  padding-bottom: 14px; border-bottom: 1px solid var(--line);
+}
+.dstage.has-sheet .dstage__foot { position: relative; z-index: 31; }
 /* Above an open sheet, over the canvas: a tap here closes it, never draws. */
 .dstage__scrim { position: fixed; inset: 0; z-index: 30; background: rgba(31, 34, 51, .12); }
 

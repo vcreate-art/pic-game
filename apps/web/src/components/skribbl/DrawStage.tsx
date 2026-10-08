@@ -91,7 +91,28 @@ export function DrawStage() {
       </div>
       </div>
 
-      {/* The guessing stage's bottom row, the same here: you, the guess box
+      {sheet && (
+        <>
+          {/* Above the sheet: a tap here closes it, and never draws. */}
+          <div className="dstage__scrim" onClick={() => setSheet(null)} aria-hidden="true" />
+          {/* Above the chat bar, which stays where it is at the bottom. */}
+          <div
+            className={`gsheet dstage__sheet ${sheet === 'me' ? 'gsheet--me' : ''}`}
+            style={{ height: Math.min(SHEET_PX, Math.round(vv.height * SHEET_RATIO)) }}
+          >
+            {sheet === 'players' ? (
+              <Scoreboard />
+            ) : (
+              <>
+                <SheetMe />
+                <RoomMenu standings={false} leaveTile />
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* The chat bar, as on the guessing stage: you, the guess box
           (shut while you draw, and saying so, as the desktop's does), and
           the players. */}
       <div className="gstage__form dstage__foot">
@@ -121,28 +142,6 @@ export function DrawStage() {
       </div>
 
 
-      {sheet && (
-        <>
-          {/* Above the bottom row and its sheet: a tap here closes the sheet,
-              and never draws. */}
-          <div className="dstage__scrim" onClick={() => setSheet(null)} aria-hidden="true" />
-          {/* Under the bottom row, which stays as the sheet's header, as it
-              does over the keyboard's place when guessing. */}
-          <div
-            className={`gsheet dstage__sheet ${sheet === 'me' ? 'gsheet--me' : ''}`}
-            style={{ height: Math.min(SHEET_PX, Math.round(vv.height * SHEET_RATIO)) }}
-          >
-            {sheet === 'players' ? (
-              <Scoreboard />
-            ) : (
-              <>
-                <SheetMe />
-                <RoomMenu standings={false} leaveTile />
-              </>
-            )}
-          </div>
-        </>
-      )}
     </div>
   );
 }
