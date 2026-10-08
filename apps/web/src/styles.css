@@ -1113,14 +1113,28 @@ button, input { font: inherit; color: inherit; }
   justify-content: flex-end; padding-top: 6px; pointer-events: none;
 }
 .dstage__feed > :first-child { margin-top: auto; }
-/* What everyone thinks of the drawing, read-only, in its top corner. */
-.dstage__tally {
-  position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; align-items: center; gap: 4px;
-  padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
-  background: rgba(255, 255, 255, .86); font-size: 13px; opacity: .8; pointer-events: none;
+/* The colour bar down the drawing's right edge (ColorBar): a thin line,
+   with a white rim and a shadow so it reads on any drawing, inside a wide
+   invisible catch area, 40px across, for a thumb. */
+.colorbar {
+  position: absolute; top: 16px; bottom: 16px; right: 17px; z-index: 3; width: 6px;
+  border-radius: 999px; cursor: pointer; touch-action: none;
+  box-shadow: 0 0 0 2px #fff, 0 1px 6px rgba(31, 34, 51, .3);
 }
-.dstage__tally b { margin-right: 4px; font-size: 12px; }
-.dstage__tally b:last-child { margin-right: 0; }
+.colorbar::before { content: ''; position: absolute; inset: -10px -17px; }
+.colorbar:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+/* Where the colour is on the bar. */
+.colorbar__thumb {
+  position: absolute; left: 50%; width: 22px; height: 22px; border-radius: 50%; pointer-events: none;
+  transform: translate(-50%, -50%); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(31, 34, 51, .4);
+  transition: width .12s ease, height .12s ease;
+}
+.colorbar.is-dragging .colorbar__thumb { width: 26px; height: 26px; }
+/* While dragging, a big drop of the colour to the left of the finger. */
+.colorbar__drop {
+  position: absolute; right: calc(100% + 22px); width: 46px; height: 46px; border-radius: 50%; pointer-events: none;
+  transform: translateY(-50%); border: 3px solid #fff; box-shadow: 0 2px 10px rgba(31, 34, 51, .35);
+}
 
 /* The middle: the guesses, and you and the players in the corner. */
 .dstage__middle {
@@ -1130,15 +1144,11 @@ button, input { font: inherit; color: inherit; }
 .dstage__middle .dstage__feed { padding-right: 96px; }
 .dstage__corner { position: absolute; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 2; display: flex; align-items: center; gap: 8px; }
 
-/* The tools, right under the drawing: the palette as two rows of small
-   round swatches, then the groups spread across under it. */
+/* The tools, right under the drawing: the groups spread across. */
 .dtools {
-  flex: none; display: flex; flex-direction: column; gap: 12px; padding: 12px;
+  flex: none; display: flex; flex-direction: column; padding: 10px 12px;
   border-bottom: 1px solid var(--line); background: var(--card);
 }
-.dtools__palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px 0; justify-items: center; }
-.dtools__palette .swatch { width: 28px; height: 28px; border-radius: 50%; }
-.dtools__palette .swatch.is-active { transform: none; box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ink); }
 .dtools__row { display: flex; align-items: center; justify-content: space-between; }
 .dtools__group { display: flex; gap: 4px; }
 .dtools__btn {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Eraser, PaintBucket, Pencil, Redo2, Trash2, Undo2, Users } from 'lucide-react';
-import { BRUSH_SIZES, PALETTE } from '@pic-game/shared';
+import { BRUSH_SIZES } from '@pic-game/shared';
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
 import { useDismiss } from '../../lib/useDismiss.js';
 import { useVisualViewport } from '../../lib/useVisualViewport.js';
@@ -8,7 +8,6 @@ import { getSocket } from '../../net/socket.js';
 import { selectSkribbl, useGame } from '../../store/game.js';
 import { useTools } from '../../store/tools.js';
 import { Podium } from '../Podium.js';
-import { useReaction } from '../Reactions.js';
 import { RoomMenu } from '../RoomPanel.js';
 import { Scoreboard } from '../Scoreboard.js';
 import { TurnResult } from '../TurnResult.js';
@@ -17,11 +16,11 @@ import { MeButton, SenderAvatar, SheetMe, StageHead, useStageChrome } from './st
 
 /**
  * Drawing on a phone. The guessing stage's header (with the word you're
- * drawing in place of the blanks), the canvas as wide as the screen, the
- * tools right under it (the whole palette, then the brush, pen, fill and
- * eraser, undo and redo, and clear, grouped by spacing), and the guesses
- * filling the rest, down to the bottom, with your avatar and the players
- * button in their corner. There's no keyboard to make room for; the sheets rise
+ * drawing in place of the blanks), the canvas as wide as the screen with a
+ * colour bar down its right edge, the tools right under it (the brush, pen,
+ * fill and eraser, undo and redo, and clear, grouped by spacing), and the
+ * guesses filling the rest, down to the bottom, with your avatar and the
+ * players button in their corner. There's no keyboard to make room for; the sheets rise
  * over the tools, and a tap above one closes it.
  * Nothing scrolls, so a stroke never moves the page.
  */
@@ -54,7 +53,7 @@ export function DrawStage() {
 
       <div className="gstage__board board__wrap">
         <CanvasBoard />
-        <Tally />
+        {phase === 'drawing' && <ColorBar />}
         {phase === 'choosing' && <WordChoice />}
         {phase === 'turnEnd' && <TurnResult />}
         {phase === 'gameEnd' && <Podium />}
@@ -63,7 +62,6 @@ export function DrawStage() {
       {/* The tools right under the drawing, where the hand already is. */}
       {phase === 'drawing' && (
         <div className="dtools">
-          <DrawTools />
           <DrawActions />
         </div>
       )}
@@ -122,25 +120,6 @@ export function DrawStage() {
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-/** The whole palette, two rows across the screen: one tap to a colour. */
-function DrawTools() {
-  const { tool, color, setColor } = useTools();
-  return (
-    <div className="dtools__palette">
-      {PALETTE.map((c) => (
-        <button
-          key={c}
-          type="button"
-          className={`swatch ${color === c && tool !== 'eraser' ? 'is-active' : ''}`}
-          style={{ background: c }}
-          onClick={() => setColor(c)}
-          aria-label={`Colour ${c}`}
-        />
-      ))}
     </div>
   );
 }
@@ -239,17 +218,89 @@ function DrawActions() {
   );
 }
 
-/** What everyone thinks of your drawing, in its top corner where guessers
- *  have their react button. Yours to see, not to vote on. */
-function Tally() {
-  const r = useReaction();
-  if (!r || !r.isDrawer) return null;
+/** The colour bar, top to bottom: white, the rainbow, brown, black. */
+const BAR_STOPS: readonly (readonly [number, string])[] = [
+  [0, '#ffffff'],
+  [0.07, '#ff3030'],
+  [0.18, '#ff9500'],
+  [0.29, '#ffd60a'],
+  [0.41, '#34c759'],
+  [0.52, '#00c2b8'],
+  [0.62, '#0a84ff'],
+  [0.71, '#5e5ce6'],
+  [0.8, '#bf5af2'],
+  [0.88, '#ff4fa3'],
+  [0.94, '#8b5a2b'],
+  [1, '#000000'],
+];
+const BAR_GRADIENT = `linear-gradient(to bottom, ${BAR_STOPS.map(([t, c]) => `${c} ${t * 100}%`).join(', ')})`;
+
+const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+/** The colour at a point down the bar, 0 at the top to 1 at the bottom. */
+function colorAt(t: number): string {
+  const i = Math.max(1, BAR_STOPS.findIndex(([at]) => at >= t));
+  const [t0, c0] = BAR_STOPS[i - 1]!;
+  const [t1, c1] = BAR_STOPS[i]!;
+  const k = t1 === t0 ? 0 : (t - t0) / (t1 - t0);
+  const a = rgb(c0);
+  const b = rgb(c1);
+  return `#${a.map((v, j) => Math.round(v + (b[j]! - v) * k).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/**
+ * Colour as WhatsApp and Instagram do it: a bar down the drawing's right
+ * edge, touched or dragged for any colour along it, with a big drop of the
+ * colour beside the finger while it moves, so the finger doesn't hide it.
+ * Its presses are its own: they never draw. Arrow keys step along it too.
+ */
+function ColorBar() {
+  const { color, setColor } = useTools();
+  const bar = useRef<HTMLDivElement>(null);
+  // Where along the bar the colour came from; black, at the bottom, to start.
+  const [at, setAt] = useState(1);
+  const [dragging, setDragging] = useState(false);
+  const pick = (t: number) => {
+    const c = Math.min(1, Math.max(0, t));
+    setAt(c);
+    setColor(colorAt(c));
+  };
+  const fromPointer = (y: number) => {
+    const r = bar.current!.getBoundingClientRect();
+    pick((y - r.top) / r.height);
+  };
+
   return (
-    <div className="dstage__tally" aria-label={`${r.likes} likes, ${r.dislikes} dislikes`}>
-      <span aria-hidden="true">👍</span>
-      <b>{r.likes}</b>
-      <span aria-hidden="true">👎</span>
-      <b>{r.dislikes}</b>
+    <div
+      ref={bar}
+      className={`colorbar ${dragging ? 'is-dragging' : ''}`}
+      style={{ background: BAR_GRADIENT }}
+      role="slider"
+      tabIndex={0}
+      aria-label="Colour"
+      aria-orientation="vertical"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(at * 100)}
+      aria-valuetext={color}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setDragging(true);
+        fromPointer(e.clientY);
+      }}
+      onPointerMove={(e) => dragging && fromPointer(e.clientY)}
+      onPointerUp={() => setDragging(false)}
+      onPointerCancel={() => setDragging(false)}
+      onKeyDown={(e) => {
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        e.preventDefault();
+        pick(at + (e.key === 'ArrowDown' ? 0.02 : -0.02));
+      }}
+    >
+      <span className="colorbar__thumb" style={{ top: `${at * 100}%`, background: color }} />
+      {dragging && <span className="colorbar__drop" style={{ top: `${at * 100}%`, background: color }} />}
     </div>
   );
 }
