@@ -927,11 +927,10 @@ button, input { font: inherit; color: inherit; }
 .gstage__head .timer__num { font-size: 13px; }
 /* The blanks take what's left and shrink before anything wraps. */
 .gstage__word { flex: 1; min-width: 0; display: flex; justify-content: center; overflow: hidden; }
-.gstage__head .wordmask__slots { flex-wrap: nowrap; gap: 3px; min-width: 0; }
-.gstage__head .wordmask__slot { flex: 0 1 14px; min-width: 7px; width: auto; height: 22px; border-bottom-width: 2px; font-size: 15px; }
-.gstage__head .wordmask__gap { flex: 0 1 8px; width: auto; }
+.gstage__head .wordmask__slots { flex-wrap: nowrap; gap: 4px; min-width: 0; }
+.gstage__head .wordmask__slot { flex: 0 1 18px; min-width: 8px; width: auto; height: 26px; border-bottom-width: 3px; font-size: 19px; }
+.gstage__head .wordmask__gap { flex: 0 1 12px; width: auto; }
 .gstage__status { font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gstage__word .wordmask__count { flex: none; margin-left: 8px; }
 
 /* Thumbs up or down, as one faint button in the drawing's top corner; open,
    the two thumbs and their counts slide out to its left. */

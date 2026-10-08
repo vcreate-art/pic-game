@@ -590,9 +590,9 @@ function GuessField({
 }
 
 /**
- * The stage's header, in place of the app's: the round and the timer, and
- * the blanks with any hint letters and the letter count, all in sight while
- * the keyboard is up. Between turns it says what's happening instead.
+ * The stage's header, in place of the app's: the round, the blanks with any
+ * hint letters, and the timer, all in sight while the
+ * keyboard is up. Between turns it says what's happening instead.
  */
 function StageHead({ headRef }: { headRef: React.RefObject<HTMLElement> }) {
   const room = useGame(selectSkribbl);
@@ -608,19 +608,14 @@ function StageHead({ headRef }: { headRef: React.RefObject<HTMLElement> }) {
         <small>Round</small>
         {room.round}/{room.settings.rounds}
       </span>
-      {phase === 'drawing' && turn && <Timer endsAt={turn.endsAt} total={room.settings.drawTime} />}
       <div className="gstage__word">
         {phase === 'drawing' && turn?.mask ? (
-          <>
-            <Slots mask={turn.mask} revealed={turn.revealed} />
-            <span className="wordmask__count" title="Letters in the word">
-              {(turn.mask.match(/_/g) ?? []).length}
-            </span>
-          </>
+          <Slots mask={turn.mask} revealed={turn.revealed} />
         ) : (
           <span className="gstage__status">{status}</span>
         )}
       </div>
+      {phase === 'drawing' && turn && <Timer endsAt={turn.endsAt} total={room.settings.drawTime} />}
     </header>
   );
 }
