@@ -331,6 +331,12 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       room.undo(s.playerId);
     });
 
+    socket.on('canvas:redo', () => {
+      const room = skribbl();
+      if (!room || !s.playerId || !s.draw.tryTake(4)) return;
+      room.redo(s.playerId);
+    });
+
     socket.on('canvas:clear', () => {
       const room = skribbl();
       if (!room || !s.playerId || !s.draw.tryTake(8)) return;

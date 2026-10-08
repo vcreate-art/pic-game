@@ -30,6 +30,9 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   round = 0;
   turnIndex = 0;
   ops: CanvasOp[] = [];
+  /** The drawer's undone ops, latest last, for redo. Emptied by anything new
+   *  drawn, a fill, a clear, or a new turn, as in any editor. */
+  private undone: CanvasOp[] = [];
 
   // ---- current turn (word is private to this object and the drawer's socket) ----
   private word: string | null = null;
@@ -256,6 +259,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.drawerId = drawer.id;
     this.phase = 'choosing';
     this.ops = [];
+    this.undone = [];
 
     // Always stock a full list of built-ins. In players mode these are padding
     // that suggestions push out; in builtin mode they are the whole list.
@@ -561,6 +565,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.round = 0;
     this.turnIndex = 0;
     this.ops = [];
+    this.undone = [];
     this.broadcastState();
   }
 
@@ -633,6 +638,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     if (!this.isDrawer(playerId)) return;
     if (this.ops.length >= MAX_OPS_PER_TURN) return;
     this.ops.push({ kind: 'stroke', id: op.id, by: playerId, tool: op.tool, color: op.color, size: op.size, pts: [...op.pts] });
+    this.undone = [];
     this.openStrokes.add(op.id);
     this.io.to(this.code).except(this.socketOf(playerId) ?? '').emit('draw:start', { ...op, by: playerId });
   }
@@ -657,6 +663,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     if (this.ops.length >= MAX_OPS_PER_TURN) return;
     const op: CanvasOp = { kind: 'fill', id: randomUUID(), by: playerId, x, y, color };
     this.ops.push(op);
+    this.undone = [];
     this.io.to(this.code).except(this.socketOf(playerId) ?? '').emit('draw:fill', op);
   }
 
@@ -664,7 +671,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     if (!this.isDrawer(playerId)) return;
     for (let i = this.ops.length - 1; i >= 0; i--) {
       if (this.ops[i]!.by === playerId) {
-        this.ops.splice(i, 1);
+        this.undone.push(...this.ops.splice(i, 1));
         break;
       }
     }
@@ -673,9 +680,20 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.io.to(this.code).emit('canvas:undone', { ops: this.ops });
   }
 
+  /** Puts back the last op undone, and ships the history as undo does. */
+  redo(playerId: string): void {
+    if (!this.isDrawer(playerId)) return;
+    if (this.ops.length >= MAX_OPS_PER_TURN) return;
+    const op = this.undone.pop();
+    if (!op) return;
+    this.ops.push(op);
+    this.io.to(this.code).emit('canvas:undone', { ops: this.ops });
+  }
+
   clearCanvas(playerId: string): void {
     if (!this.isDrawer(playerId)) return;
     this.ops = [];
+    this.undone = [];
     this.openStrokes.clear();
     this.io.to(this.code).emit('canvas:cleared');
   }

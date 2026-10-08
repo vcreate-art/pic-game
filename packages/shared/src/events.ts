@@ -103,6 +103,7 @@ export interface ClientToServerEvents {
   'draw:end': (p: { id: string }) => void;
   'draw:fill': (p: { x: number; y: number; color: string }) => void;
   'canvas:undo': () => void;
+  'canvas:redo': () => void;
   'canvas:clear': () => void;
 
   'chat:guess': (p: { text: string }) => void;
