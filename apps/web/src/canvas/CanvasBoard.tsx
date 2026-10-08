@@ -98,10 +98,11 @@ const CURSOR_MAX = 120;
  * in its colour (grey for the eraser), with a faint dark edge so it shows on
  * any colour, white included, and a dot in the middle when it's too small
  * to read as a ring. An image cursor, so the browser draws it with the
- * pointer, never trailing behind. Fill works at a point: a crosshair.
+ * pointer, never trailing behind. Fill: the toolbar's paint bucket, its
+ * drip in the colour, pointing at where the fill lands.
  */
 function brushCursor(tool: string, color: string, diameter: number): string {
-  if (tool === 'fill') return 'crosshair';
+  if (tool === 'fill') return bucketCursor(color);
   const d = Math.max(4, Math.min(CURSOR_MAX, diameter));
   const box = Math.ceil(d + 6);
   const c = box / 2;
@@ -115,4 +116,22 @@ function brushCursor(tool: string, color: string, diameter: number): string {
     (d < 10 ? `<circle cx="${c}" cy="${c}" r="1.2" fill="${ink}"/>` : '') +
     `</svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${Math.round(c)} ${Math.round(c)}, crosshair`;
+}
+
+/** The paint bucket (lucide's, as on the fill button), drawn twice: wide
+ *  and white underneath so it shows on any drawing, then dark on top. Its
+ *  drip is filled with the colour, and its tip is the click point. */
+function bucketCursor(color: string): string {
+  const bucket =
+    '<path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/>' +
+    '<path d="m5 2 5 5"/><path d="M2 13h15"/>';
+  const drip = '<path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/>';
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="-2 -2 28 28" fill="none" stroke-linecap="round" stroke-linejoin="round">' +
+    `<g stroke="#fff" stroke-width="4">${bucket}${drip}</g>` +
+    `<g stroke="#1c1d26" stroke-width="2">${bucket}</g>` +
+    `<g stroke="#1c1d26" stroke-width="1.5" fill="${color}">${drip}</g>` +
+    '</svg>';
+  // The drip's tip, at (20, 22) in the icon, which sits 2px in.
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 22 24, crosshair`;
 }
