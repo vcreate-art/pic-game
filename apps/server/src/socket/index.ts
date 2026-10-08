@@ -313,6 +313,14 @@ export function attachSocket(io: IO, rooms: RoomManager): void {
       room.strokeAppend(s.playerId, p.id, pts);
     });
 
+    socket.on('draw:replace', (p) => {
+      const room = skribbl();
+      if (!room || !s.playerId || !s.draw.tryTake(2)) return;
+      const pts = sanitizePoints(p?.pts);
+      if (!pts || typeof p?.id !== 'string') return;
+      room.replaceStroke(s.playerId, p.id, pts);
+    });
+
     socket.on('draw:end', (p) => {
       const room = skribbl();
       if (!room || !s.playerId || typeof p?.id !== 'string') return;

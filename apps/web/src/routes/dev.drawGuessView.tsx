@@ -17,7 +17,8 @@ import { useGame } from '../store/game.js';
  * hyphens show as in a real one, for trying long answers), ?likes=N and
  * ?dislikes=N set the drawing's reactions, and
  * the panel in the corner changes them, adds guesses, or keeps a stream of
- * them coming. Guesses you type show up locally, since nothing is listening.
+ * them coming. Guesses you type show up locally, since nothing is listening,
+ * and clear, undo and redo work on the canvas here as the server would.
  */
 
 const ME = 'me';
@@ -130,11 +131,49 @@ export default function DrawGuessPreview() {
   useEffect(() => {
     const socket = getSocket();
     const emit = socket.emit.bind(socket);
+    // The canvas, done here as the server would: clear (set aside, so undo
+    // can bring it back), and undo and redo of your own steps, with anything
+    // new drawn emptying what redo has.
+    const engine = getEngine();
+    let undone: (CanvasOp | 'clear')[] = [];
+    const cleared: CanvasOp[][] = [];
     (socket as unknown as { emit: (...a: unknown[]) => unknown }).emit = (ev: unknown, ...rest: unknown[]) => {
       if (ev === 'chat:guess') {
         useGame.getState().pushMessage(say('You', (rest[0] as { text: string }).text));
         return socket;
       }
+      if (ev === 'canvas:clear') {
+        if (engine.snapshot().length) cleared.push([...engine.snapshot()]);
+        engine.clear();
+        undone = [];
+        return socket;
+      }
+      if (ev === 'canvas:undo') {
+        const ops = [...engine.snapshot()];
+        const i = ops.findLastIndex((o) => o.by === 'me');
+        if (i >= 0) {
+          undone.push(...ops.splice(i, 1));
+          engine.replay(ops);
+        } else {
+          const before = cleared.pop();
+          if (before) {
+            undone.push('clear');
+            engine.replay([...before, ...ops]);
+          }
+        }
+        return socket;
+      }
+      if (ev === 'canvas:redo') {
+        const step = undone.pop();
+        if (step === 'clear') {
+          cleared.push([...engine.snapshot()]);
+          engine.clear();
+        } else if (step) {
+          engine.replay([...engine.snapshot(), step]);
+        }
+        return socket;
+      }
+      if (ev === 'draw:start' || ev === 'draw:fill') undone = [];
       return (emit as (...a: unknown[]) => unknown)(ev, ...rest);
     };
     return () => {

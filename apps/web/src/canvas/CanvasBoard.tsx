@@ -34,6 +34,10 @@ export function CanvasBoard() {
         engine.endStroke(id);
         socket.emit('draw:end', { id });
       },
+      replace(id, pts) {
+        engine.replaceStroke(id, pts);
+        socket.emit('draw:replace', { id, pts });
+      },
       fill(x, y, color) {
         engine.applyFill({ kind: 'fill', id: uid(), by: 'me', x, y, color });
         socket.emit('draw:fill', { x, y, color });
