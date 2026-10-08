@@ -442,10 +442,15 @@ export function GuessStage() {
   // as many as fit, solid down the gap and fading only once over the drawing.
   const cramped = dockHeight > 0;
   const gap = Math.max(0, stageHeight - headHeight - boardHeight - footHeight);
-  const tapStage = () => {
+  /** A tap on the drawing or the chat: back to typing. Not a tap inside an
+   *  overlay's card (picking a word, suggesting one), which is the card's,
+   *  nor while an overlay is up at all: picking a word would raise the keys
+   *  only for the drawing stage, which has no box, to drop them again. */
+  const tapStage = (e: React.MouseEvent) => {
+    if ((e.target as Element).closest('.overlay')) return;
     fold();
     if (sheet) closeSheet();
-    else if (!keyboardIsUp()) focusInput();
+    else if (!overlaid && !keyboardIsUp()) focusInput();
   };
 
   return (
