@@ -2,7 +2,7 @@
 
 What changed for players, newest first. Each entry is one feature merged
 into `develop`; a push to `develop` deploys it to
-[game-night.vcreate.art](https://game-night.vcreate.art).
+[fun.vcreate.art](https://fun.vcreate.art).
 
 ## 2026-10-09
 
