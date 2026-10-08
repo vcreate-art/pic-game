@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type CSSProperties } from 'react';
 import { GAME_LABELS } from '@pic-game/shared';
-import { ChevronDown, DoorOpen, Pause, Play, RotateCcw } from 'lucide-react';
+import { ChevronDown, DoorOpen, LogOut, Pause, Play, RotateCcw } from 'lucide-react';
 import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { useDismiss } from '../lib/useDismiss.js';
 import { getSocket } from '../net/socket.js';
@@ -65,7 +65,16 @@ export function RoomPanel() {
  * phone's guessing stage, which lists the players itself and so can leave the
  * standings out.
  */
-export function RoomMenu({ onDone, standings = true }: { onDone?: () => void; standings?: boolean }) {
+export function RoomMenu({
+  onDone,
+  standings = true,
+  leaveTile = false,
+}: {
+  onDone?: () => void;
+  standings?: boolean;
+  /** Leave as a red tile beside the host's controls, rather than a link below. */
+  leaveTile?: boolean;
+}) {
   const room = useGame((s) => s.room);
   const me = useGame((s) => s.me);
   const isHost = useGame(selectIsHost);
@@ -102,7 +111,7 @@ export function RoomMenu({ onDone, standings = true }: { onDone?: () => void; st
 
   return (
     <>
-      {isHost && (can.pause || paused || can.restart || can.toLobby) && (
+      {((isHost && (can.pause || paused || can.restart || can.toLobby)) || leaveTile) && (
         confirm ? (
           <div className="room__confirm">
             <p>
@@ -125,29 +134,35 @@ export function RoomMenu({ onDone, standings = true }: { onDone?: () => void; st
         ) : (
           <div className="room__controls">
             {/* A countdown runs out by itself; there's nothing to pause or resume. */}
-            {meta.countdown ? null : paused ? (
+            {!isHost || meta.countdown ? null : paused ? (
               <button type="button" className="room__ctl is-on" onClick={() => send('room:resume')}>
                 <Play aria-hidden="true" />
                 Resume
               </button>
             ) : (
-              can.pause && (
+              isHost && can.pause && (
                 <button type="button" className="room__ctl" onClick={() => send('room:pause')}>
                   <Pause aria-hidden="true" />
                   Pause
                 </button>
               )
             )}
-            {can.restart && (
+            {isHost && can.restart && (
               <button type="button" className="room__ctl" onClick={() => ask('restart')}>
                 <RotateCcw aria-hidden="true" />
                 {playing ? 'Restart' : 'Play again'}
               </button>
             )}
-            {can.toLobby && (
+            {isHost && can.toLobby && (
               <button type="button" className="room__ctl" onClick={() => ask('toLobby')}>
                 <DoorOpen aria-hidden="true" />
                 Lobby
+              </button>
+            )}
+            {leaveTile && (
+              <button type="button" className="room__ctl room__ctl--leave" onClick={leave}>
+                <LogOut aria-hidden="true" />
+                Leave
               </button>
             )}
           </div>
@@ -194,9 +209,11 @@ export function RoomMenu({ onDone, standings = true }: { onDone?: () => void; st
         <p className="room__note">{nameOf(hostId)} is hosting, and picks what everyone plays next.</p>
       )}
 
-      <button type="button" className="room__leave" onClick={leave}>
-        Leave room
-      </button>
+      {!leaveTile && (
+        <button type="button" className="room__leave" onClick={leave}>
+          Leave room
+        </button>
+      )}
     </>
   );
 }

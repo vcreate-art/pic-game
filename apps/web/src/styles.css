@@ -994,6 +994,10 @@ button, input { font: inherit; color: inherit; }
   color: var(--ink-soft); font-size: 14px; font-weight: 600; cursor: pointer;
 }
 .gsheet__row svg { width: 16px; height: 16px; }
+/* The room's controls in the sheet: 4:3 tiles no wider than 96px, centred,
+   at the bottom of the sheet. */
+.gsheet .room__controls { grid-auto-columns: minmax(0, 96px); justify-content: center; margin-top: auto; }
+.gsheet .room__ctl { aspect-ratio: 4 / 3; justify-content: center; padding: 4px; }
 /* The QR card and the room menu, laid in the sheet rather than popping up. */
 .gsheet .profile__pop { position: static; width: auto; box-shadow: none; }
 /* The players as a list here, not the strip the drawer's phone layout uses. */
@@ -2992,6 +2996,10 @@ button, input { font: inherit; color: inherit; }
 .room__ctl.is-on:hover { color: #fff; }
 .room__ctl.is-on { background: var(--game); border-color: var(--game); color: #fff; }
 .room__ctl:focus-visible { outline: 2px solid var(--game); outline-offset: 2px; }
+/* Leaving, as a tile among the controls (the phone's room sheet): red. */
+.room__ctl--leave { --btn-ink: var(--warn-wash); color: var(--warn); border-color: var(--warn-edge); }
+.room__ctl--leave:hover { border-color: var(--warn); color: var(--warn); }
+.room__ctl--leave:focus-visible { outline-color: var(--warn); }
 .room__confirm { display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; }
 .room__confirm p { margin: 0; }
 .room__confirmrow { display: flex; gap: 8px; }

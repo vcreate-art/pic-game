@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Bug, SmilePlus, Smartphone, Users } from 'lucide-react';
+import { Bug, SmilePlus, Users } from 'lucide-react';
 import { MAX_CHAT_LEN } from '../../constants.js';
 import { CanvasBoard } from '../../canvas/CanvasBoard.js';
 import { isPostHogEnabled } from '../../lib/posthog.js';
@@ -7,7 +7,6 @@ import { useDismiss } from '../../lib/useDismiss.js';
 import { lastKeyboardHeight, useVisualViewport } from '../../lib/useVisualViewport.js';
 import { selectSkribbl, useGame } from '../../store/game.js';
 import { useGuessBox } from '../Chat.js';
-import { PhoneHandoff } from '../PhoneHandoff.js';
 import { Podium } from '../Podium.js';
 import { useReaction } from '../Reactions.js';
 import { RoomMenu } from '../RoomPanel.js';
@@ -23,7 +22,8 @@ import { Slots } from '../WordMask.js';
  * chat rising over it and fading as it climbs, and the guess box with the
  * room button beside it; under them the keyboard, which is up by default, or
  * the room sheet that button swaps in for it: the players, and what the
- * app's header held (playing on your phone, reporting a bug, the room menu).
+ * app's header held (reporting a bug, the room menu). Not playing on your
+ * phone: this is the phone.
  *
  * The keyboard handling is the toys repo's mobile editor's: the stage is sized
  * to what the keyboard leaves, so the browser never scrolls anything under the
@@ -474,7 +474,6 @@ export function GuessStage() {
       {sheet && (
         <div className="gsheet" style={{ height: dock }}>
           <Scoreboard />
-          <SheetPhone />
           {isPostHogEnabled && (
             <button
               type="button"
@@ -485,7 +484,7 @@ export function GuessStage() {
               Report a bug
             </button>
           )}
-          <RoomMenu standings={false} />
+          <RoomMenu standings={false} leaveTile />
         </div>
       )}
     </div>
@@ -625,21 +624,6 @@ function StageHead({ headRef }: { headRef: React.RefObject<HTMLElement> }) {
         {phase === 'drawing' && turn && <Timer endsAt={turn.endsAt} total={room.settings.drawTime} />}
       </div>
     </header>
-  );
-}
-
-/**
- * Moving your seat to another phone, as a row in the room sheet; the QR code
- * opens in its place. You're already in the players list above it.
- */
-function SheetPhone() {
-  const [phone, setPhone] = useState(false);
-  if (phone) return <PhoneHandoff onBack={() => setPhone(false)} />;
-  return (
-    <button type="button" className="gsheet__row" onClick={() => setPhone(true)}>
-      <Smartphone aria-hidden="true" />
-      Play on your phone
-    </button>
   );
 }
 
