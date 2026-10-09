@@ -220,7 +220,10 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
     const drawer = this.nextConnectedDrawer();
     if (!drawer) {
-      this.abortToLobby();
+      // Everyone left to draw this round is away: the round is over. From the
+      // top of the order there is nobody connected at all.
+      if (this.turnIndex === 0) this.abortToLobby();
+      else this.nextRound();
       return;
     }
     this.drawerId = drawer.id;
@@ -257,9 +260,12 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     });
   }
 
+  /** The next connected player from `turnIndex` to the end of the order. It
+   *  never wraps to the start: that would begin the next round's turns
+   *  without counting the round, so with someone away at the end of the
+   *  order the game would never end. */
   private nextConnectedDrawer(): ServerPlayer | null {
-    for (let i = 0; i < this.order.length; i++) {
-      const idx = (this.turnIndex + i) % this.order.length;
+    for (let idx = this.turnIndex; idx < this.order.length; idx++) {
       const p = this.players.get(this.order[idx]!);
       if (p?.connected) {
         this.turnIndex = idx;
@@ -372,9 +378,19 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   private nextTurn(): void {
     this.turnIndex++;
     if (this.turnIndex >= this.order.length) {
-      this.turnIndex = 0;
-      this.round++;
+      this.nextRound();
+      return;
     }
+    this.continueGame();
+  }
+
+  private nextRound(): void {
+    this.turnIndex = 0;
+    this.round++;
+    this.continueGame();
+  }
+
+  private continueGame(): void {
     if (this.round > this.settings.rounds) {
       this.endGame();
       return;
