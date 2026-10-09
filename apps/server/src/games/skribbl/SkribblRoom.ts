@@ -48,6 +48,10 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   private hintsShown = 0;
   private endsAt = 0;
   private usedWords = new Set<string>();
+  /** Who was away when their turn came this round, in that order: they draw
+   *  after everyone else, if they are back by then. The name is kept for the
+   *  notice in case they leave meanwhile. */
+  private deferred: { id: string; name: string }[] = [];
   private deltas: Record<string, number> = {};
   private openStrokes = new Set<string>();
   /** Thumbs on the current drawing. A fresh object each turn rather than
@@ -132,6 +136,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
   protected override onPlayerDisconnected(p: ServerPlayer): boolean {
     if (this.drawerId === p.id && (this.phase === 'drawing' || this.phase === 'choosing')) {
+      this.turnNotice(`${p.name} is away, so their turn ends here.`);
       this.endTurn('drawer-left');
       return true;
     }
@@ -145,6 +150,10 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
    *  drawer who leaves takes the index back past the start for a moment,
    *  and the next turn brings it to 0. */
   override removePlayer(playerId: string): void {
+    const p = this.players.get(playerId);
+    if (p && this.drawerId === playerId && (this.phase === 'drawing' || this.phase === 'choosing')) {
+      this.turnNotice(`${p.name} left, so their turn ends here.`);
+    }
     const idx = this.order.indexOf(playerId);
     const inGame = this.phase !== 'lobby' && this.phase !== 'gameEnd';
     if (inGame && idx !== -1 && idx <= this.turnIndex) this.turnIndex--;
@@ -221,6 +230,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.gallery = [];
     this.round = 1;
     this.turnIndex = 0;
+    this.deferred = [];
     this.order = [...this.players.keys()];
     this.beginTurn();
     this.syncMeta();
@@ -230,11 +240,12 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.clearTimers();
     this.resetTurnState();
 
-    const drawer = this.nextConnectedDrawer();
+    const fresh = this.turnIndex === 0 && this.deferred.length === 0;
+    const drawer = this.nextDrawer();
     if (!drawer) {
-      // Everyone left to draw this round is away: the round is over. From the
-      // top of the order there is nobody connected at all.
-      if (this.turnIndex === 0) this.abortToLobby();
+      // Nobody left to draw this round: the round is over. From the top of a
+      // round, it means nobody is connected at all.
+      if (fresh) this.abortToLobby();
       else this.nextRound();
       return;
     }
@@ -272,19 +283,34 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     });
   }
 
-  /** The next connected player from `turnIndex` to the end of the order. It
-   *  never wraps to the start: that would begin the next round's turns
-   *  without counting the round, so with someone away at the end of the
-   *  order the game would never end. */
-  private nextConnectedDrawer(): ServerPlayer | null {
-    for (let idx = this.turnIndex; idx < this.order.length; idx++) {
-      const p = this.players.get(this.order[idx]!);
-      if (p?.connected) {
-        this.turnIndex = idx;
-        return p;
+  /**
+   * Who draws next this round, or null when the round is done. Through the
+   * order from `turnIndex`, anyone away going to the back of the round; then,
+   * past the end of the order (where `turnIndex` stays), those put back, each
+   * drawing if they have returned and skipped if not. It never wraps to the
+   * start, which would begin the next round's turns without counting it.
+   */
+  private nextDrawer(): ServerPlayer | null {
+    for (; this.turnIndex < this.order.length; this.turnIndex++) {
+      const p = this.players.get(this.order[this.turnIndex]!);
+      if (!p) continue;
+      if (p.connected) return p;
+      if (!this.deferred.some((d) => d.id === p.id)) {
+        this.deferred.push({ id: p.id, name: p.name });
+        this.turnNotice(`${p.name} is away, so they'll draw last this round.`);
       }
     }
+    while (this.deferred.length > 0) {
+      const { id, name } = this.deferred.shift()!;
+      const p = this.players.get(id);
+      if (p?.connected) return p;
+      this.turnNotice(p ? `${name} is still away, so their turn is skipped.` : `${name} left, so their turn is skipped.`);
+    }
     return null;
+  }
+
+  private turnNotice(text: string): void {
+    this.io.to(this.code).emit('turn:notice', { text });
   }
 
   chooseWord(playerId: string, id: string): void {
@@ -387,17 +413,16 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.schedule(TURN_END_SECONDS * 1000, () => this.nextTurn());
   }
 
+  /** On to the next turn; whether that is the next round, beginTurn finds.
+   *  Past the end of the order the turns are those put back, taken in turn. */
   private nextTurn(): void {
-    this.turnIndex++;
-    if (this.turnIndex >= this.order.length) {
-      this.nextRound();
-      return;
-    }
+    if (this.turnIndex < this.order.length) this.turnIndex++;
     this.continueGame();
   }
 
   private nextRound(): void {
     this.turnIndex = 0;
+    this.deferred = [];
     this.round++;
     this.continueGame();
   }
@@ -428,6 +453,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.phase = 'lobby';
     this.round = 0;
     this.turnIndex = 0;
+    this.deferred = [];
     this.ops = [];
     this.undone = [];
     this.cleared = [];

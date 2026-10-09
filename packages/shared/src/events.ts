@@ -289,6 +289,9 @@ export interface ServerToClientEvents {
     reason: 'timeout' | 'all-guessed' | 'drawer-left';
   }) => void;
   'game:end': (p: { players: Player[]; gallery: Drawing[] }) => void;
+  /** A turn moved to the end of the round, skipped, or cut short because its
+   *  drawer is away or left: a line for everyone, shown as a popup. */
+  'turn:notice': (p: { text: string }) => void;
   /** The current drawing's reactions, whenever they change. */
   'draw:reactions': (p: { likes: string[]; dislikes: string[] }) => void;
 

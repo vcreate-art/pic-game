@@ -136,6 +136,12 @@ export function bindSocket(engine: CanvasEngine): () => void {
 
   socket.on('chat:message', (m) => g().pushMessage(m));
   socket.on('guess:correct', ({ playerId }) => g().markGuessed(playerId));
+  socket.on('turn:notice', ({ text }) => {
+    g().setNotice(text);
+    setTimeout(() => {
+      if (useGame.getState().notice === text) useGame.getState().setNotice(null);
+    }, 4000);
+  });
 
   socket.on('error', ({ message }) => {
     g().setNotice(message);
@@ -156,7 +162,7 @@ export function bindSocket(engine: CanvasEngine): () => void {
       'room:settings', 'room:meta', 'host:changed', 'kicked', 'room:replaced', 'turn:choosing', 'turn:clock', 'word:secret',
       'turn:drawing', 'hint:reveal', 'turn:end', 'game:end', 'draw:reactions',
       'draw:start', 'draw:append', 'draw:end', 'draw:replace', 'draw:fill',
-      'canvas:undone', 'canvas:cleared', 'chat:message', 'guess:correct', 'error',
+      'canvas:undone', 'canvas:cleared', 'chat:message', 'guess:correct', 'turn:notice', 'error',
       'chess:state', 'chess:moved', 'chess:over', 'chess:rejected',
       'realms:state', 'realms:hand', 'realms:over', 'realms:rejected',
       'fight:state', 'fight:frame', 'fight:events',
