@@ -139,6 +139,18 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     return true;
   }
 
+  /** BaseRoom takes the seat out of the order, which moves everyone after it
+   *  up one. The turn index moves with them when the seat was at or before
+   *  it, so the next turn is still the next player's, not the one after. A
+   *  drawer who leaves takes the index back past the start for a moment,
+   *  and the next turn brings it to 0. */
+  override removePlayer(playerId: string): void {
+    const idx = this.order.indexOf(playerId);
+    const inGame = this.phase !== 'lobby' && this.phase !== 'gameEnd';
+    if (inGame && idx !== -1 && idx <= this.turnIndex) this.turnIndex--;
+    super.removePlayer(playerId);
+  }
+
   protected override onPlayerRemoved(playerId: string): boolean {
     if (this.drawerId === playerId && (this.phase === 'drawing' || this.phase === 'choosing')) {
       this.endTurn('drawer-left');
