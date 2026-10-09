@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { serverNow } from '../net/clock.js';
+import { roomNow } from '../net/clock.js';
 import { getSocket } from '../net/socket.js';
 import { selectIsHost, useGame } from '../store/game.js';
 import { Avatar } from './Avatar.js';
@@ -23,12 +23,12 @@ export function PausedOverlay() {
   const players = useGame((s) => s.room?.players);
   const hostId = useGame((s) => s.room?.hostId);
   const isHost = useGame(selectIsHost);
-  const [now, setNow] = useState(serverNow);
+  const [now, setNow] = useState(roomNow);
 
   useEffect(() => {
     if (!paused) return;
-    setNow(serverNow());
-    const t = setInterval(() => setNow(serverNow()), 1000);
+    setNow(roomNow());
+    const t = setInterval(() => setNow(roomNow()), 1000);
     return () => clearInterval(t);
   }, [paused]);
 

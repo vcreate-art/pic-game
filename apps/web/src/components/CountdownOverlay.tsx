@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { GAME_LABELS } from '@pic-game/shared';
-import { serverNow } from '../net/clock.js';
+import { roomNow } from '../net/clock.js';
 import { useGame } from '../store/game.js';
 import { GAME_ICONS } from './gameIcons.js';
 
@@ -11,12 +11,12 @@ import { GAME_ICONS } from './gameIcons.js';
 export function CountdownOverlay() {
   const countdown = useGame((s) => s.room?.meta.countdown ?? null);
   const kind = useGame((s) => s.room?.kind);
-  const [now, setNow] = useState(serverNow);
+  const [now, setNow] = useState(roomNow);
 
   useEffect(() => {
     if (!countdown) return;
-    setNow(serverNow());
-    const t = setInterval(() => setNow(serverNow()), 100);
+    setNow(roomNow());
+    const t = setInterval(() => setNow(roomNow()), 100);
     return () => clearInterval(t);
   }, [countdown]);
 

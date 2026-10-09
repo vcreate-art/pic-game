@@ -66,7 +66,7 @@ function room(phase: Phase, drawer: string, count: number, word: string, votes: 
     hostId: ME,
     serverTime: now,
     meta: {
-      stage: 'playing', paused: null, countdown: null, wins: {}, winsByGame: {}, played: {}, games: 0,
+      stage: 'playing', paused: null, countdown: null, clock: null, wins: {}, winsByGame: {}, played: {}, games: 0,
       can: { pause: true, restart: true, toLobby: true, switch: true },
     },
     phase,

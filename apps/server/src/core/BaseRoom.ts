@@ -5,9 +5,22 @@ import type {
   RoomStage, RoomStateBase, ServerToClientEvents,
 } from '@pic-game/shared';
 import { EMPTY_ROOM_TTL_MS, GAME_COUNTDOWN_MS, PAUSE_HOST_AWAY_MS } from '../config.js';
+import { RoomClock, TICK_MS, type TimerHandle } from './RoomClock.js';
 import { RoomSession } from './RoomSession.js';
 
 export type IO = Server<ClientToServerEvents, ServerToClientEvents>;
+
+/** One line of a room's timeline, for god mode. */
+export interface TimelineEntry {
+  seq: number;
+  /** Room time, and the tick of the room's clock it fell on. */
+  at: number;
+  tick: number;
+  text: string;
+}
+
+/** How many timeline lines a room keeps. */
+const TIMELINE_KEPT = 300;
 
 /** Where a room is in its game, in the terms every game shares: getting
  *  ready, in the middle of one, or looking at the result. */
@@ -60,14 +73,23 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   /** Join order, which games may also use as turn order. */
   order: string[] = [];
 
+  /** The room's own time, which god mode can freeze, speed up or step. Every
+   *  game timer runs on it; the empty-room collection stays on real time. */
+  readonly clock = new RoomClock();
+  /** What has happened in the room lately, oldest first, for god mode. */
+  private timelineLog: TimelineEntry[] = [];
+  private timelineSeq = 0;
+  /** Room time the current game went into play, for its tick count. */
+  private playStartedAt: number | null = null;
+
   /** Set while the host has the game paused. */
   private roomPause: RoomPause | null = null;
   /** Resumes a paused game whose host has dropped out. */
-  private pauseAwayTimer: ReturnType<typeof setTimeout> | null = null;
+  private pauseAwayTimer: TimerHandle | null = null;
   /** The 3-2-1 under way, if any. A countdown holds the game the same way a
    *  pause does, so every game that can pause gets one for free. */
   private countdown: RoomCountdown | null = null;
-  private countdownTimer: ReturnType<typeof setTimeout> | null = null;
+  private countdownTimer: TimerHandle | null = null;
   /** The stage as last broadcast, to notice a game going into play. */
   private lastStage: RoomStage = 'lobby';
 
@@ -156,6 +178,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     this.players.set(player.id, player);
     this.order.push(player.id);
     if (!this.hostId) this.hostId = player.id;
+    this.trace(`${name} joined`);
     this.cancelEmptyCollection();
     // Someone back after leaving brings their record with them.
     this.sendMetaIfChanged();
@@ -226,6 +249,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   /** A seat stays reclaimable for as long as it exists: an away seat that
    *  refused its owner would sit in the room beside their new one. */
   private rebind(p: P, socketId: string): P {
+    if (!p.connected) this.trace(`${p.name} is back`);
     p.socketId = socketId;
     p.connected = true;
     p.disconnectedAt = null;
@@ -241,6 +265,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     p.connected = false;
     p.socketId = null;
     p.disconnectedAt = Date.now();
+    this.trace(`${p.name} dropped out`);
     this.io.to(this.code).emit('player:updated', this.publicPlayer(p));
 
     this.onPlayerDisconnected(p);
@@ -248,9 +273,10 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     // game stuck. The pause may already be gone if the drop ended the game.
     if (this.roomPause && playerId === this.hostId) {
       this.clearPauseAway();
-      this.pauseAwayTimer = setTimeout(
-        () => this.resumeNow('The host is away, so the game carries on.'),
+      this.pauseAwayTimer = this.clock.after(
         PAUSE_HOST_AWAY_MS,
+        () => this.resumeNow('The host is away, so the game carries on.'),
+        'resume: host away',
       );
     }
     if (this.activeCount() === 0) this.scheduleEmptyCollection();
@@ -261,6 +287,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     if (!p) return;
     this.players.delete(playerId);
     this.order = this.order.filter((id) => id !== playerId);
+    this.trace(`${p.name} left`);
     this.io.to(this.code).emit('player:left', { id: playerId });
 
     if (this.hostId === playerId) {
@@ -373,6 +400,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
       stage: this.lifecycle(),
       paused: this.roomPause,
       countdown: this.countdown,
+      clock: this.clock.mapping(),
       can: {
         pause: this.canPause(),
         restart: this.lifecycle() !== 'lobby',
@@ -394,7 +422,8 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   /** Host only: stops the game where it is until the host resumes it. */
   pauseGame(by: string): void {
     if (by !== this.hostId || this.roomPause || !this.canPause()) return;
-    this.roomPause = { by, at: Date.now() };
+    this.roomPause = { by, at: this.clock.now() };
+    this.trace('paused');
     this.onPause();
     this.systemMessage(`${this.players.get(by)?.name ?? 'The host'} paused the game.`);
     this.emitMeta();
@@ -412,20 +441,21 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
    *  that has just been set up; a resume holds one that's already paused. */
   private countIn(kind: RoomCountdown['kind']): void {
     if (!this.roomPause) {
-      this.roomPause = { by: this.hostId, at: Date.now() };
+      this.roomPause = { by: this.hostId, at: this.clock.now() };
       this.onPause();
     }
-    this.countdown = { kind, until: Date.now() + GAME_COUNTDOWN_MS };
+    this.countdown = { kind, until: this.clock.now() + GAME_COUNTDOWN_MS };
+    this.trace(`counting in (${kind})`);
     this.clearCountdown();
-    this.countdownTimer = setTimeout(() => {
+    this.countdownTimer = this.clock.after(GAME_COUNTDOWN_MS, () => {
       this.countdownTimer = null;
       this.countdown = null;
       this.resumeNow(kind === 'resume' ? 'Back to the game.' : null);
-    }, GAME_COUNTDOWN_MS);
+    }, `count-in (${kind})`);
   }
 
   private clearCountdown(): void {
-    if (this.countdownTimer) clearTimeout(this.countdownTimer);
+    this.clock.cancel(this.countdownTimer);
     this.countdownTimer = null;
   }
 
@@ -436,7 +466,8 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
     this.countdown = null;
     this.clearCountdown();
     this.clearPauseAway();
-    this.onResume(Date.now() - paused.at);
+    this.trace('running');
+    this.onResume(this.clock.now() - paused.at);
     if (message) this.systemMessage(message);
     this.emitMeta();
   }
@@ -451,7 +482,7 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
   }
 
   private clearPauseAway(): void {
-    if (this.pauseAwayTimer) clearTimeout(this.pauseAwayTimer);
+    this.clock.cancel(this.pauseAwayTimer);
     this.pauseAwayTimer = null;
   }
 
@@ -512,7 +543,12 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
 
   /** Notes who is taking part when play begins, however it was reached. */
   private noteStage(stage: RoomStage): void {
-    if (stage === 'playing' && this.lastStage !== 'playing') this.takingPart = new Set(this.players.keys());
+    if (stage === this.lastStage) return;
+    this.trace(`stage: ${stage}`);
+    if (stage === 'playing') {
+      this.takingPart = new Set(this.players.keys());
+      this.playStartedAt = this.clock.now();
+    }
   }
 
   /** Sends the room-level facts on their own. Most games broadcast only their
@@ -602,9 +638,108 @@ export abstract class BaseRoom<P extends CorePlayer = CorePlayer> {
       .map((p) => this.publicPlayer(p));
   }
 
+  // ------------------------------------------------------------------ god mode
+
+  /** Notes something that happened, for the room's timeline in god mode. */
+  trace(text: string): void {
+    const at = this.clock.now();
+    this.timelineLog.push({ seq: ++this.timelineSeq, at, tick: this.tickAt(at), text });
+    if (this.timelineLog.length > TIMELINE_KEPT) this.timelineLog.shift();
+  }
+
+  timeline(): readonly TimelineEntry[] {
+    return this.timelineLog;
+  }
+
+  /** Whole ticks of room time since the room was made. */
+  private tickAt(at: number): number {
+    return Math.floor((at - this.createdAt) / TICK_MS);
+  }
+
+  /** The clock's side of god mode: ticks so far, its speed, what is due. */
+  clockState() {
+    const now = this.clock.now();
+    return {
+      tick: this.tickAt(now),
+      gameTick: this.playStartedAt === null || this.lifecycle() === 'lobby'
+        ? null
+        : Math.floor((now - this.playStartedAt) / TICK_MS),
+      speed: this.clock.speed,
+      pending: this.clock.pending(),
+      /** Whether this game's timers all run on the room clock, so changing
+       *  it moves the whole game. Games still on their own timers don't. */
+      controllable: this.clockDriven,
+    };
+  }
+
+  /** Games whose every timer runs on the room clock say so; for the rest,
+   *  god mode leaves their time alone. */
+  protected get clockDriven(): boolean {
+    return false;
+  }
+
+  /** Lets the clock's change reach every player's countdowns. */
+  godClock(action: { kind: 'speed'; speed: number } | { kind: 'step'; ticks: number } | { kind: 'next' }): void {
+    if (!this.clockDriven) return;
+    switch (action.kind) {
+      case 'speed':
+        this.trace(`god: speed ×${action.speed}`);
+        this.clock.setSpeed(action.speed);
+        break;
+      case 'step':
+        this.trace(`god: step ${action.ticks} tick${action.ticks === 1 ? '' : 's'}`);
+        this.clock.advance(action.ticks * TICK_MS);
+        break;
+      case 'next': {
+        const due = this.clock.nextDue();
+        if (due === null) return;
+        this.trace('god: on to the next event');
+        this.clock.advance(Math.max(0, due - this.clock.now()));
+        break;
+      }
+    }
+    this.emitMeta();
+  }
+
+  /** Host controls, taken by god mode on the host's behalf. */
+  godPause(): void {
+    this.trace('god: pause');
+    this.pauseGame(this.hostId);
+  }
+
+  godResume(): void {
+    this.trace('god: resume');
+    this.resumeGame(this.hostId);
+  }
+
+  godRestart(): void {
+    this.trace('god: restart');
+    this.restart(this.hostId);
+  }
+
+  godToLobby(): void {
+    this.trace('god: to the lobby');
+    this.backToLobby(this.hostId);
+  }
+
+  godKick(playerId: string): void {
+    const p = this.players.get(playerId);
+    if (!p) return;
+    this.trace(`god: removed ${p.name}`);
+    this.emitTo(playerId, 'kicked', { by: 'the host' });
+    this.systemMessage(`${p.name} was removed.`);
+    this.removePlayer(playerId);
+  }
+
+  /** What only this game knows, for god mode: secrets included. */
+  godDetails(): Record<string, unknown> {
+    return {};
+  }
+
   destroy(): void {
     this.dropPause();
     this.onDestroy();
+    this.clock.dispose();
     if (this.emptyTimer) clearTimeout(this.emptyTimer);
     this.emptyTimer = null;
     this.destroyed = true;

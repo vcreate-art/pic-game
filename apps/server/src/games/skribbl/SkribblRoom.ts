@@ -12,6 +12,7 @@ import {
   TURN_END_SECONDS, EMPTY_ROOM_TTL_MS,
 } from '../../config.js';
 import { BaseRoom, type CorePlayer, type IO, type RoomLifecycle } from '../../core/BaseRoom.js';
+import type { TimerHandle } from '../../core/RoomClock.js';
 import { topScorers } from '../../core/RoomSession.js';
 import { pickWords } from './words.js';
 
@@ -65,13 +66,14 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     ops: CanvasOp[]; reactions: { likes: Set<string>; dislikes: Set<string> };
   }[] = [];
 
-  private phaseTimer: ReturnType<typeof setTimeout> | null = null;
-  private hintTimer: ReturnType<typeof setInterval> | null = null;
+  private phaseTimer: TimerHandle | null = null;
+  private hintTimer: TimerHandle | null = null;
   /** The step the phase timer will run, and when, for pausing. */
   private phaseFn: (() => void) | null = null;
+  private phaseLabel = '';
   private phaseDue = 0;
   /** What was left of the phase timer when the game was paused. */
-  private heldPhase: { fn: () => void; ms: number } | null = null;
+  private heldPhase: { fn: () => void; ms: number; label: string } | null = null;
 
   constructor(code: string, io: IO) {
     super(code, io);
@@ -91,9 +93,16 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     return true;
   }
 
+  /** Every timer here runs on the room clock, so god mode can drive it. */
+  protected override get clockDriven(): boolean {
+    return true;
+  }
+
   /** Stops the turn clock and the hints where they are. */
   protected override onPause(): void {
-    this.heldPhase = this.phaseFn ? { fn: this.phaseFn, ms: Math.max(0, this.phaseDue - Date.now()) } : null;
+    this.heldPhase = this.phaseFn
+      ? { fn: this.phaseFn, ms: Math.max(0, this.phaseDue - this.clock.now()), label: this.phaseLabel }
+      : null;
     this.clearTimers();
   }
 
@@ -104,8 +113,8 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     const held = this.heldPhase;
     this.heldPhase = null;
     if (held) {
-      if (this.phase === 'choosing' || this.phase === 'drawing') this.endsAt = Date.now() + held.ms;
-      this.schedule(held.ms, held.fn);
+      if (this.phase === 'choosing' || this.phase === 'drawing') this.endsAt = this.clock.now() + held.ms;
+      this.schedule(held.ms, held.fn, held.label);
     }
     if (this.phase === 'drawing') this.startHints();
     this.io.to(this.code).emit('turn:clock', { endsAt: this.endsAt });
@@ -228,6 +237,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     for (const p of this.players.values()) p.score = 0;
     this.usedWords.clear();
     this.gallery = [];
+    this.trace(`game started: ${this.settings.rounds} rounds, ${this.settings.drawTime}s to draw`);
     this.round = 1;
     this.turnIndex = 0;
     this.deferred = [];
@@ -251,6 +261,8 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     }
     this.drawerId = drawer.id;
     this.phase = 'choosing';
+    this.trace(`round ${this.round}: ${drawer.name} is choosing`
+      + (this.turnIndex >= this.order.length ? ' (put back to the end)' : ` (turn index ${this.turnIndex})`));
     this.ops = [];
     this.undone = [];
     this.cleared = [];
@@ -262,14 +274,14 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     });
 
     this.io.to(this.code).emit('canvas:cleared');
-    this.endsAt = Date.now() + CHOOSE_SECONDS * 1000;
+    this.endsAt = this.clock.now() + CHOOSE_SECONDS * 1000;
     this.io.to(this.code).emit('turn:choosing', {
       drawerId: drawer.id,
       round: this.round,
       endsAt: this.endsAt,
     });
     this.sendOptions();
-    this.schedule(CHOOSE_SECONDS * 1000, () => this.autoChoose());
+    this.schedule(CHOOSE_SECONDS * 1000, () => this.autoChoose(), 'word picked for them');
   }
 
   /** The word options, to the drawer's socket alone. */
@@ -310,6 +322,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   }
 
   private turnNotice(text: string): void {
+    this.trace(`notice: ${text}`);
     this.io.to(this.code).emit('turn:notice', { text });
   }
 
@@ -317,6 +330,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     if (this.phase !== 'choosing' || playerId !== this.drawerId) return;
     const word = this.offered.get(id);
     if (!word) return;
+    this.trace(`word picked: ${word}`);
     this.commitWord(word);
   }
 
@@ -328,6 +342,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
       this.abortToLobby();
       return;
     }
+    this.trace(`no pick in time, given: ${pick.text}`);
     this.commitWord(pick.text);
   }
 
@@ -343,7 +358,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.hintPositions = pickHintPositions(word, this.settings.hints, Math.random);
     this.hintsShown = 0;
     this.phase = 'drawing';
-    this.endsAt = Date.now() + this.settings.drawTime * 1000;
+    this.endsAt = this.clock.now() + this.settings.drawTime * 1000;
     // Before the secret goes out, so every guess of this turn lands below it.
     this.broadcastChat({ kind: 'divider', text: `${this.players.get(playerId)?.name ?? 'Someone'} is drawing` });
 
@@ -352,7 +367,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     const turn = this.turnPublic();
     if (turn) this.io.to(this.code).emit('turn:drawing', turn);
 
-    this.schedule(this.settings.drawTime * 1000, () => this.endTurn('timeout'));
+    this.schedule(this.settings.drawTime * 1000, () => this.endTurn('timeout'), 'turn runs out');
     this.startHints();
   }
 
@@ -361,7 +376,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     const total = this.hintPositions.length;
     if (this.hintsShown >= total) return;
 
-    const elapsed = this.settings.drawTime * 1000 - (this.endsAt - Date.now());
+    const elapsed = this.settings.drawTime * 1000 - (this.endsAt - this.clock.now());
     const due = (this.settings.drawTime * 1000 * (this.hintsShown + 1)) / (total + 1);
     if (elapsed < due) return;
 
@@ -369,6 +384,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     const char = this.word[idx]!;
     this.revealed[idx] = char;
     this.hintsShown++;
+    this.trace(`hint: letter ${idx + 1} is ${char}`);
     this.io.to(this.code).emit('hint:reveal', { index: idx, char });
   }
 
@@ -403,6 +419,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     }
 
     this.phase = 'turnEnd';
+    this.trace(`turn over (${reason})${word ? `, the word was ${word}` : ''}`);
     this.io.to(this.code).emit('turn:end', {
       word,
       deltas: this.deltas,
@@ -410,7 +427,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
       reason,
     });
     this.word = null;
-    this.schedule(TURN_END_SECONDS * 1000, () => this.nextTurn());
+    this.schedule(TURN_END_SECONDS * 1000, () => this.nextTurn(), 'next turn');
   }
 
   /** On to the next turn; whether that is the next round, beginTurn finds.
@@ -424,6 +441,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     this.turnIndex = 0;
     this.deferred = [];
     this.round++;
+    if (this.round <= this.settings.rounds) this.trace(`round ${this.round} begins`);
     this.continueGame();
   }
 
@@ -442,12 +460,14 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
   private endGame(): void {
     this.clearTimers();
     this.phase = 'gameEnd';
+    this.trace('game over');
     this.recordWin(topScorers(Object.fromEntries([...this.players.values()].map((p) => [p.id, p.score]))));
     this.io.to(this.code).emit('game:end', { players: this.publicPlayers(), gallery: this.galleryPublic() });
-    this.schedule(GAME_END_SECONDS * 1000, () => this.abortToLobby());
+    this.schedule(GAME_END_SECONDS * 1000, () => this.abortToLobby(), 'back to the lobby');
   }
 
   private abortToLobby(): void {
+    if (this.phase !== 'lobby') this.trace('back to the lobby');
     this.clearTimers();
     this.resetTurnState();
     this.phase = 'lobby';
@@ -482,33 +502,35 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
    *  firing turn transitions forever and never gets collected. */
   /** Runs the phase's next step after `ms`, remembering what is due and when
    *  so a pause can stop it and pick it up again with the time that was left. */
-  private schedule(ms: number, fn: () => void): void {
-    if (this.phaseTimer) clearTimeout(this.phaseTimer);
+  private schedule(ms: number, fn: () => void, label: string): void {
+    this.clock.cancel(this.phaseTimer);
     // Someone leaving can move the game on mid-pause; the next step waits.
     if (this.isPaused) {
       this.phaseTimer = null;
       this.phaseFn = null;
-      this.heldPhase = { fn, ms };
+      this.heldPhase = { fn, ms, label };
       return;
     }
     this.phaseFn = fn;
-    this.phaseDue = Date.now() + ms;
-    this.phaseTimer = setTimeout(() => {
+    this.phaseLabel = label;
+    this.phaseDue = this.clock.now() + ms;
+    this.phaseTimer = this.clock.after(ms, () => {
       this.phaseTimer = null;
       this.phaseFn = null;
       fn();
-    }, ms);
+    }, label);
   }
 
   private startHints(): void {
-    if (this.hintTimer) clearInterval(this.hintTimer);
+    this.clock.cancel(this.hintTimer);
+    this.hintTimer = null;
     if (this.isPaused) return;
-    this.hintTimer = setInterval(() => this.maybeReveal(), 1000);
+    this.hintTimer = this.clock.every(1000, () => this.maybeReveal(), 'hint check');
   }
 
   private clearTimers(): void {
-    if (this.phaseTimer) clearTimeout(this.phaseTimer);
-    if (this.hintTimer) clearInterval(this.hintTimer);
+    this.clock.cancel(this.phaseTimer);
+    this.clock.cancel(this.hintTimer);
     this.phaseTimer = null;
     this.hintTimer = null;
     this.phaseFn = null;
@@ -685,6 +707,7 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     }
 
     if (verdict === 'close') {
+      this.trace(`${player.name} was close: ${text}`);
       // Sent to the near-misser alone; broadcasting it would narrow the word for everyone.
       this.emitTo(playerId, 'chat:message', {
         id: randomUUID(),
@@ -699,10 +722,11 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
 
   private awardGuess(player: ServerPlayer): void {
     const placement = this.eligibleGuessers().filter((p) => p.guessedAt !== null).length;
-    player.guessedAt = Date.now();
+    this.trace(`${player.name} guessed it (#${placement + 1})`);
+    player.guessedAt = this.clock.now();
     player.placement = placement;
 
-    const pts = guessPoints(this.endsAt - Date.now(), this.settings.drawTime, placement);
+    const pts = guessPoints(this.endsAt - this.clock.now(), this.settings.drawTime, placement);
     player.score += pts;
     this.deltas[player.id] = (this.deltas[player.id] ?? 0) + pts;
 
@@ -733,6 +757,68 @@ export class SkribblRoom extends BaseRoom<ServerPlayer> {
     for (const p of this.players.values()) {
       if (p.guessedAt !== null || p.id === this.drawerId) this.emitTo(p.id, 'chat:message', msg);
     }
+  }
+
+  // ------------------------------------------------------------------ god mode
+
+  private get inTurns(): boolean {
+    return this.phase === 'choosing' || this.phase === 'drawing' || this.phase === 'turnEnd';
+  }
+
+  /** Ends the turn under way as if its time ran out. */
+  godSkipTurn(): void {
+    if (this.phase !== 'choosing' && this.phase !== 'drawing') return;
+    this.trace('god: skip the turn');
+    this.endTurn('timeout');
+  }
+
+  /** Ends the round after this turn: nobody else in it draws, those put back
+   *  included, and the next round starts as it would have. */
+  godEndRound(): void {
+    if (!this.inTurns) return;
+    this.trace(`god: end round ${this.round}`);
+    this.turnIndex = this.order.length;
+    this.deferred = [];
+    if (this.phase !== 'turnEnd') this.endTurn('timeout');
+  }
+
+  /** Makes this the last round and ends it, so the game reaches its end
+   *  through the turn's end and the podium, as it would have. */
+  godEndGame(): void {
+    if (!this.inTurns) return;
+    this.trace('god: end the game');
+    this.round = this.settings.rounds;
+    this.godEndRound();
+  }
+
+  override godDetails(): Record<string, unknown> {
+    const name = (id: string | null) => (id ? this.players.get(id)?.name ?? '(gone)' : null);
+    return {
+      phase: this.phase,
+      round: this.round,
+      rounds: this.settings.rounds,
+      turnIndex: this.turnIndex,
+      order: this.order.map((id, i) => ({
+        index: i,
+        name: name(id),
+        connected: this.players.get(id)?.connected ?? false,
+        drawing: id === this.drawerId,
+      })),
+      deferred: this.deferred.map((d) => d.name),
+      drawer: name(this.drawerId),
+      word: this.word,
+      options: this.options.map((o) => o.text),
+      mask: this.mask,
+      revealed: this.revealed,
+      hintPositions: this.hintPositions,
+      hintsShown: this.hintsShown,
+      endsInMs: this.inTurns && this.phase !== 'turnEnd' ? Math.max(0, Math.round(this.endsAt - this.clock.now())) : null,
+      guessed: [...this.players.values()].filter((p) => p.guessedAt !== null).map((p) => p.name),
+      deltas: Object.fromEntries(Object.entries(this.deltas).map(([id, d]) => [name(id), d])),
+      ops: this.ops.length,
+      usedWords: this.usedWords.size,
+      settings: this.settings,
+    };
   }
 
   // ------------------------------------------------------------ serialization

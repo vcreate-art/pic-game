@@ -1,3 +1,4 @@
+import type { RoomClockMapping } from '@pic-game/shared';
 import { getSocket } from './socket.js';
 
 /** Server epoch minus client epoch. Every countdown renders against server time,
@@ -10,17 +11,32 @@ let best = Number.POSITIVE_INFINITY;
  *  back on resume, so they carry on from where they stopped. */
 let pausedAt: number | null = null;
 
+/** How the room's own time runs against the server's, once god mode has
+ *  changed it. Null while they are the same. */
+let roomClock: RoomClockMapping | null = null;
+
 export function setPausedAt(at: number | null): void {
   pausedAt = at;
+}
+
+export function setRoomClock(c: RoomClockMapping | null): void {
+  roomClock = c;
 }
 
 export function serverNow(): number {
   return Date.now() + offset;
 }
 
-/** Server time as the game sees it: standing still while paused. */
+/** The room's own time, which every deadline it sends is in: the server's,
+ *  unless god mode has frozen, sped up or stepped the room. */
+export function roomNow(): number {
+  const now = serverNow();
+  return roomClock ? roomClock.at + (now - roomClock.wall) * roomClock.rate : now;
+}
+
+/** Room time as the game sees it: standing still while paused. */
 export function gameNow(): number {
-  return pausedAt ?? serverNow();
+  return pausedAt ?? roomNow();
 }
 
 export function isClockPaused(): boolean {
@@ -28,7 +44,7 @@ export function isClockPaused(): boolean {
 }
 
 export function msUntil(serverEpoch: number): number {
-  return Math.max(0, serverEpoch - (pausedAt ?? serverNow()));
+  return Math.max(0, serverEpoch - gameNow());
 }
 
 /** Takes the sample with the lowest round-trip, which is the least distorted

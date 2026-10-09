@@ -42,6 +42,22 @@ pm2 save   # persists the process list pm2 startup restores on boot
 Sanity check: `pm2 status` should show `pic-game` as `online`, and
 `curl -f http://127.0.0.1:3001/health` should return 200.
 
+### God mode
+
+`/god` shows every live room's full state (secret words included) and can
+steer it, its clock included. On production it is off until a key is set.
+Add a long random `GOD_KEY` to the `.env` the server reads at start (the
+repo root's, next to the PostHog keys, since pm2 runs from there), then
+restart:
+
+```bash
+echo "GOD_KEY=$(openssl rand -hex 24)" >> .env
+pm2 restart pic-game --update-env
+grep GOD_KEY .env   # the key to paste into /god, once per browser
+```
+
+Locally, with no `GOD_KEY` set, `/god` is open.
+
 ## 4. Install nginx as the reverse proxy
 
 ```bash

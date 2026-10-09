@@ -3520,3 +3520,70 @@ button, input { font: inherit; color: inherit; }
 }
 .devpanel button.is-on { background: #fff; color: #1c1d26; }
 .devpanel.is-closed .devpanel__toggle { background: rgba(28, 29, 38, .85); }
+
+/* ---------------------------------------------------------------- god mode */
+
+.god {
+  margin: 0 auto; width: 100%; max-width: 1280px;
+  display: flex; flex-direction: column; gap: 16px; padding: 20px 0 40px;
+}
+.god__head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.god__title { margin: 0; font-family: var(--display); font-size: 32px; font-weight: 800; }
+.god__muted { color: var(--ink-soft); font-size: 13px; }
+.god__key { max-width: 360px; margin: 40px auto; display: flex; flex-direction: column; gap: 12px; }
+.god__input {
+  border: 1px solid var(--line); border-radius: var(--radius-control); padding: 9px 12px;
+  font: inherit; background: var(--card); color: var(--ink);
+}
+.god__input--num { width: 72px; }
+.god__layout { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: start; }
+.god__rooms { display: flex; flex-direction: column; gap: 6px; }
+.god__room {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  border: 1px solid var(--edge); border-radius: var(--radius-control); background: var(--card);
+  padding: 9px 12px; color: var(--ink); font: inherit; cursor: pointer;
+}
+.god__room:hover { border-color: var(--accent); }
+.god__room.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.god__room-view { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.god__bar { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.god__code { margin: 0; font-family: var(--display); font-size: 26px; font-weight: 800; letter-spacing: .04em; }
+.god__tag {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--warn); background: var(--warn-soft); border-radius: 999px; padding: 2px 9px;
+}
+.god__flash { margin: 0; color: var(--warn); font-weight: 600; }
+.god__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.god__grid > .card { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.god__grid .card__title { margin: 0; }
+.god__ticks { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+.god__ticks strong { font-family: var(--display); font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.god__row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.god__row .btn { padding: 7px 12px; }
+.god__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.god__list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.god__kick { padding: 3px 9px !important; font-size: 12px; margin-left: 8px; }
+.god__dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); margin-right: 7px; }
+.god__dot.is-on { background: var(--ok); }
+.god__facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
+.god__facts dt { color: var(--ink-soft); }
+.god__facts dd { margin: 0; min-width: 0; }
+.god__mono { font-family: ui-monospace, monospace; letter-spacing: .15em; }
+.god__order { margin: 0; padding: 0; list-style: none; }
+.god__order li.is-at { font-weight: 700; color: var(--accent); }
+.god__raw {
+  margin: 0; max-height: 420px; overflow: auto; font-size: 12px;
+  background: var(--paper); border-radius: var(--radius-control); padding: 10px;
+}
+.god__timeline {
+  list-style: none; margin: 0; padding: 0; max-height: 420px; overflow: auto;
+  font-size: 13px; display: flex; flex-direction: column; gap: 3px;
+}
+.god__timeline li.is-god { color: var(--accent); font-weight: 600; }
+
+@media (max-width: 860px) {
+  .god { padding: 16px; }
+  .god__layout, .god__grid { grid-template-columns: minmax(0, 1fr); }
+  .god__rooms { flex-direction: row; overflow-x: auto; }
+  .god__room { flex: none; }
+}

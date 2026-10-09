@@ -9,6 +9,7 @@ import { IS_PROD, PORT, isAllowedOrigin } from './config.js';
 import { RoomManager } from './core/RoomManager.js';
 import { makeRoutes } from './http/routes.js';
 import { attachSocket } from './socket/index.js';
+import { attachGod } from './god/index.js';
 import { logServerLifecycle, shutdownPostHogLogs } from './posthogLogs.js';
 
 const app = express();
@@ -36,6 +37,7 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(http, {
 const rooms = new RoomManager(io);
 app.use(makeRoutes(rooms));
 attachSocket(io, rooms);
+attachGod(io as unknown as Parameters<typeof attachGod>[0], rooms);
 
 // Serve the built client when there is one, so `npm start` is the whole app on
 // one port. Same depth from src/ and dist/, so this resolves from either.

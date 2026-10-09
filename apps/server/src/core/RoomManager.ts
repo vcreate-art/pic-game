@@ -112,6 +112,11 @@ export class RoomManager {
     this.rooms.delete(room.code);
   }
 
+  /** Every live room, for god mode. */
+  all(): AnyRoom[] {
+    return [...this.rooms.values()];
+  }
+
   get size(): number {
     return this.rooms.size;
   }

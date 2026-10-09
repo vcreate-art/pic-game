@@ -275,6 +275,16 @@ export interface RoomCountdown {
   until: number;
 }
 
+/** How a room's own time relates to the server's, once god mode has changed
+ *  it: room time was `at` when the server's clock read `wall`, and runs
+ *  `rate` times as fast since (0 while frozen). Every deadline a room sends is
+ *  in its own time. */
+export interface RoomClockMapping {
+  at: number;
+  wall: number;
+  rate: number;
+}
+
 /** Room-level facts that outlive any one game: the session's wins, and what
  *  the host can do right now, so the UI doesn't repeat the server's rules. */
 export interface RoomMeta {
@@ -283,6 +293,9 @@ export interface RoomMeta {
   paused: RoomPause | null;
   /** Set while counting down to play: the game holds still until then. */
   countdown: RoomCountdown | null;
+  /** Set once god mode has changed the room's clock; null while room time is
+   *  server time. */
+  clock: RoomClockMapping | null;
   /** Wins this session, by player id. Survives switching games. */
   wins: Record<string, number>;
   /** The same wins split by game, by player id. */
