@@ -148,16 +148,27 @@ function RoomPanel({ socket, code }: { socket: GodSocket; code: string }) {
   const since = useRef(0);
 
   useEffect(() => {
+    let live = true;
+    since.current = 0;
+    setTimeline([]);
+    // Polls can overlap (a slow reply, or several sent at once on reconnect),
+    // each asking from the same `since`, so only entries past the newest one
+    // shown are kept.
     const poll = () =>
       socket.emit('god:room', { code, since: since.current }, (r) => {
+        if (!live) return;
         setRoom(r);
-        if (!r || r.timeline.length === 0) return;
-        since.current = r.timeline.at(-1)!.seq;
-        setTimeline((t) => [...t, ...r.timeline].slice(-TIMELINE_SHOWN));
+        const fresh = r ? r.timeline.filter((e) => e.seq > since.current) : [];
+        if (fresh.length === 0) return;
+        since.current = fresh.at(-1)!.seq;
+        setTimeline((t) => [...t, ...fresh].slice(-TIMELINE_SHOWN));
       });
     poll();
     const t = setInterval(poll, ROOM_POLL_MS);
-    return () => clearInterval(t);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
   }, [socket, code]);
 
   const act = useCallback(
