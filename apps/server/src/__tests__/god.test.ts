@@ -9,11 +9,15 @@ import { fakeIO } from './fakeIO.js';
 const av = { color: 0, face: 0 };
 
 /** A Draw & Guess game of three, two rounds, just past its count-in. Uses fake timers. */
-function game() {
+function game(words?: string[]) {
   vi.useFakeTimers();
   const { io, sent } = fakeIO();
   const room = new RoomManager(io).create('skribbl') as SkribblRoom;
   room.updateSettings({ rounds: 2, drawTime: 30 });
+  if (words) {
+    room.setWords(words.join('\n'));
+    room.updateSettings({ wordSource: 'custom' });
+  }
   const seats = Array.from({ length: 3 }, (_, i) => room.addPlayer(`P${i}`, av, `sock${i}`));
   room.startGame(seats[0]!.id);
   vi.advanceTimersByTime(GAME_COUNTDOWN_MS);
@@ -70,7 +74,11 @@ describe('god mode on Draw & Guess', () => {
   });
 
   it('reveals hints on the ticks they are due', () => {
-    const { room } = game();
+    // Long words only: a short one is allowed fewer hints, which moves the first.
+    const { room } = game([
+      'elephant', 'umbrella', 'pineapple', 'butterfly', 'mountain',
+      'calendar', 'dinosaur', 'keyboard', 'sandwich', 'treasure',
+    ]);
     act(room, { kind: 'speed', speed: 0 });
     act(room, { kind: 'next' }); // into drawing, with 2 hints over 30s: at 10s and 20s
     const shown = () => room.godDetails().hintsShown;
