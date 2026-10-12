@@ -106,7 +106,6 @@ button, input { font: inherit; color: inherit; }
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 280px;
   display: flex; flex-direction: column; gap: 12px;
 }
-.profile__avatar { display: flex; align-items: center; gap: 12px; }
 .profile__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .profile__note { margin: 0; font-size: 12px; color: var(--ink-soft); }
 
@@ -225,7 +224,7 @@ button, input { font: inherit; color: inherit; }
 .btn:not(.btn--primary):hover:not(:disabled) { border-color: var(--accent); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn:focus-visible, .sheet__close:focus-visible, .join__cycle button:focus-visible {
+.btn:focus-visible, .sheet__close:focus-visible {
   outline: 2px solid var(--ink); outline-offset: 2px;
 }
 .btn--primary { --btn-ink: rgba(0, 0, 0, .22); background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -333,14 +332,38 @@ button, input { font: inherit; color: inherit; }
 .landing--home .landing__section { margin-top: 0; }
 .landing__intro .landing__title { margin: 0; font-size: 40px; line-height: 1.05; }
 .landing__intro .landing__sub { margin-top: 6px; font-size: 15px; }
-/* One class deeper than `.landing__card .btn--primary`, which comes later. */
+/* One class deeper than `.landing__card .btn--primary`, which comes later:
+   the join button is an outline in the avatar's colour (the form's accent,
+   set in JoinPanel), not a picked game's, on a light shade of it, and the
+   colour inks in on hover.
+
+   Its label is white only where the ink has reached: the ink's radius is
+   one animated length, --ink-r, that sizes both the ink's circle and a
+   white disc painted into the label's text, from the same --ex/--ey, so
+   the two grow as one and the text splits along the ink's edge. */
+@property --ink-r { syntax: '<length>'; inherits: true; initial-value: 0px; }
 .landing__join .landing__card .btn--primary {
-  /* Near black already, so darker ink wouldn't show: it inks in the app's
-     accent instead, the join card's one bit of colour, and only on hover. */
   --btn-ink: var(--accent);
-  background: var(--ink); border-color: var(--ink);
+  --ink-r: 0px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
+  border-color: var(--accent); color: var(--accent);
+  transition: transform .08s ease, border-color .15s ease, --ink-r .5s cubic-bezier(.55, 0, .25, 1);
 }
-.landing__join .landing__card .btn--primary:hover:not(:disabled) { border-color: var(--accent); }
+.landing__join .landing__card .btn--primary::before {
+  clip-path: circle(var(--ink-r) at var(--ex, 50%) var(--ey, 50%));
+  transition: none;
+}
+/* Wider than any join button is long, from any point on its edge. */
+.landing__join .landing__card .btn--primary.is-inked:not(:disabled) { --ink-r: 640px; }
+.landing__join .landing__card .btn--primary.ink-place { transition: none; }
+/* The label spans the button's whole padding box, as the ink does, so the
+   disc's centre lands on the same point. */
+.landing__join .btn__label {
+  display: block; margin: -13px -22px; padding: 13px 22px;
+  background: radial-gradient(circle var(--ink-r) at var(--ex, 50%) var(--ey, 50%),
+    #fff var(--ink-r), var(--accent) var(--ink-r));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
 
 .landing__heading {
   margin: 0 0 0 4px; font-family: var(--display); font-size: 21px; font-weight: 800;
@@ -358,14 +381,23 @@ button, input { font: inherit; color: inherit; }
 .landing__card { display: flex; flex-direction: column; gap: 14px; }
 
 .join { display: flex; flex-direction: column; gap: 16px; }
-.join__avatar { display: flex; align-items: center; gap: 14px; }
-.join__cycle { display: flex; gap: 8px; }
-.join__cycle button {
-  border: 1px solid var(--line); background: var(--paper);
-  border-radius: 10px; padding: 7px 11px; font-size: 13px; font-weight: 600; cursor: pointer;
-  white-space: nowrap;
+/* Choosing an avatar (AvatarPicker): the face between two round arrows that
+   step it, the colours below as swatches, the chosen one ringed in itself. */
+.avpick { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.avpick__face { display: flex; align-items: center; gap: 14px; }
+.avpick__step {
+  display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border-radius: 999px;
 }
-.join__cycle button:hover { border-color: var(--accent); }
+.avpick__step svg { width: 18px; height: 18px; }
+.avpick__colors { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; }
+.avpick__swatch {
+  width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--swatch); cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.avpick__swatch:hover { transform: scale(1.12); }
+.avpick__swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--swatch); }
+.avpick__swatch:focus-visible { outline: 2px solid var(--ink); outline-offset: 5px; }
 
 .avatar-wrap { position: relative; display: block; flex: none; }
 .avatar {
@@ -373,6 +405,36 @@ button, input { font: inherit; color: inherit; }
   width: 100%; height: 100%;
   color: #fff; font-weight: 700; font-family: var(--display);
   letter-spacing: -.04em; user-select: none;
+}
+/* Trying LoginCritter's idea: the face (AvatarFace, on a 36-unit grid where
+   a px is a unit) turns toward where the avatar looks (--lx/--ly from
+   avatarGaze.ts), the eyes a touch further than the rest, and a glad
+   avatar hops with its eyes squeezed shut. */
+.avatar { overflow: hidden; }
+.avatar > .aface { display: block; width: 100%; height: 100%; }
+/* The face drawn larger than its grid, and larger again on a small avatar,
+   so it still reads as a face at a glance. */
+.avatar > .aface > .aface__face { transform-box: view-box; transform-origin: 18px 18px; scale: 1.15; }
+.avatar--small > .aface > .aface__face { scale: 1.32; }
+.aface__face {
+  translate: calc(var(--lx, 0) * 4.5px) calc(var(--ly, 0) * 3.5px);
+  transition: translate .18s ease-out;
+}
+.aface__eyes {
+  transform-box: fill-box; transform-origin: center;
+  translate: calc(var(--lx, 0) * 1.2px) calc(var(--ly, 0) * .9px);
+  transition: translate .18s ease-out, scale .15s ease;
+}
+.avatar[data-mood='glad'] { animation: avatar-hop .5s ease-out; }
+.avatar[data-mood='glad'] .aface__eyes { scale: 1 .35; }
+@keyframes avatar-hop {
+  0%, 100% { transform: translateY(0); }
+  35% { transform: translateY(-14%); }
+  60% { transform: translateY(2%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aface__face, .aface__eyes { transition: none; }
+  .avatar[data-mood='glad'] { animation: none; }
 }
 /* Host badge, tucked on the top-left corner. The ring separates it from the
    avatar colour underneath, whatever that colour happens to be. */
@@ -384,11 +446,15 @@ button, input { font: inherit; color: inherit; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field__label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .field__label em { font-weight: 400; font-style: normal; opacity: .75; }
+/* White with a quiet edge, like the cards and outline buttons around it; the
+   edge takes the accent on hover, and doubles to it with focus. */
 .field__input {
-  border: 1px solid var(--line); background: var(--paper);
+  border: 1px solid var(--line); background: var(--card);
   border-radius: 12px; padding: 12px 14px; outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
-.field__input:focus { border-color: var(--accent); background: var(--card); box-shadow: 0 0 0 3px var(--accent-soft); }
+.field__input:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.field__input:focus { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .field__input--code {
   text-align: center; text-transform: uppercase; letter-spacing: .3em;
   /* Letter-spacing trails the last character too; this pads it back to centre. */
@@ -1395,12 +1461,13 @@ button, input { font: inherit; color: inherit; }
 .picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 18px; padding-top: .25em; }
 
 /* Each game is a box cover: paper edged in the game's colour, its name as
-   the art and its icon, in that colour, bleeding off the corner. Pointing
-   at it (or focusing it) slides the blurb up under the name like a drawer,
-   shrinking the name to make room, while a darker shade of the colour
-   spreads from where the pointer came in and the text turns white over it;
-   --ex/--ey come from inkFrom() in the landing route. Focus spreads it from
-   the centre. */
+   the art and its icon, in that colour, bleeding off the corner. A blob of a
+   darker shade of the colour follows the pointer and shows on whichever
+   covers it overlaps; on the cover the pointer settles in (or the one in
+   focus) the shade fills the cover from the blob,
+   the text turns white over it and the blurb slides up under the name like
+   a drawer, shrinking the name to make room. --ex/--ey/--er come from
+   useNearInk() in GameCovers. Focus spreads it from the centre. */
 .pick {
   display: flex; flex-direction: column; gap: 10px; padding: 0;
   border: 0; background: none; text-align: left; cursor: pointer;
@@ -1415,7 +1482,8 @@ button, input { font: inherit; color: inherit; }
   /* In step with the ink, so a quick pass doesn't flicker the text. */
   transition: color .5s cubic-bezier(.55, 0, .25, 1);
 }
-/* Under the icon and the text, over the paper. */
+/* Over the paper and the icon, under the text; it carries the icon's white
+   copy in it. */
 .pick__ink {
   position: absolute; inset: 0;
   background: color-mix(in srgb, var(--game, var(--ink)) 72%, #000);
@@ -1435,10 +1503,20 @@ button, input { font: inherit; color: inherit; }
 }
 .switchgrid .pick__stage { top: 7px; left: 7px; padding: 1px 6px; font-size: 9.5px; }
 /* No blurb opens in the lobby's grid, so there it stays put. */
-.switchgrid .pick:hover .pick__stage, .switchgrid .pick:focus-visible .pick__stage { opacity: 1; }
+.switchgrid .pick.is-inked .pick__stage, .switchgrid .pick:focus-visible .pick__stage { opacity: 1; }
 .pick__art {
   position: absolute; top: -4px; right: -18px; width: 72px; height: 72px;
   color: var(--game, var(--ink)); opacity: .6;
+  /* A hard shadow, no blur: the icon as if printed on the box and offset. */
+  filter: drop-shadow(3px 3px 0 color-mix(in srgb, var(--game, var(--ink)) 55%, #000));
+}
+/* The same icon inside the ink, where the game's colour would all but vanish
+   into its own darker shade: white, softer so it stays in the back, with a
+   shadow darker than the ink. The ink's clip cuts it to the ink's shape, so
+   the icon is white wherever the ink has reached and coloured elsewhere. */
+.pick__art--inked {
+  color: #fff; opacity: .45;
+  filter: drop-shadow(3px 3px 0 rgba(0, 0, 0, .55));
 }
 /* A soft glow of the game's colour rising from the bottom-left corner,
    under the name. First in the cover, so the ink covers it on hover. */
@@ -1471,12 +1549,24 @@ button, input { font: inherit; color: inherit; }
   transition: opacity .25s ease, transform .35s cubic-bezier(.3, .7, .3, 1);
 }
 .pick__blurb { padding: 0 2px; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
+/* A long blurb, set smaller so it fits the open cover with the name above. */
+.pick.is-long .pick__more > span { font-size: 12px; line-height: 1.3; }
 /* 150% of the circle's reference length reaches the far corner from any
    point on the edge. */
-/* is-inked comes from inkFrom() once the circle sits, still empty, where the
-   pointer came in, so it grows from there instead of sliding in. */
+/* is-inked comes from useNearInk() in GameCovers once the pointer settles in
+   the cover; the script draws the fill spreading, so this full circle only
+   shows for a cover in focus or chosen. */
 .pick.is-inked .pick__ink,
 .pick:focus-visible .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
+/* The ink useNearInk() in GameCovers draws on this cover, frame by frame: the
+   pointer's blob, or this cover's fill spreading from it or draining back,
+   a circle --er in radius centred at --ex/--ey, even off the cover. The
+   script does the easing, so no transition. After the fill above, so it
+   wins over it while it's drawing. */
+.pick.is-near .pick__ink {
+  clip-path: circle(var(--er, 0px) at var(--ex, 50%) var(--ey, 50%));
+  transition: none;
+}
 .pick:focus-visible .pick__cover { color: #fff; }
 .pick:focus-visible .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
 /* The blurb slides up into the corner it sits in, so it steps aside with the
@@ -1486,14 +1576,15 @@ button, input { font: inherit; color: inherit; }
 .pick:focus-visible .pick__more { grid-template-rows: 1fr; }
 .pick:focus-visible .pick__more > span { opacity: 1; transform: none; }
 /* Only with a real pointer: on touch, :hover sticks to the last tapped card.
-   There the blurb stays under the cover. */
+   There the blurb stays under the cover. A cover opens with its ink, once
+   the pointer settles in it (useNearInk), not on :hover. */
 @media (hover: hover) {
-  .pick:hover .pick__cover { color: #fff; }
-  .pick:hover .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
-  .pick:hover .pick__stage { opacity: 0; }
-  .pick:hover .pick__name { font-size: 17px; margin-bottom: 5px; }
-  .pick:hover .pick__more { grid-template-rows: 1fr; }
-  .pick:hover .pick__more > span { opacity: 1; transform: none; }
+  .pick.is-inked .pick__cover { color: #fff; }
+  .pick.is-inked .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
+  .pick.is-inked .pick__stage { opacity: 0; }
+  .pick.is-inked .pick__name { font-size: 17px; margin-bottom: 5px; }
+  .pick.is-inked .pick__more { grid-template-rows: 1fr; }
+  .pick.is-inked .pick__more > span { opacity: 1; transform: none; }
   .pick__blurb { display: none; }
   .picker { row-gap: 18px; }
 }
@@ -3337,10 +3428,10 @@ button, input { font: inherit; color: inherit; }
 .switchgrid .picker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 2px; }
 .switchgrid .pick__cover { padding: 10px 11px; border-radius: 10px; }
 .switchgrid .pick__art { top: -3px; right: -12px; width: 46px; height: 46px; }
-.switchgrid .pick__name, .switchgrid .pick:hover .pick__name, .switchgrid .pick:focus-visible .pick__name {
+.switchgrid .pick__name, .switchgrid .pick.is-inked .pick__name, .switchgrid .pick:focus-visible .pick__name {
   font-size: 15px; margin-bottom: 0;
 }
-.switchgrid .pick__cat, .switchgrid .pick:hover .pick__cat, .switchgrid .pick:focus-visible .pick__cat {
+.switchgrid .pick__cat, .switchgrid .pick.is-inked .pick__cat, .switchgrid .pick:focus-visible .pick__cat {
   max-height: 18px; margin-top: 2px; opacity: 1; font-size: 11.5px;
 }
 .switchgrid .pick__more, .switchgrid .pick__blurb { display: none; }

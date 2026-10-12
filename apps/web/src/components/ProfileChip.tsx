@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Lock, Pencil, Smartphone, Trophy } from 'lucide-react';
-import { AVATAR_COLORS, AVATAR_FACES } from '@pic-game/shared';
 import { MAX_NAME_LEN } from '../constants.js';
 import { PROFILE_EVENT, getSocket, loadProfile, saveProfile, type Profile } from '../net/socket.js';
 import { useGame } from '../store/game.js';
 import { useDismiss } from '../lib/useDismiss.js';
 import { ACHIEVEMENTS, byRelevance, totalPlayed, totalWon, useStats } from '../lib/achievements.js';
 import { Avatar } from './Avatar.js';
+import { AvatarPicker } from './AvatarPicker.js';
 import { PhoneHandoff } from './PhoneHandoff.js';
 import { noAutofill } from '../lib/noAutofill.js';
 
@@ -134,13 +134,14 @@ export function ProfileEditor({ className, onDone }: { className?: string; onDon
 
   return (
     <form className={className} onSubmit={save}>
-      <div className="profile__avatar">
-        <Avatar data={{ color, face }} size={56} />
-        <div className="join__cycle">
-          <button type="button" onClick={() => setColor((c) => (c + 1) % AVATAR_COLORS.length)}>Colour</button>
-          <button type="button" onClick={() => setFace((f) => (f + 1) % AVATAR_FACES.length)}>Face</button>
-        </div>
-      </div>
+      <AvatarPicker
+        value={{ color, face }}
+        onChange={(a) => {
+          setColor(a.color);
+          setFace(a.face);
+        }}
+        size={56}
+      />
       <label className="field">
         <span className="field__label">Nickname</span>
         <input

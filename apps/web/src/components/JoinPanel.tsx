@@ -1,9 +1,14 @@
-import { useEffect, useState } from 'react';
-import { AVATAR_COLORS, AVATAR_FACES } from '@pic-game/shared';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { AVATAR_COLORS, AVATAR_FACE_COUNT, type Avatar } from '@pic-game/shared';
 import { MAX_NAME_LEN } from '../constants.js';
 import { PROFILE_EVENT, loadProfile, saveProfile, type Profile } from '../net/socket.js';
-import { Avatar } from './Avatar.js';
+import { AvatarPicker } from './AvatarPicker.js';
 import { noAutofill } from '../lib/noAutofill.js';
+
+/** Set while a form saves the avatar it was just given, so no form takes
+ *  that save for an edit from the header and resets the name being typed.
+ *  Module-wide: the front page has two forms sharing one draft. */
+let savingAvatar = false;
 
 export interface Identity {
   name: string;
@@ -17,7 +22,7 @@ export function initialIdentity(): Identity {
     name: saved?.name ?? '',
     avatar: {
       color: saved?.avatar.color ?? Math.floor(Math.random() * AVATAR_COLORS.length),
-      face: saved?.avatar.face ?? Math.floor(Math.random() * AVATAR_FACES.length),
+      face: saved?.avatar.face ?? Math.floor(Math.random() * AVATAR_FACE_COUNT),
     },
   };
 }
@@ -48,12 +53,25 @@ export function JoinPanel({
   const { name } = id;
   const { color, face } = id.avatar;
   const setName = (n: string) => set({ ...id, name: n });
-  const setColor = (c: number) => set({ ...id, avatar: { color: c, face } });
-  const setFace = (f: number) => set({ ...id, avatar: { color, face: f } });
+  const setAvatar = (avatar: Avatar) => {
+    set({ ...id, avatar });
+    // Kept as soon as it's picked, not only on joining, so it survives a
+    // reload and the header shows it. Under the name already saved, so a
+    // name half typed isn't kept; with none saved yet, the one typed.
+    const keep = loadProfile()?.name || name.trim();
+    if (!keep) return;
+    savingAvatar = true;
+    try {
+      saveProfile({ name: keep, avatar });
+    } finally {
+      savingAvatar = false;
+    }
+  };
 
   // Edited from the header while this form is open: take the new values.
   useEffect(() => {
     const on = (e: Event) => {
+      if (savingAvatar) return;
       const p = (e as CustomEvent<Profile>).detail;
       set({ name: p.name, avatar: { color: p.avatar.color, face: p.avatar.face } });
     };
@@ -71,18 +89,15 @@ export function JoinPanel({
   };
 
   return (
-    <form className="join" onSubmit={submit}>
-      <div className="join__avatar">
-        <Avatar data={{ color, face }} size={76} />
-        <div className="join__cycle">
-          <button type="button" onClick={() => setColor((color + 1) % AVATAR_COLORS.length)}>
-            Next colour
-          </button>
-          <button type="button" onClick={() => setFace((face + 1) % AVATAR_FACES.length)}>
-            Next face
-          </button>
-        </div>
-      </div>
+    // The avatar's colour themes the form: its arrows, its fields' edges and
+    // the button's ink. Darkened a third, so white text and thin icons on it
+    // still read, yellow and orange included.
+    <form
+      className="join"
+      onSubmit={submit}
+      style={{ '--accent': `color-mix(in srgb, ${AVATAR_COLORS[color % AVATAR_COLORS.length]} 68%, #000)` } as CSSProperties}
+    >
+      <AvatarPicker value={{ color, face }} onChange={setAvatar} size={76} />
 
       <label className="field">
         <span className="field__label">Nickname</span>
@@ -102,7 +117,7 @@ export function JoinPanel({
       {error && <p className="field__error">{error}</p>}
 
       <button className="btn btn--primary btn--lg" type="submit" disabled={busy || !name.trim()}>
-        {busy ? 'Connecting…' : submitLabel}
+        <span className="btn__label">{busy ? 'Connecting…' : submitLabel}</span>
       </button>
     </form>
   );

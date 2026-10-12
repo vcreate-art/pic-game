@@ -1,6 +1,6 @@
 import type { Server, Socket } from 'socket.io';
 import {
-  AVATAR_COLORS, AVATAR_FACES, GAME_KINDS, sanitizePoints, BRUSH_SIZES,
+  AVATAR_COLORS, AVATAR_FACE_COUNT, GAME_KINDS, sanitizePoints, BRUSH_SIZES,
   MANUAL_BONUSES, HEXES, type GameKind, type ManualBonus, type Side,
   type Avatar, type ClientToServerEvents, type JoinAck, type ServerToClientEvents,
 } from '@pic-game/shared';
@@ -57,7 +57,7 @@ function cleanAvatar(raw: unknown): Avatar {
   const face = Number(a?.face);
   return {
     color: Number.isInteger(color) && color >= 0 && color < AVATAR_COLORS.length ? color : 0,
-    face: Number.isInteger(face) && face >= 0 && face < AVATAR_FACES.length ? face : 0,
+    face: Number.isInteger(face) && face >= 0 && face < AVATAR_FACE_COUNT ? face : 0,
   };
 }
 
