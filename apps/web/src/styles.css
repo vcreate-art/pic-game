@@ -1488,19 +1488,19 @@ button, input { font: inherit; color: inherit; }
 /* 150% of the circle's reference length reaches the far corner from any
    point on the edge. */
 /* is-inked comes from useNearInk() in GameCovers once the pointer settles in
-   the cover, with the circle already sitting at the blob, so it grows from
-   there. */
+   the cover; the script draws the fill spreading, so this full circle only
+   shows for a cover in focus or chosen. */
 .pick.is-inked .pick__ink,
 .pick:focus-visible .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
-/* The part of the pointer's blob over this cover: a circle --er in radius,
-   centred where the blob is, even off the cover (useNearInk in GameCovers).
-   The script eases the blob along itself, so no transition, except while a
-   filled cover drains back into it. */
+/* The ink useNearInk() in GameCovers draws on this cover, frame by frame: the
+   pointer's blob, or this cover's fill spreading from it or draining back,
+   a circle --er in radius centred at --ex/--ey, even off the cover. The
+   script does the easing, so no transition. After the fill above, so it
+   wins over it while it's drawing. */
 .pick.is-near .pick__ink {
   clip-path: circle(var(--er, 0px) at var(--ex, 50%) var(--ey, 50%));
   transition: none;
 }
-.pick.is-near.is-draining .pick__ink { transition: clip-path .45s ease-out; }
 .pick:focus-visible .pick__cover { color: #fff; }
 .pick:focus-visible .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
 /* The blurb slides up into the corner it sits in, so it steps aside with the

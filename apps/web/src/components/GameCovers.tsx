@@ -10,34 +10,51 @@ const REACH = 1 / 3;
 /** The blob's full size, across, as a share of the nearest cover's shorter
  *  side. It grows to that as the pointer closes in on a cover. */
 const BLOB = 0.6;
-/** How much of the way to the pointer the blob moves each frame. Under 1,
- *  so it trails the pointer and seems to fly after it. */
+/** The spring that pulls the blob after the pointer: it trails a little,
+ *  seems to fly after it, and overshoots a touch before it settles. A
+ *  damping ratio of about 0.75 (damping / 2√stiffness). */
+const STIFFNESS = 450;
+const DAMPING = 32;
+/** How much of the way the blob's size moves to its goal in a 60th of a
+ *  second, as it swells near a cover or shrinks away from one. */
 const FOLLOW = 0.3;
-/** Faster than this, in px per ms, the pointer is passing over a cover, not
- *  landing on it: the blob flies on through instead of the cover filling. */
+/** How much of the way to filling a cover its ink spreads in a 60th of a
+ *  second. */
+const SPREAD = 0.14;
+/** How much of the way back into the blob a cover's fill drains in a 60th of
+ *  a second: quicker than the blob moves, so it catches up with it. */
+const DRAIN = 0.4;
+/** The pointer's speed, in px per ms, past which it is passing over a cover,
+ *  not landing on it: the blob flies on through instead of the cover filling.
+ *  Under half of it, a cover fills as soon as the pointer is in; between, the
+ *  pointer has to stop first. */
 const FAST = 1;
-/** How long the pointer is still before the cover under it fills. */
+/** How long the pointer is still before it counts as stopped. */
 const SETTLE_MS = 80;
-/** How long a cover takes to drain back into the blob as the pointer leaves. */
-const DRAIN_MS = 450;
+/** The most the ink speeds up for a fast pointer: everything runs this many
+ *  times quicker at (RUSH - 1) × FAST or more, so a quick sweep finishes as
+ *  quickly. */
+const RUSH = 6;
+/** At full rush, the ink's size and a draining fill move straight at this
+ *  many px per (sped-up) ms, to the end, instead of easing out. */
+const LINEAR = 1;
 
-/** Puts the ink's centre at a point on screen, as a share of the cover. */
-function placeInk(cover: HTMLElement, x: number, y: number) {
-  const box = cover.getBoundingClientRect();
-  cover.style.setProperty('--ex', `${((x - box.left) / box.width) * 100}%`);
-  cover.style.setProperty('--ey', `${((y - box.top) / box.height) * 100}%`);
-}
+/** A per-frame easing share, given for a 60th of a second, made good for a
+ *  frame of `dt` ms, so it eases at the same pace on any screen's refresh
+ *  rate. */
+const ease = (share: number, dt: number) => 1 - (1 - share) ** (dt / (1000 / 60));
 
-const coverOf = (pick: HTMLElement) => pick.firstElementChild as HTMLElement;
-const inkOf = (pick: HTMLElement) => coverOf(pick).firstElementChild as HTMLElement;
-
-/** Applies a change to the ink's circle at once, with no transition. */
-function snapInk(pick: HTMLElement, change: () => void) {
-  const ink = inkOf(pick);
-  ink.style.transition = 'none';
-  change();
-  void getComputedStyle(ink).clipPath;
-  ink.style.transition = '';
+/**
+ * One frame's step from `from` toward `to`: easing out when the pointer is
+ * slow (a share of what's left, so it slows into the end), straight at
+ * LINEAR px per ms when it's fast, and a mix of the two between, by `fast`
+ * from 0 to 1.
+ */
+function toward(from: number, to: number, share: number, dt: number, fast: number) {
+  const d = to - from;
+  const curved = d * ease(share, dt);
+  const straight = Math.sign(d) * Math.min(Math.abs(d), LINEAR * dt);
+  return from + curved * (1 - fast) + straight * fast;
 }
 
 /** How far a point is outside a box, in px; 0 on or inside it. */
@@ -45,15 +62,32 @@ function gapTo(box: DOMRect, x: number, y: number) {
   return Math.hypot(Math.max(box.left - x, 0, x - box.right), Math.max(box.top - y, 0, y - box.bottom));
 }
 
+/** From a point, the distance to a box's farthest corner: a circle that big
+ *  there covers it all. */
+function farCorner(box: DOMRect, x: number, y: number) {
+  return Math.hypot(Math.max(x - box.left, box.right - x), Math.max(y - box.top, box.bottom - y));
+}
+
+const coverOf = (pick: HTMLElement) => pick.firstElementChild as HTMLElement;
+
+/** A circle of ink, in screen px. */
+interface Circle {
+  x: number;
+  y: number;
+  r: number;
+}
+
 /**
- * Inks the covers with one blob of ink that follows the pointer, trailing a
- * little, and shows on whichever covers it overlaps: across the gap between
+ * Inks the covers with one blob of ink that follows the pointer on a spring,
+ * trailing a little, and shows on whichever covers it overlaps: across the gap between
  * two, part of it on each, cut by their edges, the way metaballs meet. It
  * swells as the pointer closes in on a cover, from a third of the cover's
- * size out. The cover the pointer comes to rest in (or crosses slowly)
- * fills from the blob; swept across quickly, the blob flies on through
- * instead, and leaving a filled cover drains it back into the blob. Only a
- * mouse inks: on touch the blurb sits under the cover instead.
+ * size out. The cover the pointer crosses slowly or comes to rest in fills,
+ * spreading from where the blob is; swept across quickly, the blob flies on
+ * through instead. Leaving a filled cover, its fill drains back into the
+ * blob wherever the blob has got to. All of it is drawn here, frame by
+ * frame, so every cover's ink keeps step with the one blob. Only a mouse
+ * inks: on touch the blurb sits under the cover instead.
  */
 function useNearInk(ref: React.RefObject<HTMLDivElement>) {
   useEffect(() => {
@@ -62,44 +96,37 @@ function useNearInk(ref: React.RefObject<HTMLDivElement>) {
     // Where the pointer is, and whether it's still on the page.
     let to: { x: number; y: number } | null = null;
     let away = true;
-    // The blob, in screen px: it eases toward the pointer each frame.
-    const blob = { x: 0, y: 0, r: 0 };
-    // The pointer's speed, smoothed over the last few moves, and when it last
-    // moved: still for a moment, it counts as stopped whatever it was.
+    // The blob, sprung toward the pointer, and its speed in px per second.
+    const blob: Circle = { x: 0, y: 0, r: 0 };
+    const pull = { x: 0, y: 0 };
+    let drawnAt = 0;
+    // Each cover's own circle: the blob itself, or its fill, spreading out
+    // or draining back. A cover in the map is filled or still draining.
+    const fills = new Map<HTMLElement, Circle>();
+    // The pointer's speed, from its last move and smoothed over the last few,
+    // and when it last moved: still for a moment, it counts as stopped.
     let speed = 0;
+    let lastSpeed = 0;
     let movedAt = 0;
+    // How much the ink is sped up just now, from the pointer's speed: it
+    // follows the speed up at once and lets go of it over a moment, so a
+    // cover landed on after a sweep still fills quickly.
+    let rush = 1;
     let frame = 0;
     let settle = 0;
-    const drains = new Set<number>();
 
     const picks = () => [...grid.children].filter((c): c is HTMLButtonElement => c instanceof HTMLButtonElement);
 
-    const fill = (pick: HTMLElement, x: number, y: number) => {
-      // Out of the blob, the fill grows from the blob where it is.
-      if (!pick.classList.contains('is-near')) snapInk(pick, () => placeInk(coverOf(pick), x, y));
-      pick.classList.remove('is-near', 'is-draining');
-      pick.classList.add('is-inked');
-    };
-    const drain = (pick: HTMLElement) => {
-      pick.classList.remove('is-inked');
-      pick.classList.add('is-near', 'is-draining');
-      const t = window.setTimeout(() => {
-        pick.classList.remove('is-draining');
-        drains.delete(t);
-      }, DRAIN_MS);
-      drains.add(t);
-    };
-    /** Shows the part of the blob that overlaps a cover, or none of it. */
-    const draw = (pick: HTMLElement, box: DOMRect) => {
+    /** Shows a circle on a cover, as much of it as overlaps the cover. */
+    const show = (pick: HTMLElement, box: DOMRect, c: Circle) => {
       const cover = coverOf(pick);
-      // Draining, the fill shrinks toward the blob wherever it has gone.
-      if ((blob.r > 0.5 && gapTo(box, blob.x, blob.y) < blob.r) || pick.classList.contains('is-draining')) {
-        placeInk(cover, blob.x, blob.y);
-        cover.style.setProperty('--er', `${blob.r}px`);
+      if (c.r > 0.5 && gapTo(box, c.x, c.y) < c.r) {
+        cover.style.setProperty('--ex', `${((c.x - box.left) / box.width) * 100}%`);
+        cover.style.setProperty('--ey', `${((c.y - box.top) / box.height) * 100}%`);
+        cover.style.setProperty('--er', `${c.r}px`);
         pick.classList.add('is-near');
-      } else if (pick.classList.contains('is-near') && !pick.classList.contains('is-draining')) {
-        // Nothing of it on this cover: put the circle away unseen.
-        snapInk(pick, () => pick.classList.remove('is-near'));
+      } else {
+        pick.classList.remove('is-near');
       }
     };
 
@@ -107,6 +134,16 @@ function useNearInk(ref: React.RefObject<HTMLDivElement>) {
       frame = 0;
       if (!to) return;
       const now = performance.now();
+      // Time since the last frame drawn, capped so a frame after a pause (or
+      // the first) doesn't fling the spring.
+      const real = Math.min(drawnAt ? now - drawnAt : 1000 / 60, 50);
+      drawnAt = now;
+      const pace = now - movedAt >= SETTLE_MS ? 0 : Math.max(speed, lastSpeed);
+      rush = Math.max(1 + Math.min(pace / FAST, RUSH - 1), rush * 0.9 ** (real / (1000 / 60)));
+      // Sped up, every animation below runs on in this much time, and the
+      // faster the pointer, the straighter it runs rather than easing out.
+      const dt = real * rush;
+      const fast = (rush - 1) / (RUSH - 1);
       const all = picks();
       const boxes = all.map((p) => coverOf(p).getBoundingClientRect());
 
@@ -128,41 +165,85 @@ function useNearInk(ref: React.RefObject<HTMLDivElement>) {
       if (blob.r < 0.5) {
         blob.x = to.x;
         blob.y = to.y;
+        pull.x = pull.y = 0;
       }
-      blob.x += (to.x - blob.x) * FOLLOW;
-      blob.y += (to.y - blob.y) * FOLLOW;
-      blob.r += (goal - blob.r) * FOLLOW;
+      // In steps of at most a 60th of a second, so a sped-up frame doesn't
+      // throw the spring.
+      const steps = Math.ceil(dt / (1000 / 60));
+      const sec = dt / steps / 1000;
+      for (let n = 0; n < steps; n++) {
+        pull.x += (STIFFNESS * (to.x - blob.x) - DAMPING * pull.x) * sec;
+        pull.y += (STIFFNESS * (to.y - blob.y) - DAMPING * pull.y) * sec;
+        blob.x += pull.x * sec;
+        blob.y += pull.y * sec;
+      }
+      blob.r = toward(blob.r, goal, FOLLOW, dt, fast);
 
-      const passing = speed > FAST && now - movedAt < SETTLE_MS;
+      const still = now - movedAt >= SETTLE_MS;
+      let busy =
+        Math.abs(to.x - blob.x) + Math.abs(to.y - blob.y) + Math.abs(goal - blob.r) > 0.5 ||
+        Math.abs(pull.x) + Math.abs(pull.y) > 5 ||
+        rush > 1.01;
       let flying = false;
+
       all.forEach((pick, i) => {
         const box = boxes[i]!;
-        const inside = !away && gapTo(box, to!.x, to!.y) === 0;
         if (pick.disabled) {
-          if (pick.classList.contains('is-near') || pick.classList.contains('is-inked')) {
-            snapInk(pick, () => pick.classList.remove('is-near', 'is-inked', 'is-draining'));
-          }
+          fills.delete(pick);
+          pick.classList.remove('is-near', 'is-inked');
+          return;
+        }
+        const inside = !away && gapTo(box, to!.x, to!.y) === 0;
+        // Landed: in, and slow enough or stopped. Passing over: in, but fast.
+        const landed = inside && (pace < FAST / 2 || still);
+        if (inside && !landed) flying = true;
+        const opened = pick.classList.contains('is-inked');
+        if (landed && !opened) {
+          pick.classList.add('is-inked');
+          // It spreads from wherever the blob is on it, or its fill is.
+          if (!fills.has(pick)) fills.set(pick, { ...blob });
+        } else if (!inside && opened) {
+          pick.classList.remove('is-inked');
+        }
+
+        const fill = fills.get(pick);
+        if (!fill) {
+          show(pick, box, blob);
           return;
         }
         if (pick.classList.contains('is-inked')) {
-          if (inside) return;
-          drain(pick);
-        } else if (inside && !passing) {
-          fill(pick, blob.x, blob.y);
-          return;
+          // Spreading from where it started until it covers the cover.
+          const full = farCorner(box, fill.x, fill.y) + 2;
+          fill.r = toward(fill.r, full, SPREAD, dt, fast);
+          if (full - fill.r > 0.5) busy = true;
+        } else {
+          // Draining into the blob, wherever it has got to.
+          // Its centre moves as one, along the line to the blob's.
+          const dx = blob.x - fill.x;
+          const dy = blob.y - fill.y;
+          const far = Math.hypot(dx, dy);
+          const k = ease(DRAIN, dt) * (1 - fast) + (far ? Math.min(1, (LINEAR * dt) / far) : 1) * fast;
+          fill.x += dx * k;
+          fill.y += dy * k;
+          fill.r = toward(fill.r, blob.r, DRAIN, dt, fast);
+          if (Math.abs(blob.x - fill.x) + Math.abs(blob.y - fill.y) + Math.abs(blob.r - fill.r) < 0.5) {
+            fills.delete(pick);
+          } else {
+            busy = true;
+          }
         }
-        if (inside) flying = true;
-        draw(pick, box);
+        show(pick, box, fills.get(pick) ?? blob);
       });
 
-      // Keep easing until the blob has caught up with the pointer; and a
-      // blob flying over a cover lands once the pointer stops, which no move
-      // will come to say, so look again then.
-      const moving = Math.abs(to.x - blob.x) + Math.abs(to.y - blob.y) + Math.abs(goal - blob.r) > 0.5;
-      if (moving) soon();
+      // Keep drawing until everything has caught up; and a blob flying over
+      // a cover lands once the pointer stops, which no move will come to
+      // say, so look again then.
+      if (busy) soon();
+      // Stopped: the next frame starts the clock afresh.
+      else drawnAt = 0;
       clearTimeout(settle);
       if (flying) settle = window.setTimeout(soon, SETTLE_MS);
-      if (away && !moving) to = null;
+      if (away && !busy) to = null;
     };
     const soon = () => {
       if (!frame) frame = requestAnimationFrame(tick);
@@ -170,9 +251,8 @@ function useNearInk(ref: React.RefObject<HTMLDivElement>) {
     const move = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse') return;
       const dt = e.timeStamp - movedAt;
-      speed = to && !away && dt > 0 && dt < SETTLE_MS
-        ? 0.6 * (Math.hypot(e.clientX - to.x, e.clientY - to.y) / dt) + 0.4 * speed
-        : 0;
+      lastSpeed = to && !away && dt > 0 && dt < SETTLE_MS ? Math.hypot(e.clientX - to.x, e.clientY - to.y) / dt : 0;
+      speed = 0.6 * lastSpeed + 0.4 * speed;
       movedAt = e.timeStamp;
       to = { x: e.clientX, y: e.clientY };
       away = false;
@@ -192,7 +272,6 @@ function useNearInk(ref: React.RefObject<HTMLDivElement>) {
     return () => {
       cancelAnimationFrame(frame);
       clearTimeout(settle);
-      drains.forEach((t) => clearTimeout(t));
       document.removeEventListener('pointermove', move);
       document.removeEventListener('pointerout', out);
       window.removeEventListener('scroll', soon, { capture: true });
