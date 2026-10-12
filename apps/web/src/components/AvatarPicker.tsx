@@ -17,6 +17,28 @@ const COLOR_NAMES: Record<(typeof AVATAR_COLORS)[number], string> = {
 };
 
 /**
+ * The order the arrows walk the faces in: all of them, shuffled, so each
+ * step changes more than the eyes (face numbers count through the eyes
+ * first). Seeded, so it's the same order everywhere and every time.
+ */
+const FACE_ORDER: readonly number[] = (() => {
+  let seed = 0x5eed;
+  // mulberry32: small and good enough for a shuffle.
+  const rand = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const order = Array.from({ length: AVATAR_FACE_COUNT }, (_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [order[i], order[j]] = [order[j]!, order[i]!];
+  }
+  return order;
+})();
+
+/**
  * Choosing an avatar: arrows either side of it step through the faces, both
  * ways, and every colour sits below as a swatch to pick outright. On the join
  * card and in the profile editor alike.
@@ -30,8 +52,11 @@ export function AvatarPicker({
   onChange: (avatar: AvatarData) => void;
   size: number;
 }) {
-  const faces = AVATAR_FACE_COUNT;
-  const step = (by: number) => onChange({ ...value, face: (value.face + by + faces) % faces });
+  const step = (by: number) => {
+    const n = FACE_ORDER.length;
+    const at = Math.max(0, FACE_ORDER.indexOf(value.face));
+    onChange({ ...value, face: FACE_ORDER[(at + by + n) % n]! });
+  };
 
   return (
     <div className="avpick">
