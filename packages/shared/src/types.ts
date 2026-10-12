@@ -410,6 +410,11 @@ export const AVATAR_COLORS = [
 
 export const AVATAR_FACES = ['^_^', 'o_o', '>_<', '-_-', 'O_O', 'u_u', 'T_T', 'n_n'] as const;
 
+/** Faces drawn from parts: an avatar's face number picks one of each, eyes
+ *  changing fastest. Covers the old faces' numbers too. */
+export const AVATAR_FACE_PARTS = { eyes: 3, mouths: 6, glasses: 4 } as const;
+export const AVATAR_FACE_COUNT = AVATAR_FACE_PARTS.eyes * AVATAR_FACE_PARTS.mouths * AVATAR_FACE_PARTS.glasses;
+
 export const PALETTE = [
   '#000000', '#6b7280', '#ef4444', '#f97316', '#eab308', '#84cc16',
   '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6',

@@ -406,29 +406,30 @@ button, input { font: inherit; color: inherit; }
   color: #fff; font-weight: 700; font-family: var(--display);
   letter-spacing: -.04em; user-select: none;
 }
-/* Trying LoginCritter's idea: the face turns toward where the avatar looks
-   (--lx/--ly from avatarGaze.ts), the eyes a touch further than the mouth,
-   and a glad avatar hops with its eyes squeezed shut. */
+/* Trying LoginCritter's idea: the face (AvatarFace, on a 36-unit grid where
+   a px is a unit) turns toward where the avatar looks (--lx/--ly from
+   avatarGaze.ts), the eyes a touch further than the rest, and a glad
+   avatar hops with its eyes squeezed shut. */
 .avatar { overflow: hidden; }
-.avatar__face {
-  display: inline-flex;
-  transform: translate(calc(var(--lx, 0) * .32em), calc(var(--ly, 0) * .24em));
-  transition: transform .18s ease-out;
+.avatar > .aface { display: block; width: 100%; height: 100%; }
+.aface__face {
+  translate: calc(var(--lx, 0) * 4.5px) calc(var(--ly, 0) * 3.5px);
+  transition: translate .18s ease-out;
 }
-.avatar__eye {
-  display: inline-block;
-  transform: translate(calc(var(--lx, 0) * .1em), calc(var(--ly, 0) * .08em));
-  transition: transform .18s ease-out;
+.aface__eyes {
+  transform-box: fill-box; transform-origin: center;
+  translate: calc(var(--lx, 0) * 1.2px) calc(var(--ly, 0) * .9px);
+  transition: translate .18s ease-out, scale .15s ease;
 }
 .avatar[data-mood='glad'] { animation: avatar-hop .5s ease-out; }
-.avatar[data-mood='glad'] .avatar__eye { transform: scaleY(.35); }
+.avatar[data-mood='glad'] .aface__eyes { scale: 1 .35; }
 @keyframes avatar-hop {
   0%, 100% { transform: translateY(0); }
   35% { transform: translateY(-14%); }
   60% { transform: translateY(2%); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .avatar__face, .avatar__eye { transition: none; }
+  .aface__face, .aface__eyes { transition: none; }
   .avatar[data-mood='glad'] { animation: none; }
 }
 /* Host badge, tucked on the top-left corner. The ring separates it from the

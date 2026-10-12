@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { AVATAR_COLORS, AVATAR_FACES, type Avatar as AvatarData } from '@pic-game/shared';
+import { AVATAR_COLORS, AVATAR_FACE_COUNT, type Avatar as AvatarData } from '@pic-game/shared';
 import { Avatar } from './Avatar.js';
 
 /** Keyed by the colour itself, so a colour added to the list fails to
@@ -30,7 +30,7 @@ export function AvatarPicker({
   onChange: (avatar: AvatarData) => void;
   size: number;
 }) {
-  const faces = AVATAR_FACES.length;
+  const faces = AVATAR_FACE_COUNT;
   const step = (by: number) => onChange({ ...value, face: (value.face + by + faces) % faces });
 
   return (

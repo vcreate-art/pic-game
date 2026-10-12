@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { AVATAR_COLORS, AVATAR_FACES, type Avatar } from '@pic-game/shared';
+import { AVATAR_COLORS, AVATAR_FACE_COUNT, type Avatar } from '@pic-game/shared';
 import { MAX_NAME_LEN } from '../constants.js';
 import { PROFILE_EVENT, loadProfile, saveProfile, type Profile } from '../net/socket.js';
 import { AvatarPicker } from './AvatarPicker.js';
@@ -22,7 +22,7 @@ export function initialIdentity(): Identity {
     name: saved?.name ?? '',
     avatar: {
       color: saved?.avatar.color ?? Math.floor(Math.random() * AVATAR_COLORS.length),
-      face: saved?.avatar.face ?? Math.floor(Math.random() * AVATAR_FACES.length),
+      face: saved?.avatar.face ?? Math.floor(Math.random() * AVATAR_FACE_COUNT),
     },
   };
 }
