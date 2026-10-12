@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { AVATAR_COLORS, AVATAR_FACES, type Avatar } from '@pic-game/shared';
 import { MAX_NAME_LEN } from '../constants.js';
 import { PROFILE_EVENT, loadProfile, saveProfile, type Profile } from '../net/socket.js';
@@ -70,7 +70,14 @@ export function JoinPanel({
   };
 
   return (
-    <form className="join" onSubmit={submit}>
+    // The avatar's colour themes the form: its arrows, its fields' edges and
+    // the button's ink. Darkened a third, so white text and thin icons on it
+    // still read, yellow and orange included.
+    <form
+      className="join"
+      onSubmit={submit}
+      style={{ '--accent': `color-mix(in srgb, ${AVATAR_COLORS[color % AVATAR_COLORS.length]} 68%, #000)` } as CSSProperties}
+    >
       <AvatarPicker value={{ color, face }} onChange={setAvatar} size={76} />
 
       <label className="field">
@@ -91,7 +98,7 @@ export function JoinPanel({
       {error && <p className="field__error">{error}</p>}
 
       <button className="btn btn--primary btn--lg" type="submit" disabled={busy || !name.trim()}>
-        {busy ? 'Connecting…' : submitLabel}
+        <span className="btn__label">{busy ? 'Connecting…' : submitLabel}</span>
       </button>
     </form>
   );
