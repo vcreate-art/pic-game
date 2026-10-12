@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { AVATAR_COLORS, AVATAR_FACES } from '@pic-game/shared';
+import { AVATAR_COLORS, AVATAR_FACES, type Avatar } from '@pic-game/shared';
 import { MAX_NAME_LEN } from '../constants.js';
 import { PROFILE_EVENT, loadProfile, saveProfile, type Profile } from '../net/socket.js';
-import { Avatar } from './Avatar.js';
+import { AvatarPicker } from './AvatarPicker.js';
 import { noAutofill } from '../lib/noAutofill.js';
 
 export interface Identity {
@@ -48,8 +48,7 @@ export function JoinPanel({
   const { name } = id;
   const { color, face } = id.avatar;
   const setName = (n: string) => set({ ...id, name: n });
-  const setColor = (c: number) => set({ ...id, avatar: { color: c, face } });
-  const setFace = (f: number) => set({ ...id, avatar: { color, face: f } });
+  const setAvatar = (avatar: Avatar) => set({ ...id, avatar });
 
   // Edited from the header while this form is open: take the new values.
   useEffect(() => {
@@ -72,17 +71,7 @@ export function JoinPanel({
 
   return (
     <form className="join" onSubmit={submit}>
-      <div className="join__avatar">
-        <Avatar data={{ color, face }} size={76} />
-        <div className="join__cycle">
-          <button type="button" onClick={() => setColor((color + 1) % AVATAR_COLORS.length)}>
-            Next colour
-          </button>
-          <button type="button" onClick={() => setFace((face + 1) % AVATAR_FACES.length)}>
-            Next face
-          </button>
-        </div>
-      </div>
+      <AvatarPicker value={{ color, face }} onChange={setAvatar} size={76} />
 
       <label className="field">
         <span className="field__label">Nickname</span>

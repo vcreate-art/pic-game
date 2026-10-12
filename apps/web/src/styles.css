@@ -106,7 +106,6 @@ button, input { font: inherit; color: inherit; }
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 280px;
   display: flex; flex-direction: column; gap: 12px;
 }
-.profile__avatar { display: flex; align-items: center; gap: 12px; }
 .profile__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .profile__note { margin: 0; font-size: 12px; color: var(--ink-soft); }
 
@@ -225,7 +224,7 @@ button, input { font: inherit; color: inherit; }
 .btn:not(.btn--primary):hover:not(:disabled) { border-color: var(--accent); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn:focus-visible, .sheet__close:focus-visible, .join__cycle button:focus-visible {
+.btn:focus-visible, .sheet__close:focus-visible {
   outline: 2px solid var(--ink); outline-offset: 2px;
 }
 .btn--primary { --btn-ink: rgba(0, 0, 0, .22); background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -358,14 +357,23 @@ button, input { font: inherit; color: inherit; }
 .landing__card { display: flex; flex-direction: column; gap: 14px; }
 
 .join { display: flex; flex-direction: column; gap: 16px; }
-.join__avatar { display: flex; align-items: center; gap: 14px; }
-.join__cycle { display: flex; gap: 8px; }
-.join__cycle button {
-  border: 1px solid var(--line); background: var(--paper);
-  border-radius: 10px; padding: 7px 11px; font-size: 13px; font-weight: 600; cursor: pointer;
-  white-space: nowrap;
+/* Choosing an avatar (AvatarPicker): the face between two round arrows that
+   step it, the colours below as swatches, the chosen one ringed in itself. */
+.avpick { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.avpick__face { display: flex; align-items: center; gap: 14px; }
+.avpick__step {
+  display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border-radius: 999px;
 }
-.join__cycle button:hover { border-color: var(--accent); }
+.avpick__step svg { width: 18px; height: 18px; }
+.avpick__colors { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; }
+.avpick__swatch {
+  width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--swatch); cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.avpick__swatch:hover { transform: scale(1.12); }
+.avpick__swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--swatch); }
+.avpick__swatch:focus-visible { outline: 2px solid var(--ink); outline-offset: 5px; }
 
 .avatar-wrap { position: relative; display: block; flex: none; }
 .avatar {
