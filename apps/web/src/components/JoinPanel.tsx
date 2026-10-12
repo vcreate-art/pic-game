@@ -5,6 +5,11 @@ import { PROFILE_EVENT, loadProfile, saveProfile, type Profile } from '../net/so
 import { AvatarPicker } from './AvatarPicker.js';
 import { noAutofill } from '../lib/noAutofill.js';
 
+/** Set while a form saves the avatar it was just given, so no form takes
+ *  that save for an edit from the header and resets the name being typed.
+ *  Module-wide: the front page has two forms sharing one draft. */
+let savingAvatar = false;
+
 export interface Identity {
   name: string;
   avatar: { color: number; face: number };
@@ -48,11 +53,25 @@ export function JoinPanel({
   const { name } = id;
   const { color, face } = id.avatar;
   const setName = (n: string) => set({ ...id, name: n });
-  const setAvatar = (avatar: Avatar) => set({ ...id, avatar });
+  const setAvatar = (avatar: Avatar) => {
+    set({ ...id, avatar });
+    // Kept as soon as it's picked, not only on joining, so it survives a
+    // reload and the header shows it. Under the name already saved, so a
+    // name half typed isn't kept; with none saved yet, the one typed.
+    const keep = loadProfile()?.name || name.trim();
+    if (!keep) return;
+    savingAvatar = true;
+    try {
+      saveProfile({ name: keep, avatar });
+    } finally {
+      savingAvatar = false;
+    }
+  };
 
   // Edited from the header while this form is open: take the new values.
   useEffect(() => {
     const on = (e: Event) => {
+      if (savingAvatar) return;
       const p = (e as CustomEvent<Profile>).detail;
       set({ name: p.name, avatar: { color: p.avatar.color, face: p.avatar.face } });
     };
