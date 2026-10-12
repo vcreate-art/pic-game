@@ -36,23 +36,29 @@ const MOUTHS: ReadonlyArray<ReactNode> = [
   <path d="M14.8 19q1.6 1.8 3.2 0q1.6 1.8 3.2 0" fill="none" strokeWidth={STROKE} strokeLinecap="round" strokeLinejoin="round" />,
 ];
 
+/** The lenses' half-sizes, around each eye: big enough to read as glasses on
+ *  a small avatar, with a bridge between them. */
+const RIM = 3.6;
+const SQUARE = { w: 3.9, h: 2.9 };
+const SHADE = { w: 4, h: 2.7 };
+
 const GLASSES: ReadonlyArray<ReactNode> = [
   null,
-  <g fill="none" strokeWidth={1}>
-    <circle cx={EYE_X[0]} cy={EYE_Y} r={2.7} />
-    <circle cx={EYE_X[1]} cy={EYE_Y} r={2.7} />
-    <path d={`M${EYE_X[0] + 2.7} ${EYE_Y}h${EYE_X[1] - EYE_X[0] - 5.4}`} />
+  <g fill="none" strokeWidth={1.1}>
+    <circle cx={EYE_X[0]} cy={EYE_Y} r={RIM} />
+    <circle cx={EYE_X[1]} cy={EYE_Y} r={RIM} />
+    <path d={`M${EYE_X[0] + RIM} ${EYE_Y}h${EYE_X[1] - EYE_X[0] - 2 * RIM}`} />
   </g>,
-  <g fill="none" strokeWidth={1} strokeLinejoin="round">
-    <rect x={EYE_X[0] - 3} y={EYE_Y - 2.2} width={6} height={4.4} rx={0.8} />
-    <rect x={EYE_X[1] - 3} y={EYE_Y - 2.2} width={6} height={4.4} rx={0.8} />
-    <path d={`M${EYE_X[0] + 3} ${EYE_Y - 0.4}h${EYE_X[1] - EYE_X[0] - 6}`} />
+  <g fill="none" strokeWidth={1.1} strokeLinejoin="round">
+    <rect x={EYE_X[0] - SQUARE.w} y={EYE_Y - SQUARE.h} width={2 * SQUARE.w} height={2 * SQUARE.h} rx={1} />
+    <rect x={EYE_X[1] - SQUARE.w} y={EYE_Y - SQUARE.h} width={2 * SQUARE.w} height={2 * SQUARE.h} rx={1} />
+    <path d={`M${EYE_X[0] + SQUARE.w} ${EYE_Y - 0.6}h${EYE_X[1] - EYE_X[0] - 2 * SQUARE.w}`} />
   </g>,
   // Shades: dark lenses over the eyes, whatever the ink.
-  <g strokeWidth={1}>
-    <rect x={EYE_X[0] - 3} y={EYE_Y - 1.9} width={6} height={3.8} rx={1.6} fill="#15161d" />
-    <rect x={EYE_X[1] - 3} y={EYE_Y - 1.9} width={6} height={3.8} rx={1.6} fill="#15161d" />
-    <path d={`M${EYE_X[0] + 3} ${EYE_Y - 0.8}h${EYE_X[1] - EYE_X[0] - 6}`} fill="none" />
+  <g strokeWidth={1.1}>
+    <rect x={EYE_X[0] - SHADE.w} y={EYE_Y - SHADE.h} width={2 * SHADE.w} height={2 * SHADE.h} rx={2.2} fill="#15161d" />
+    <rect x={EYE_X[1] - SHADE.w} y={EYE_Y - SHADE.h} width={2 * SHADE.w} height={2 * SHADE.h} rx={2.2} fill="#15161d" />
+    <path d={`M${EYE_X[0] + SHADE.w} ${EYE_Y - 1}h${EYE_X[1] - EYE_X[0] - 2 * SHADE.w}`} fill="none" />
   </g>,
 ];
 
