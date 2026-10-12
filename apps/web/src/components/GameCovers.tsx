@@ -37,6 +37,10 @@ function inkFrom(e: React.PointerEvent<HTMLButtonElement>) {
   pick.classList.add('is-inked');
 }
 
+/** Past this many characters a blurb won't fit an open cover at the usual
+ *  size, so the cover sets it smaller (Flip 7's and Maze Wars' today). */
+const LONG_BLURB = 78;
+
 /** How many columns the grid is laying covers out in right now. */
 function columnsOf(grid: HTMLElement): number {
   return getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length;
@@ -121,7 +125,7 @@ export function GameCovers({
           <button
             key={k}
             type="button"
-            className={`pick ${active === k ? 'is-active' : ''}`}
+            className={`pick ${active === k ? 'is-active' : ''} ${GAME_LABELS[k].blurb.length > LONG_BLURB ? 'is-long' : ''}`}
             disabled={!!why}
             title={why ?? undefined}
             onClick={() => pick(k, i)}
