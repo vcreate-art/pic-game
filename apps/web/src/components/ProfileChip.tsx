@@ -7,7 +7,7 @@ import { useGame } from '../store/game.js';
 import { useDismiss } from '../lib/useDismiss.js';
 import { ACHIEVEMENTS, byRelevance, totalPlayed, totalWon, useStats } from '../lib/achievements.js';
 import { Avatar } from './Avatar.js';
-import { AvatarPicker } from './AvatarPicker.js';
+import { AvatarPicker, avatarAccent } from './AvatarPicker.js';
 import { PhoneHandoff } from './PhoneHandoff.js';
 import { noAutofill } from '../lib/noAutofill.js';
 
@@ -133,7 +133,8 @@ export function ProfileEditor({ className, onDone }: { className?: string; onDon
   };
 
   return (
-    <form className={className} onSubmit={save}>
+    // Themed by the avatar's colour, as the join card is.
+    <form className={className} onSubmit={save} style={avatarAccent(color)}>
       <AvatarPicker
         value={{ color, face }}
         onChange={(a) => {
