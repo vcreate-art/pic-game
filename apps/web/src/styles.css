@@ -1439,6 +1439,19 @@ button, input { font: inherit; color: inherit; }
 .pick__art {
   position: absolute; top: -4px; right: -18px; width: 72px; height: 72px;
   color: var(--game, var(--ink)); opacity: .6;
+  /* A hard shadow, no blur: the icon as if printed on the box and offset. */
+  filter: drop-shadow(3px 3px 0 color-mix(in srgb, var(--game, var(--ink)) 55%, #000));
+  transition: color .5s cubic-bezier(.55, 0, .25, 1), opacity .5s cubic-bezier(.55, 0, .25, 1),
+    filter .5s cubic-bezier(.55, 0, .25, 1);
+}
+/* On the ink the game's colour all but vanishes into its own darker shade,
+   so the icon turns white with the text, softer so it stays in the back,
+   and its shadow goes darker than the ink. */
+.pick.is-inked .pick__art,
+.pick:focus-visible .pick__art,
+.pick.is-active .pick__art {
+  color: #fff; opacity: .45;
+  filter: drop-shadow(3px 3px 0 rgba(0, 0, 0, .55));
 }
 /* A soft glow of the game's colour rising from the bottom-left corner,
    under the name. First in the cover, so the ink covers it on hover. */
