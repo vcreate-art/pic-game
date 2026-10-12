@@ -412,6 +412,10 @@ button, input { font: inherit; color: inherit; }
    avatar hops with its eyes squeezed shut. */
 .avatar { overflow: hidden; }
 .avatar > .aface { display: block; width: 100%; height: 100%; }
+/* The face drawn larger than its grid, and larger again on a small avatar,
+   so it still reads as a face at a glance. */
+.avatar > .aface > .aface__face { transform-box: view-box; transform-origin: 18px 18px; scale: 1.15; }
+.avatar--small > .aface > .aface__face { scale: 1.32; }
 .aface__face {
   translate: calc(var(--lx, 0) * 4.5px) calc(var(--ly, 0) * 3.5px);
   transition: translate .18s ease-out;

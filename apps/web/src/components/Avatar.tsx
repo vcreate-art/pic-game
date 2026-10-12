@@ -28,7 +28,7 @@ export function Avatar({
 
   return (
     <span className="avatar-wrap" style={{ width: size, height: size }}>
-      <span ref={ref} className="avatar" style={{ background: color }} aria-hidden="true">
+      <span ref={ref} className={size < 40 ? 'avatar avatar--small' : 'avatar'} style={{ background: color }} aria-hidden="true">
         {/* Eyes, a mouth and glasses from the face number (AvatarFace). */}
         <AvatarFace face={data.face} ink={inkFor(data.color)} />
       </span>
