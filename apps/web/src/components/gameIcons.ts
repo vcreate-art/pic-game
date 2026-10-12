@@ -1,6 +1,6 @@
 import type { GameKind } from '@pic-game/shared';
 import {
-  ChessKnight, Crosshair, Footprints, Grid3x3, PawPrint, Pencil, Rocket, Spade, Swords, Trophy, VenetianMask,
+  ChessKnight, Crosshair, Footprints, Grid3x3, Palette, PawPrint, Rocket, Spade, Swords, Trophy, VenetianMask,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -9,7 +9,7 @@ import {
  *  neighbours in the grid don't blur together, and each one is dark enough
  *  to carry white text (4.5:1 or better). */
 export const GAME_ICONS: Record<GameKind, { icon: LucideIcon; color: string }> = {
-  skribbl: { icon: Pencil, color: '#b3245f' },
+  skribbl: { icon: Palette, color: '#b3245f' },
   kungfu: { icon: ChessKnight, color: '#0f6e66' },
   realms: { icon: Rocket, color: '#4b2fa8' },
   fight: { icon: Swords, color: '#b8231f' },
