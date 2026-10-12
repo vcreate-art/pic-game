@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { Outlet, createRootRoute } from '@tanstack/react-router';
-import { Bug, Dices } from 'lucide-react';
+import { Bug } from 'lucide-react';
 import { ProfileChip } from '../components/ProfileChip.js';
 import { CountdownOverlay } from '../components/CountdownOverlay.js';
 import { PausedOverlay } from '../components/PausedOverlay.js';
@@ -31,8 +31,7 @@ function RootLayout() {
           </div>
         ) : (
           <a className="brand" href="/">
-            <Dices className="brand__mark" aria-hidden="true" />
-            <span className="brand__name">PartyMode</span>
+            <span className="brand__name">Fun &amp; Friends</span>
           </a>
         )}
         <div className="topbar__right">
