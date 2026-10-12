@@ -4,37 +4,137 @@ import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { CategoryLabel } from './CategoryLabel.js';
 import { GAME_ICONS } from './gameIcons.js';
 
-/** Where the pointer crossed a cover's edge, so the ink spreads from the
- *  point it came in and drains toward the point it left. Sliding from one
- *  cover to the next, it reads as one stroke passing between them. */
-function inkFrom(e: React.PointerEvent<HTMLButtonElement>) {
-  const pick = e.currentTarget;
-  const cover = pick.firstElementChild as HTMLElement;
-  const box = pick.getBoundingClientRect();
-  const place = () => {
-    cover.style.setProperty('--ex', `${((e.clientX - box.left) / cover.offsetWidth) * 100}%`);
-    cover.style.setProperty('--ey', `${((e.clientY - box.top) / cover.offsetHeight) * 100}%`);
-  };
-  const ink = cover.firstElementChild as HTMLElement;
-  if (e.type === 'pointerleave') {
-    // Shrinking while it moves is what drains it toward where it left. Ink
-    // that has barely spread, from a pointer only passing over, shrinks where
-    // it is: dragged across the cover it would show as a stray dot.
-    const grown = parseFloat(/circle\(([\d.]+)%/.exec(getComputedStyle(ink).clipPath)?.[1] ?? '0');
-    if (grown > 20) place();
-    pick.classList.remove('is-inked');
-    return;
-  }
-  // Only a mouse inks: on touch the blurb sits under the cover instead.
-  if (e.pointerType !== 'mouse') return;
-  // The circle's centre and size animate together, so moving the centre as
-  // it grows would slide the ink in from wherever it last left. Move it while
-  // it's still empty, with no transition, then let it grow from there.
+/** How close the pointer comes to a cover's edge, in px, before the ink
+ *  starts to reach for it. */
+const NEAR = 32;
+/** How far the ink bulges in at the edge, in px, with the pointer touching it. */
+const BULGE = 20;
+
+/** Puts the ink's centre at a point on screen, as a share of the cover. */
+function placeInk(cover: HTMLElement, x: number, y: number) {
+  const box = cover.getBoundingClientRect();
+  cover.style.setProperty('--ex', `${((x - box.left) / box.width) * 100}%`);
+  cover.style.setProperty('--ey', `${((y - box.top) / box.height) * 100}%`);
+}
+
+const coverOf = (pick: HTMLElement) => pick.firstElementChild as HTMLElement;
+const inkOf = (pick: HTMLElement) => coverOf(pick).firstElementChild as HTMLElement;
+
+/** Applies a change to the ink's circle at once, with no transition, so it
+ *  can then grow from where it was put instead of sliding there. */
+function snapInk(pick: HTMLElement, change: () => void) {
+  const ink = inkOf(pick);
   ink.style.transition = 'none';
-  place();
+  change();
   void getComputedStyle(ink).clipPath;
   ink.style.transition = '';
+}
+
+/** The pointer is inside: the ink fills the cover from where it is. */
+function fill(pick: HTMLElement, x: number, y: number) {
+  if (pick.classList.contains('is-inked')) return;
+  const grow = () => placeInk(coverOf(pick), x, y);
+  // Out of a bulge, the circle is already there to grow from.
+  if (pick.classList.contains('is-near')) grow();
+  else snapInk(pick, grow);
+  pick.classList.remove('is-near');
   pick.classList.add('is-inked');
+}
+
+/** The pointer is close but outside: a bead of ink bulges in from the
+ *  nearest point of the edge, larger the closer it comes, the way two
+ *  metaballs reach for each other before they meet. */
+function bulge(pick: HTMLElement, box: DOMRect, d: number, x: number, y: number) {
+  const cover = coverOf(pick);
+  const edgeX = Math.min(Math.max(x, box.left), box.right);
+  const edgeY = Math.min(Math.max(y, box.top), box.bottom);
+  // From nothing, the bead starts at the edge point and swells from there;
+  // after that it follows the pointer along the edge. Backing out through
+  // the edge, the fill drains to a bead where the pointer left.
+  if (!pick.classList.contains('is-near') && !pick.classList.contains('is-inked')) {
+    snapInk(pick, () => placeInk(cover, edgeX, edgeY));
+  }
+  placeInk(cover, edgeX, edgeY);
+  cover.style.setProperty('--er', `${(1 - d / NEAR) ** 2 * BULGE}px`);
+  pick.classList.remove('is-inked');
+  pick.classList.add('is-near');
+}
+
+/** The pointer has moved off: the ink drains toward where it went. */
+function clear(pick: HTMLElement, x: number, y: number) {
+  if (pick.classList.contains('is-inked')) {
+    // Shrinking while it moves is what drains it toward where it left. Ink
+    // that has barely spread, from a pointer only passing over, shrinks
+    // where it is: dragged across the cover it would show as a stray dot.
+    const grown = parseFloat(/circle\(([\d.]+)%/.exec(getComputedStyle(inkOf(pick)).clipPath)?.[1] ?? '0');
+    if (grown > 20) placeInk(coverOf(pick), x, y);
+  }
+  pick.classList.remove('is-inked', 'is-near');
+}
+
+/**
+ * Inks the covers like metaballs: within NEAR px of a cover, a bead of ink
+ * bulges in from its edge toward the pointer, and only once the pointer is
+ * inside does the cover fill. One cover at a time, the nearest, so crossing
+ * the gap between two hands the bead from one to the next. Only a mouse
+ * inks: on touch the blurb sits under the cover instead.
+ */
+function useNearInk(ref: React.RefObject<HTMLDivElement>) {
+  useEffect(() => {
+    const grid = ref.current;
+    if (!grid) return;
+    let current: HTMLElement | null = null;
+    let at: { x: number; y: number } | null = null;
+    let frame = 0;
+
+    const nearest = (x: number, y: number) => {
+      let best: { pick: HTMLElement; box: DOMRect; d: number } | null = null;
+      for (const pick of grid.children) {
+        if (!(pick instanceof HTMLButtonElement) || pick.disabled) continue;
+        const box = coverOf(pick).getBoundingClientRect();
+        const d = Math.hypot(Math.max(box.left - x, 0, x - box.right), Math.max(box.top - y, 0, y - box.bottom));
+        if (d <= NEAR && (!best || d < best.d)) best = { pick, box, d };
+      }
+      return best;
+    };
+    const update = () => {
+      frame = 0;
+      if (!at) return;
+      const hit = nearest(at.x, at.y);
+      if (current && current !== hit?.pick) clear(current, at.x, at.y);
+      if (hit) {
+        if (hit.d === 0) fill(hit.pick, at.x, at.y);
+        else bulge(hit.pick, hit.box, hit.d, at.x, at.y);
+      }
+      current = hit?.pick ?? null;
+    };
+    const soon = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    const move = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse') return;
+      at = { x: e.clientX, y: e.clientY };
+      soon();
+    };
+    // Off the window altogether, nothing is near.
+    const out = (e: PointerEvent) => {
+      if (e.relatedTarget || !at) return;
+      if (current) clear(current, at.x, at.y);
+      current = null;
+      at = null;
+    };
+
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerout', out);
+    // Scrolling moves the covers under a still pointer.
+    window.addEventListener('scroll', soon, { capture: true, passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerout', out);
+      window.removeEventListener('scroll', soon, { capture: true });
+    };
+  }, [ref]);
 }
 
 /** Past this many characters a blurb won't fit an open cover at the usual
@@ -101,6 +201,7 @@ export function GameCovers({
   className?: string;
 }) {
   const ref = useGridReport(surface);
+  useNearInk(ref);
   const pick = (kind: GameKind, index: number) => {
     if (isPostHogEnabled && ref.current) {
       const columns = columnsOf(ref.current);
@@ -129,8 +230,6 @@ export function GameCovers({
             disabled={!!why}
             title={why ?? undefined}
             onClick={() => pick(k, i)}
-            onPointerEnter={inkFrom}
-            onPointerLeave={inkFrom}
             style={{ '--game': color } as CSSProperties}
           >
             <span className="pick__cover">

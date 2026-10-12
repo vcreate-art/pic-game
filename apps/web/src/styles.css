@@ -1395,12 +1395,13 @@ button, input { font: inherit; color: inherit; }
 .picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 18px; padding-top: .25em; }
 
 /* Each game is a box cover: paper edged in the game's colour, its name as
-   the art and its icon, in that colour, bleeding off the corner. Pointing
-   at it (or focusing it) slides the blurb up under the name like a drawer,
-   shrinking the name to make room, while a darker shade of the colour
-   spreads from where the pointer came in and the text turns white over it;
-   --ex/--ey come from inkFrom() in the landing route. Focus spreads it from
-   the centre. */
+   the art and its icon, in that colour, bleeding off the corner. As the
+   pointer nears it a bead of a darker shade of the colour bulges in from the
+   edge toward it; once the pointer is inside (or the cover is focused) the
+   shade fills the cover from there, the text turns white over it and the
+   blurb slides up under the name like a drawer, shrinking the name to make
+   room. --ex/--ey/--er come from useNearInk() in GameCovers. Focus spreads
+   it from the centre. */
 .pick {
   display: flex; flex-direction: column; gap: 10px; padding: 0;
   border: 0; background: none; text-align: left; cursor: pointer;
@@ -1435,7 +1436,7 @@ button, input { font: inherit; color: inherit; }
 }
 .switchgrid .pick__stage { top: 7px; left: 7px; padding: 1px 6px; font-size: 9.5px; }
 /* No blurb opens in the lobby's grid, so there it stays put. */
-.switchgrid .pick:hover .pick__stage, .switchgrid .pick:focus-visible .pick__stage { opacity: 1; }
+.switchgrid .pick.is-inked .pick__stage, .switchgrid .pick:focus-visible .pick__stage { opacity: 1; }
 .pick__art {
   position: absolute; top: -4px; right: -18px; width: 72px; height: 72px;
   color: var(--game, var(--ink)); opacity: .6;
@@ -1488,10 +1489,17 @@ button, input { font: inherit; color: inherit; }
 .pick.is-long .pick__more > span { font-size: 12px; line-height: 1.3; }
 /* 150% of the circle's reference length reaches the far corner from any
    point on the edge. */
-/* is-inked comes from inkFrom() once the circle sits, still empty, where the
-   pointer came in, so it grows from there instead of sliding in. */
+/* is-inked comes from fill() in GameCovers once the pointer is inside, with
+   the circle already sitting where it is, so it grows from there. */
 .pick.is-inked .pick__ink,
 .pick:focus-visible .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
+/* Near but outside: a bead of ink, --er across, bulging in from the edge
+   point nearest the pointer (bulge() in GameCovers). Quicker than the fill,
+   so it keeps up as it follows the pointer, with a little give. */
+.pick.is-near .pick__ink {
+  clip-path: circle(var(--er, 0px) at var(--ex, 50%) var(--ey, 50%));
+  transition: clip-path .25s ease-out;
+}
 .pick:focus-visible .pick__cover { color: #fff; }
 .pick:focus-visible .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
 /* The blurb slides up into the corner it sits in, so it steps aside with the
@@ -1501,14 +1509,15 @@ button, input { font: inherit; color: inherit; }
 .pick:focus-visible .pick__more { grid-template-rows: 1fr; }
 .pick:focus-visible .pick__more > span { opacity: 1; transform: none; }
 /* Only with a real pointer: on touch, :hover sticks to the last tapped card.
-   There the blurb stays under the cover. */
+   There the blurb stays under the cover. A cover opens with its ink, once
+   the pointer is inside it (useNearInk), the same moment as :hover. */
 @media (hover: hover) {
-  .pick:hover .pick__cover { color: #fff; }
-  .pick:hover .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
-  .pick:hover .pick__stage { opacity: 0; }
-  .pick:hover .pick__name { font-size: 17px; margin-bottom: 5px; }
-  .pick:hover .pick__more { grid-template-rows: 1fr; }
-  .pick:hover .pick__more > span { opacity: 1; transform: none; }
+  .pick.is-inked .pick__cover { color: #fff; }
+  .pick.is-inked .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
+  .pick.is-inked .pick__stage { opacity: 0; }
+  .pick.is-inked .pick__name { font-size: 17px; margin-bottom: 5px; }
+  .pick.is-inked .pick__more { grid-template-rows: 1fr; }
+  .pick.is-inked .pick__more > span { opacity: 1; transform: none; }
   .pick__blurb { display: none; }
   .picker { row-gap: 18px; }
 }
@@ -3352,10 +3361,10 @@ button, input { font: inherit; color: inherit; }
 .switchgrid .picker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 2px; }
 .switchgrid .pick__cover { padding: 10px 11px; border-radius: 10px; }
 .switchgrid .pick__art { top: -3px; right: -12px; width: 46px; height: 46px; }
-.switchgrid .pick__name, .switchgrid .pick:hover .pick__name, .switchgrid .pick:focus-visible .pick__name {
+.switchgrid .pick__name, .switchgrid .pick.is-inked .pick__name, .switchgrid .pick:focus-visible .pick__name {
   font-size: 15px; margin-bottom: 0;
 }
-.switchgrid .pick__cat, .switchgrid .pick:hover .pick__cat, .switchgrid .pick:focus-visible .pick__cat {
+.switchgrid .pick__cat, .switchgrid .pick.is-inked .pick__cat, .switchgrid .pick:focus-visible .pick__cat {
   max-height: 18px; margin-top: 2px; opacity: 1; font-size: 11.5px;
 }
 .switchgrid .pick__more, .switchgrid .pick__blurb { display: none; }
