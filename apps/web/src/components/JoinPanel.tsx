@@ -1,8 +1,8 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { AVATAR_COLORS, AVATAR_FACE_COUNT, type Avatar } from '@pic-game/shared';
 import { MAX_NAME_LEN } from '../constants.js';
 import { PROFILE_EVENT, loadProfile, saveProfile, type Profile } from '../net/socket.js';
-import { AvatarPicker } from './AvatarPicker.js';
+import { AvatarPicker, avatarAccent } from './AvatarPicker.js';
 import { noAutofill } from '../lib/noAutofill.js';
 
 /** Set while a form saves the avatar it was just given, so no form takes
@@ -90,13 +90,8 @@ export function JoinPanel({
 
   return (
     // The avatar's colour themes the form: its arrows, its fields' edges and
-    // the button's ink. Darkened a third, so white text and thin icons on it
-    // still read, yellow and orange included.
-    <form
-      className="join"
-      onSubmit={submit}
-      style={{ '--accent': `color-mix(in srgb, ${AVATAR_COLORS[color % AVATAR_COLORS.length]} 68%, #000)` } as CSSProperties}
-    >
+    // the button.
+    <form className="join" onSubmit={submit} style={avatarAccent(color)}>
       <AvatarPicker value={{ color, face }} onChange={setAvatar} size={76} />
 
       <label className="field">

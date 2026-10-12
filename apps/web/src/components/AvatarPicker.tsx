@@ -16,6 +16,13 @@ const COLOR_NAMES: Record<(typeof AVATAR_COLORS)[number], string> = {
   '#ec4899': 'Pink',
 };
 
+/** The theme an avatar's colour gives a form around it (the join card, the
+ *  profile editor): its colour darkened a third, so white text and thin
+ *  icons on it still read, yellow and orange included. */
+export function avatarAccent(color: number): CSSProperties {
+  return { '--accent': `color-mix(in srgb, ${AVATAR_COLORS[color % AVATAR_COLORS.length]} 68%, #000)` } as CSSProperties;
+}
+
 /**
  * The order the arrows walk the faces in: all of them, shuffled, so each
  * step changes more than the eyes (face numbers count through the eyes
