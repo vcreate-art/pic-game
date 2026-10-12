@@ -9,6 +9,9 @@ import { GAME_ICONS } from './gameIcons.js';
 const NEAR = 32;
 /** How far the ink bulges in at the edge, in px, with the pointer touching it. */
 const BULGE = 20;
+/** How far into a cover, as a share of its width or height from the edge the
+ *  pointer came in by, before the cover fills. */
+const FILL_AT = 1 / 3;
 
 /** Puts the ink's centre at a point on screen, as a share of the cover. */
 function placeInk(cover: HTMLElement, x: number, y: number) {
@@ -30,34 +33,50 @@ function snapInk(pick: HTMLElement, change: () => void) {
   ink.style.transition = '';
 }
 
-/** The pointer is inside: the ink fills the cover from where it is. */
+/** The pointer is a third of the way in: the ink fills the cover. */
 function fill(pick: HTMLElement, x: number, y: number) {
   if (pick.classList.contains('is-inked')) return;
-  const grow = () => placeInk(coverOf(pick), x, y);
-  // Out of a bulge, the circle is already there to grow from.
-  if (pick.classList.contains('is-near')) grow();
-  else snapInk(pick, grow);
+  // Out of a bead, the fill grows from the bead where it is. Arriving
+  // straight inside (a quick move, or a scroll), it grows from the pointer.
+  if (!pick.classList.contains('is-near')) snapInk(pick, () => placeInk(coverOf(pick), x, y));
   pick.classList.remove('is-near');
   pick.classList.add('is-inked');
 }
 
-/** The pointer is close but outside: a bead of ink bulges in from the
- *  nearest point of the edge, larger the closer it comes, the way two
- *  metaballs reach for each other before they meet. */
-function bulge(pick: HTMLElement, box: DOMRect, d: number, x: number, y: number) {
+/** A bead of ink bulging in from a point on the cover's edge, `reach` px
+ *  across, the way two metaballs reach for each other before they meet. */
+function bead(pick: HTMLElement, edgeX: number, edgeY: number, reach: number) {
   const cover = coverOf(pick);
-  const edgeX = Math.min(Math.max(x, box.left), box.right);
-  const edgeY = Math.min(Math.max(y, box.top), box.bottom);
   // From nothing, the bead starts at the edge point and swells from there;
-  // after that it follows the pointer along the edge. Backing out through
-  // the edge, the fill drains to a bead where the pointer left.
+  // after that it follows the pointer. Backing out through the edge, the
+  // fill drains to a bead where the pointer left.
   if (!pick.classList.contains('is-near') && !pick.classList.contains('is-inked')) {
     snapInk(pick, () => placeInk(cover, edgeX, edgeY));
   }
   placeInk(cover, edgeX, edgeY);
-  cover.style.setProperty('--er', `${(1 - d / NEAR) ** 2 * BULGE}px`);
+  cover.style.setProperty('--er', `${reach}px`);
   pick.classList.remove('is-inked');
   pick.classList.add('is-near');
+}
+
+/**
+ * Where the pointer is against a cover: outside it, how far; inside it, the
+ * edge it is nearest (measured as a share of the cover, so a wide cover's
+ * sides don't win over its top and bottom) and how far in it is from there.
+ */
+function against(box: DOMRect, x: number, y: number) {
+  const out = Math.hypot(Math.max(box.left - x, 0, x - box.right), Math.max(box.top - y, 0, y - box.bottom));
+  if (out > 0) {
+    return { out, edgeX: Math.min(Math.max(x, box.left), box.right), edgeY: Math.min(Math.max(y, box.top), box.bottom), depth: 0, share: 0 };
+  }
+  const sides = [
+    { depth: x - box.left, share: (x - box.left) / box.width, edgeX: box.left, edgeY: y },
+    { depth: box.right - x, share: (box.right - x) / box.width, edgeX: box.right, edgeY: y },
+    { depth: y - box.top, share: (y - box.top) / box.height, edgeX: x, edgeY: box.top },
+    { depth: box.bottom - y, share: (box.bottom - y) / box.height, edgeX: x, edgeY: box.bottom },
+  ];
+  const side = sides.reduce((a, b) => (b.share < a.share ? b : a));
+  return { out: 0, ...side };
 }
 
 /** The pointer has moved off: the ink drains toward where it went. */
@@ -74,10 +93,11 @@ function clear(pick: HTMLElement, x: number, y: number) {
 
 /**
  * Inks the covers like metaballs: within NEAR px of a cover, a bead of ink
- * bulges in from its edge toward the pointer, and only once the pointer is
- * inside does the cover fill. One cover at a time, the nearest, so crossing
- * the gap between two hands the bead from one to the next. Only a mouse
- * inks: on touch the blurb sits under the cover instead.
+ * bulges in from its edge toward the pointer, and keeps reaching for it
+ * once it's inside. A third of the way in, the cover fills; back out past
+ * that, it drains to a bead again. One cover at a time, the nearest, so
+ * crossing the gap between two hands the bead from one to the next. Only a
+ * mouse inks: on touch the blurb sits under the cover instead.
  */
 function useNearInk(ref: React.RefObject<HTMLDivElement>) {
   useEffect(() => {
@@ -88,12 +108,11 @@ function useNearInk(ref: React.RefObject<HTMLDivElement>) {
     let frame = 0;
 
     const nearest = (x: number, y: number) => {
-      let best: { pick: HTMLElement; box: DOMRect; d: number } | null = null;
+      let best: { pick: HTMLElement; at: ReturnType<typeof against> } | null = null;
       for (const pick of grid.children) {
         if (!(pick instanceof HTMLButtonElement) || pick.disabled) continue;
-        const box = coverOf(pick).getBoundingClientRect();
-        const d = Math.hypot(Math.max(box.left - x, 0, x - box.right), Math.max(box.top - y, 0, y - box.bottom));
-        if (d <= NEAR && (!best || d < best.d)) best = { pick, box, d };
+        const at = against(coverOf(pick).getBoundingClientRect(), x, y);
+        if (at.out <= NEAR && (!best || at.out < best.at.out)) best = { pick, at };
       }
       return best;
     };
@@ -103,8 +122,17 @@ function useNearInk(ref: React.RefObject<HTMLDivElement>) {
       const hit = nearest(at.x, at.y);
       if (current && current !== hit?.pick) clear(current, at.x, at.y);
       if (hit) {
-        if (hit.d === 0) fill(hit.pick, at.x, at.y);
-        else bulge(hit.pick, hit.box, hit.d, at.x, at.y);
+        const { pick, at: where } = hit;
+        if (where.out > 0) {
+          // Outside: the bead grows as the pointer closes in.
+          bead(pick, where.edgeX, where.edgeY, (1 - where.out / NEAR) ** 2 * BULGE);
+        } else if (where.share >= FILL_AT) {
+          fill(pick, at.x, at.y);
+        } else {
+          // Inside but short of a third: the bead reaches on past the
+          // pointer. Back out from the middle, the fill drains to it again.
+          bead(pick, where.edgeX, where.edgeY, BULGE + where.depth);
+        }
       }
       current = hit?.pick ?? null;
     };
@@ -233,8 +261,12 @@ export function GameCovers({
             style={{ '--game': color } as CSSProperties}
           >
             <span className="pick__cover">
-              <span className="pick__ink" aria-hidden="true" />
+              {/* The icon twice: in the game's colour under the ink, and in
+                  white inside it, so the ink's own shape cuts between them. */}
               <Icon className="pick__art" strokeWidth={1.75} aria-hidden="true" />
+              <span className="pick__ink" aria-hidden="true">
+                <Icon className="pick__art pick__art--inked" strokeWidth={1.75} />
+              </span>
               {stage && <span className="pick__stage">{stage}</span>}
               <span className="pick__text">
                 <strong className="pick__name">{GAME_LABELS[k].name}</strong>
