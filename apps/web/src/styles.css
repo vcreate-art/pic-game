@@ -406,6 +406,31 @@ button, input { font: inherit; color: inherit; }
   color: #fff; font-weight: 700; font-family: var(--display);
   letter-spacing: -.04em; user-select: none;
 }
+/* Trying LoginCritter's idea: the face turns toward where the avatar looks
+   (--lx/--ly from avatarGaze.ts), the eyes a touch further than the mouth,
+   and a glad avatar hops with its eyes squeezed shut. */
+.avatar { overflow: hidden; }
+.avatar__face {
+  display: inline-flex;
+  transform: translate(calc(var(--lx, 0) * .32em), calc(var(--ly, 0) * .24em));
+  transition: transform .18s ease-out;
+}
+.avatar__eye {
+  display: inline-block;
+  transform: translate(calc(var(--lx, 0) * .1em), calc(var(--ly, 0) * .08em));
+  transition: transform .18s ease-out;
+}
+.avatar[data-mood='glad'] { animation: avatar-hop .5s ease-out; }
+.avatar[data-mood='glad'] .avatar__eye { transform: scaleY(.35); }
+@keyframes avatar-hop {
+  0%, 100% { transform: translateY(0); }
+  35% { transform: translateY(-14%); }
+  60% { transform: translateY(2%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .avatar__face, .avatar__eye { transition: none; }
+  .avatar[data-mood='glad'] { animation: none; }
+}
 /* Host badge, tucked on the top-left corner. The ring separates it from the
    avatar colour underneath, whatever that colour happens to be. */
 .avatar__host {
