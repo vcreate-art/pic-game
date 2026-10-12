@@ -1395,13 +1395,13 @@ button, input { font: inherit; color: inherit; }
 .picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 18px; padding-top: .25em; }
 
 /* Each game is a box cover: paper edged in the game's colour, its name as
-   the art and its icon, in that colour, bleeding off the corner. As the
-   pointer nears it a bead of a darker shade of the colour bulges in from the
-   edge toward it, and keeps reaching for it inside; a third of the way in
-   (or with the cover focused) the shade fills the cover from there, the text turns white over it and the
-   blurb slides up under the name like a drawer, shrinking the name to make
-   room. --ex/--ey/--er come from useNearInk() in GameCovers. Focus spreads
-   it from the centre. */
+   the art and its icon, in that colour, bleeding off the corner. A blob of a
+   darker shade of the colour follows the pointer and shows on whichever
+   covers it overlaps; on the cover the pointer settles in (or the one in
+   focus) the shade fills the cover from the blob,
+   the text turns white over it and the blurb slides up under the name like
+   a drawer, shrinking the name to make room. --ex/--ey/--er come from
+   useNearInk() in GameCovers. Focus spreads it from the centre. */
 .pick {
   display: flex; flex-direction: column; gap: 10px; padding: 0;
   border: 0; background: none; text-align: left; cursor: pointer;
@@ -1487,17 +1487,20 @@ button, input { font: inherit; color: inherit; }
 .pick.is-long .pick__more > span { font-size: 12px; line-height: 1.3; }
 /* 150% of the circle's reference length reaches the far corner from any
    point on the edge. */
-/* is-inked comes from fill() in GameCovers a third of the way in, with the
-   bead already sitting at the edge, so it grows from there. */
+/* is-inked comes from useNearInk() in GameCovers once the pointer settles in
+   the cover, with the circle already sitting at the blob, so it grows from
+   there. */
 .pick.is-inked .pick__ink,
 .pick:focus-visible .pick__ink { clip-path: circle(150% at var(--ex, 50%) var(--ey, 50%)); }
-/* Near, or not yet a third of the way in: a bead of ink, --er across,
-   bulging in from the edge point nearest the pointer (bead() in GameCovers). Quicker than the fill,
-   so it keeps up as it follows the pointer, with a little give. */
+/* The part of the pointer's blob over this cover: a circle --er in radius,
+   centred where the blob is, even off the cover (useNearInk in GameCovers).
+   The script eases the blob along itself, so no transition, except while a
+   filled cover drains back into it. */
 .pick.is-near .pick__ink {
   clip-path: circle(var(--er, 0px) at var(--ex, 50%) var(--ey, 50%));
-  transition: clip-path .25s ease-out;
+  transition: none;
 }
+.pick.is-near.is-draining .pick__ink { transition: clip-path .45s ease-out; }
 .pick:focus-visible .pick__cover { color: #fff; }
 .pick:focus-visible .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }
 /* The blurb slides up into the corner it sits in, so it steps aside with the
@@ -1507,8 +1510,8 @@ button, input { font: inherit; color: inherit; }
 .pick:focus-visible .pick__more { grid-template-rows: 1fr; }
 .pick:focus-visible .pick__more > span { opacity: 1; transform: none; }
 /* Only with a real pointer: on touch, :hover sticks to the last tapped card.
-   There the blurb stays under the cover. A cover opens with its ink, a
-   third of the way in (useNearInk), not on :hover. */
+   There the blurb stays under the cover. A cover opens with its ink, once
+   the pointer settles in it (useNearInk), not on :hover. */
 @media (hover: hover) {
   .pick.is-inked .pick__cover { color: #fff; }
   .pick.is-inked .pick__cat { opacity: 0; max-height: 0; margin-top: 0; }

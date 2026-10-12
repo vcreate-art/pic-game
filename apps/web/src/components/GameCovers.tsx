@@ -4,14 +4,22 @@ import posthog, { isPostHogEnabled } from '../lib/posthog.js';
 import { CategoryLabel } from './CategoryLabel.js';
 import { GAME_ICONS } from './gameIcons.js';
 
-/** How close the pointer comes to a cover's edge, in px, before the ink
- *  starts to reach for it. */
-const NEAR = 32;
-/** How far the ink bulges in at the edge, in px, with the pointer touching it. */
-const BULGE = 20;
-/** How far into a cover, as a share of its width or height from the edge the
- *  pointer came in by, before the cover fills. */
-const FILL_AT = 1 / 3;
+/** How far out from a cover the blob starts to show, as a share of the
+ *  cover's width (approaching a side) or height (the top or bottom). */
+const REACH = 1 / 3;
+/** The blob's full size, across, as a share of the nearest cover's shorter
+ *  side. It grows to that as the pointer closes in on a cover. */
+const BLOB = 0.6;
+/** How much of the way to the pointer the blob moves each frame. Under 1,
+ *  so it trails the pointer and seems to fly after it. */
+const FOLLOW = 0.3;
+/** Faster than this, in px per ms, the pointer is passing over a cover, not
+ *  landing on it: the blob flies on through instead of the cover filling. */
+const FAST = 1;
+/** How long the pointer is still before the cover under it fills. */
+const SETTLE_MS = 80;
+/** How long a cover takes to drain back into the blob as the pointer leaves. */
+const DRAIN_MS = 450;
 
 /** Puts the ink's centre at a point on screen, as a share of the cover. */
 function placeInk(cover: HTMLElement, x: number, y: number) {
@@ -23,8 +31,7 @@ function placeInk(cover: HTMLElement, x: number, y: number) {
 const coverOf = (pick: HTMLElement) => pick.firstElementChild as HTMLElement;
 const inkOf = (pick: HTMLElement) => coverOf(pick).firstElementChild as HTMLElement;
 
-/** Applies a change to the ink's circle at once, with no transition, so it
- *  can then grow from where it was put instead of sliding there. */
+/** Applies a change to the ink's circle at once, with no transition. */
 function snapInk(pick: HTMLElement, change: () => void) {
   const ink = inkOf(pick);
   ink.style.transition = 'none';
@@ -33,123 +40,149 @@ function snapInk(pick: HTMLElement, change: () => void) {
   ink.style.transition = '';
 }
 
-/** The pointer is a third of the way in: the ink fills the cover. */
-function fill(pick: HTMLElement, x: number, y: number) {
-  if (pick.classList.contains('is-inked')) return;
-  // Out of a bead, the fill grows from the bead where it is. Arriving
-  // straight inside (a quick move, or a scroll), it grows from the pointer.
-  if (!pick.classList.contains('is-near')) snapInk(pick, () => placeInk(coverOf(pick), x, y));
-  pick.classList.remove('is-near');
-  pick.classList.add('is-inked');
-}
-
-/** A bead of ink bulging in from a point on the cover's edge, `reach` px
- *  across, the way two metaballs reach for each other before they meet. */
-function bead(pick: HTMLElement, edgeX: number, edgeY: number, reach: number) {
-  const cover = coverOf(pick);
-  // From nothing, the bead starts at the edge point and swells from there;
-  // after that it follows the pointer. Backing out through the edge, the
-  // fill drains to a bead where the pointer left.
-  if (!pick.classList.contains('is-near') && !pick.classList.contains('is-inked')) {
-    snapInk(pick, () => placeInk(cover, edgeX, edgeY));
-  }
-  placeInk(cover, edgeX, edgeY);
-  cover.style.setProperty('--er', `${reach}px`);
-  pick.classList.remove('is-inked');
-  pick.classList.add('is-near');
+/** How far a point is outside a box, in px; 0 on or inside it. */
+function gapTo(box: DOMRect, x: number, y: number) {
+  return Math.hypot(Math.max(box.left - x, 0, x - box.right), Math.max(box.top - y, 0, y - box.bottom));
 }
 
 /**
- * Where the pointer is against a cover: outside it, how far; inside it, the
- * edge it is nearest (measured as a share of the cover, so a wide cover's
- * sides don't win over its top and bottom) and how far in it is from there.
- */
-function against(box: DOMRect, x: number, y: number) {
-  const out = Math.hypot(Math.max(box.left - x, 0, x - box.right), Math.max(box.top - y, 0, y - box.bottom));
-  if (out > 0) {
-    return { out, edgeX: Math.min(Math.max(x, box.left), box.right), edgeY: Math.min(Math.max(y, box.top), box.bottom), depth: 0, share: 0 };
-  }
-  const sides = [
-    { depth: x - box.left, share: (x - box.left) / box.width, edgeX: box.left, edgeY: y },
-    { depth: box.right - x, share: (box.right - x) / box.width, edgeX: box.right, edgeY: y },
-    { depth: y - box.top, share: (y - box.top) / box.height, edgeX: x, edgeY: box.top },
-    { depth: box.bottom - y, share: (box.bottom - y) / box.height, edgeX: x, edgeY: box.bottom },
-  ];
-  const side = sides.reduce((a, b) => (b.share < a.share ? b : a));
-  return { out: 0, ...side };
-}
-
-/** The pointer has moved off: the ink drains toward where it went. */
-function clear(pick: HTMLElement, x: number, y: number) {
-  if (pick.classList.contains('is-inked')) {
-    // Shrinking while it moves is what drains it toward where it left. Ink
-    // that has barely spread, from a pointer only passing over, shrinks
-    // where it is: dragged across the cover it would show as a stray dot.
-    const grown = parseFloat(/circle\(([\d.]+)%/.exec(getComputedStyle(inkOf(pick)).clipPath)?.[1] ?? '0');
-    if (grown > 20) placeInk(coverOf(pick), x, y);
-  }
-  pick.classList.remove('is-inked', 'is-near');
-}
-
-/**
- * Inks the covers like metaballs: within NEAR px of a cover, a bead of ink
- * bulges in from its edge toward the pointer, and keeps reaching for it
- * once it's inside. A third of the way in, the cover fills; back out past
- * that, it drains to a bead again. One cover at a time, the nearest, so
- * crossing the gap between two hands the bead from one to the next. Only a
+ * Inks the covers with one blob of ink that follows the pointer, trailing a
+ * little, and shows on whichever covers it overlaps: across the gap between
+ * two, part of it on each, cut by their edges, the way metaballs meet. It
+ * swells as the pointer closes in on a cover, from a third of the cover's
+ * size out. The cover the pointer comes to rest in (or crosses slowly)
+ * fills from the blob; swept across quickly, the blob flies on through
+ * instead, and leaving a filled cover drains it back into the blob. Only a
  * mouse inks: on touch the blurb sits under the cover instead.
  */
 function useNearInk(ref: React.RefObject<HTMLDivElement>) {
   useEffect(() => {
     const grid = ref.current;
     if (!grid) return;
-    let current: HTMLElement | null = null;
-    let at: { x: number; y: number } | null = null;
+    // Where the pointer is, and whether it's still on the page.
+    let to: { x: number; y: number } | null = null;
+    let away = true;
+    // The blob, in screen px: it eases toward the pointer each frame.
+    const blob = { x: 0, y: 0, r: 0 };
+    // The pointer's speed, smoothed over the last few moves, and when it last
+    // moved: still for a moment, it counts as stopped whatever it was.
+    let speed = 0;
+    let movedAt = 0;
     let frame = 0;
+    let settle = 0;
+    const drains = new Set<number>();
 
-    const nearest = (x: number, y: number) => {
-      let best: { pick: HTMLElement; at: ReturnType<typeof against> } | null = null;
-      for (const pick of grid.children) {
-        if (!(pick instanceof HTMLButtonElement) || pick.disabled) continue;
-        const at = against(coverOf(pick).getBoundingClientRect(), x, y);
-        if (at.out <= NEAR && (!best || at.out < best.at.out)) best = { pick, at };
-      }
-      return best;
+    const picks = () => [...grid.children].filter((c): c is HTMLButtonElement => c instanceof HTMLButtonElement);
+
+    const fill = (pick: HTMLElement, x: number, y: number) => {
+      // Out of the blob, the fill grows from the blob where it is.
+      if (!pick.classList.contains('is-near')) snapInk(pick, () => placeInk(coverOf(pick), x, y));
+      pick.classList.remove('is-near', 'is-draining');
+      pick.classList.add('is-inked');
     };
-    const update = () => {
-      frame = 0;
-      if (!at) return;
-      const hit = nearest(at.x, at.y);
-      if (current && current !== hit?.pick) clear(current, at.x, at.y);
-      if (hit) {
-        const { pick, at: where } = hit;
-        if (where.out > 0) {
-          // Outside: the bead grows as the pointer closes in.
-          bead(pick, where.edgeX, where.edgeY, (1 - where.out / NEAR) ** 2 * BULGE);
-        } else if (where.share >= FILL_AT) {
-          fill(pick, at.x, at.y);
-        } else {
-          // Inside but short of a third: the bead reaches on past the
-          // pointer. Back out from the middle, the fill drains to it again.
-          bead(pick, where.edgeX, where.edgeY, BULGE + where.depth);
-        }
+    const drain = (pick: HTMLElement) => {
+      pick.classList.remove('is-inked');
+      pick.classList.add('is-near', 'is-draining');
+      const t = window.setTimeout(() => {
+        pick.classList.remove('is-draining');
+        drains.delete(t);
+      }, DRAIN_MS);
+      drains.add(t);
+    };
+    /** Shows the part of the blob that overlaps a cover, or none of it. */
+    const draw = (pick: HTMLElement, box: DOMRect) => {
+      const cover = coverOf(pick);
+      // Draining, the fill shrinks toward the blob wherever it has gone.
+      if ((blob.r > 0.5 && gapTo(box, blob.x, blob.y) < blob.r) || pick.classList.contains('is-draining')) {
+        placeInk(cover, blob.x, blob.y);
+        cover.style.setProperty('--er', `${blob.r}px`);
+        pick.classList.add('is-near');
+      } else if (pick.classList.contains('is-near') && !pick.classList.contains('is-draining')) {
+        // Nothing of it on this cover: put the circle away unseen.
+        snapInk(pick, () => pick.classList.remove('is-near'));
       }
-      current = hit?.pick ?? null;
+    };
+
+    const tick = () => {
+      frame = 0;
+      if (!to) return;
+      const now = performance.now();
+      const all = picks();
+      const boxes = all.map((p) => coverOf(p).getBoundingClientRect());
+
+      // The blob's size: full on a cover, smaller further out, gone past a
+      // third of the nearest cover's size.
+      let goal = 0;
+      if (!away) {
+        all.forEach((pick, i) => {
+          if (pick.disabled) return;
+          const box = boxes[i]!;
+          const dx = Math.max(box.left - to!.x, 0, to!.x - box.right) / (box.width * REACH);
+          const dy = Math.max(box.top - to!.y, 0, to!.y - box.bottom) / (box.height * REACH);
+          const near = Math.max(0, 1 - Math.hypot(dx, dy));
+          goal = Math.max(goal, near * Math.min(box.width, box.height) * BLOB * 0.5);
+        });
+      }
+      // Grown from nothing, it starts where the pointer is, not where it
+      // last faded out.
+      if (blob.r < 0.5) {
+        blob.x = to.x;
+        blob.y = to.y;
+      }
+      blob.x += (to.x - blob.x) * FOLLOW;
+      blob.y += (to.y - blob.y) * FOLLOW;
+      blob.r += (goal - blob.r) * FOLLOW;
+
+      const passing = speed > FAST && now - movedAt < SETTLE_MS;
+      let flying = false;
+      all.forEach((pick, i) => {
+        const box = boxes[i]!;
+        const inside = !away && gapTo(box, to!.x, to!.y) === 0;
+        if (pick.disabled) {
+          if (pick.classList.contains('is-near') || pick.classList.contains('is-inked')) {
+            snapInk(pick, () => pick.classList.remove('is-near', 'is-inked', 'is-draining'));
+          }
+          return;
+        }
+        if (pick.classList.contains('is-inked')) {
+          if (inside) return;
+          drain(pick);
+        } else if (inside && !passing) {
+          fill(pick, blob.x, blob.y);
+          return;
+        }
+        if (inside) flying = true;
+        draw(pick, box);
+      });
+
+      // Keep easing until the blob has caught up with the pointer; and a
+      // blob flying over a cover lands once the pointer stops, which no move
+      // will come to say, so look again then.
+      const moving = Math.abs(to.x - blob.x) + Math.abs(to.y - blob.y) + Math.abs(goal - blob.r) > 0.5;
+      if (moving) soon();
+      clearTimeout(settle);
+      if (flying) settle = window.setTimeout(soon, SETTLE_MS);
+      if (away && !moving) to = null;
     };
     const soon = () => {
-      if (!frame) frame = requestAnimationFrame(update);
+      if (!frame) frame = requestAnimationFrame(tick);
     };
     const move = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse') return;
-      at = { x: e.clientX, y: e.clientY };
+      const dt = e.timeStamp - movedAt;
+      speed = to && !away && dt > 0 && dt < SETTLE_MS
+        ? 0.6 * (Math.hypot(e.clientX - to.x, e.clientY - to.y) / dt) + 0.4 * speed
+        : 0;
+      movedAt = e.timeStamp;
+      to = { x: e.clientX, y: e.clientY };
+      away = false;
       soon();
     };
-    // Off the window altogether, nothing is near.
+    // Off the window altogether: the blob shrinks away where it is.
     const out = (e: PointerEvent) => {
-      if (e.relatedTarget || !at) return;
-      if (current) clear(current, at.x, at.y);
-      current = null;
-      at = null;
+      if (e.relatedTarget || !to) return;
+      away = true;
+      soon();
     };
 
     document.addEventListener('pointermove', move);
@@ -158,6 +191,8 @@ function useNearInk(ref: React.RefObject<HTMLDivElement>) {
     window.addEventListener('scroll', soon, { capture: true, passive: true });
     return () => {
       cancelAnimationFrame(frame);
+      clearTimeout(settle);
+      drains.forEach((t) => clearTimeout(t));
       document.removeEventListener('pointermove', move);
       document.removeEventListener('pointerout', out);
       window.removeEventListener('scroll', soon, { capture: true });
